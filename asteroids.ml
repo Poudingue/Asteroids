@@ -1,5 +1,6 @@
 open Graphics;;
-(*#load "unix.cma";;
+(*
+#load "unix.cma";;
 #load "graphics.cma";;*)
 
 (*Certaines valeurs par défaut ne suivent pas les instructions du tp pour une meilleure expérience de jeu.*)
@@ -15,20 +16,26 @@ open Graphics;;
 
 (*Le game_speed_target est la vitesse à laquelle on veut que le jeu tourne en temps normal*)
 let game_speed_target = 1. ;;
-(*Le game_speed est la vitesse réelle à laquelle le jeu tourne à l'heure actuel.*)
+(*Le game_speed est la vitesse réelle à laquelle le jeu tourne à l'heure actuelle.*)
 (*Cela permet notamment de faire des effets de ralenti ou d'accéléré*)
-let game_speed = 0.5 ;;
+let game_speed = 0.5;;
 (*Le game_speed_change détermine à quelle «vitesse» le game speed se rapproche de game_speed_target (en ratio par seconde)*)
 let game_speed_change = 0.8;;
 (*Le temps propre de l'observateur. *)
-(*En l'occurrence, on récupère celui du ship.*)
+(*En l'occurrence, on récupère celui du vaisseau.*)
 (*Cela permet d'avoir une relativité Einsteinienne.*)
 let observer_proper_time = 1.0;;(*En ratio du temps «absolu» de l'univers*)
 
 (*Le framerate demandé dans l'énoncé est de 20*)
 (*Un framerate plus élevé offre une meilleure expérience de jeu :*)
 (*Des contrôles plus réactifs, un meilleur confort visuel, et une physique plus précise.*)
-let framerate_limit = 60. ;;
+(*Bien sûr, il est possible de le changer ci-dessous :)*)
+let framerate_limit = 60.;;
+
+(*On stocke le moment auquel la dernière frame a été calculée
+pour synchroniser correctement le moment de calcul de la frame suivante*)
+let time_last_frame = Unix.gettimeofday ();;
+let time_current_frame = Unix.gettimeofday ();;
 
 
 (*Dimensions fenêtre graphique.*)
@@ -181,14 +188,16 @@ type objet_physique = {
     mutable friction : float;(*En ratio de l'inertie par seconde.*)
 
     (*orientation en radians, moment en radians.s⁻¹*)
-    orientation : float;
-    moment : float;
+    mutable orientation : float;
+    mutable moment : float;
     (*Friction de la rotation, en ratio du moment*)
     friction_moment : float;
     proper_time : float;
 
     color : Graphics.color;
 };;
+
+(*Définition fonctions générales*)
 
 (*Pi*)
 let pi = 4. *. atan 1. ;;
@@ -215,6 +224,8 @@ else (r, 2. *. atan (y /. (x +. r)));;
 (*Car on évite la racine carrée, mais n'en reste pas moins utile pour les hitbox circulaires*)
 let distancecarre (x1, y1) (x2, y2) = carre (x2 -. x1) +. carre (y2 -. y1);;
 
+
+
 (* États, positions, déplacements, etc… *)
 
 type etat = {
@@ -228,12 +239,18 @@ type etat = {
 (*Fonction déplaçant un objet selon une vélocitée donnée.*)
 (*On tient compte du framerate et de la vitesse de jeu,*)
 (*mais également du temps propre de l'objet et de l'observateur*)
-let deplac_objet objet (x, y) = objet.position <- proj objet.position (x, y) ((game_speed /. framerate_limit) *. (objet.proper_time /. observer_proper_time));;
+let deplac_objet objet (x, y) = objet.position <- proj objet.position (x, y) ((time_current_frame -. time_last_frame) *. game_speed *. observer_proper_time /. objet.proper_time);;
 
 (*Fonction accélérant un objet selon une accélération donnée.*)
 (*On tient compte du framerate et de la vitesse de jeu,*)
 (*mais également du temps propre de l'objet et de l'observateur*)
-let accel_objet objet (x, y) = objet.velocity <- proj objet.velocity (x, y) ((game_speed /. framerate_limit) *. (objet.proper_time /. observer_proper_time));;
+let accel_objet objet (x, y) = objet.velocity <- proj objet.velocity (x, y) ((time_current_frame -. time_last_frame) *. game_speed *. observer_proper_time /. objet.proper_time);;
+
+(*Fonction de rotation d'objet, avec rotation en radian*s⁻¹*)
+let rotat_objet objet rotation = objet.orientation <- objet.orientation +. rotation *. ((time_current_frame -. time_last_frame) *. game_speed *. observer_proper_time /. objet.proper_time);;
+
+(*Fonction de rotation d'objet, avec rotation en radian*s⁻²*)
+let couple_objet objet momentum = objet.moment <- objet.moment +. momentum *. ((time_current_frame -. time_last_frame) *. game_speed *. observer_proper_time /. objet.proper_time);;
 
 (*Fonction de calcul de changement de position inertiel d'un objet physique.*)
 let inertie_objet objet = deplac_objet objet objet.velocity;;
@@ -241,8 +258,12 @@ let inertie_objet objet = deplac_objet objet objet.velocity;;
 (*On calcule le changement de position de tous les objets en jeu*)
 let inertie_objets objets =  List.iter inertie_objet objets;;
 
-(*On obtient le carré de la distance avec le théorème de pythagore*)
-(*a²+b²=c²*)
+(*On calcule l'inertie en rotation des objets*)
+let moment_objet objet = rotat_objet objet objet.moment;;
+
+(*D'un groupe d'objets*)
+let moment_objets objets = List.iter moment_objet objets;;
+
 (*La racine carrée est une opération assez lourde,*)
 (*Donc plutôt que de comparer la distance entre deux objets avec la somme de leur radius,*)
 (*On compare le carré de leur distance avec le carré de la somme de leurs radiuss.*)
@@ -333,7 +354,7 @@ let spawn_asteroid (x, y) (dx, dy) radius = {
     radius_death = 0.;
     position = (x, y);
     velocity = (dx, dy);
-    friction = 0.0;
+    friction = 0.;
     orientation = Random.float (2. *. pi);
     moment = Random.float (2. *. asteroid_max_moment) -. asteroid_max_moment ;
     friction_moment = 0.;
@@ -362,7 +383,14 @@ else
 accel_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_accel);;
 
 (* rotation vers la gauche et vers la droite du ship *)
-let rotation_gauche etat = ();; (* A REDEFINIR *)
+let rotation_gauche etat =
+if ship_direct_pos then
+deplac_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_depl)
+else
+(*Dans le cas d'un contrôle de la vélocité et non de la position.*)
+(*C'est à dire en respectant le TP, et c'est bien mieux en terme d'expérience de jeu :) *)
+accel_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_accel);;
+
 let rotation_droite etat = ();; (* A REDEFINIR *)
 
 (* tir d'un nouveau projectile *)
@@ -414,14 +442,8 @@ let main () =
   (* initialisation de l'etat du jeu *)
   let etat = init_etat in
   (* programmation du refraichissement periodique de l'etat du jeu et de son affichage *)
-  let _ = Unix.setitimer Unix.ITIMER_REAL
-    { Unix.it_interval = 1. /. framerate_limit ; (* tous les 1/20eme de seconde par défaut. *)
-      Unix.it_value = 1. /. framerate_limit } in
-  Sys.set_signal Sys.sigalrm
-    (Sys.Signal_handle (fun _ ->
-      affiche_etat etat; (* ...afficher l'etat courant... *)
-      synchronize ();
-      etat_suivant etat)); (* ...puis calculate l'etat suivant *)
-  boucle_interaction etat;; (* lancer la boucle d'interaction avec le joueur *)
+  affiche_etat etat; (* ...afficher l'etat courant... *)
+  synchronize ();
+  boucle_interaction etat ;; (* lancer la boucle d'interaction avec le joueur *)
 
 let _ = main ();; (* demarrer le jeu *)
