@@ -1,6 +1,6 @@
 open Graphics;;
-(*
-#load "unix.cma";;
+
+(*#load "unix.cma";;
 #load "graphics.cma";;*)
 
 (*Certaines valeurs par défaut ne suivent pas les instructions du tp pour une meilleure expérience de jeu.*)
