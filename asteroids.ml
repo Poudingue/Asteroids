@@ -1,7 +1,6 @@
 open Graphics;;
-(*
-#load "graphics.cma";;
-*)
+(*#load "unix.cma";;
+#load "graphics.cma";;*)
 
 (*Certaines valeurs par défaut ne suivent pas les instructions du tp pour une meilleure expérience de jeu.*)
 (*Ces changements sont documentés dans les commentaires et peuvent être remis aux valeurs du pdf si nécessaire.*)
@@ -73,6 +72,8 @@ let asteroid_max_spawn_radius = 100.;;
 let asteroid_min_spawn_radius = 0.8;;(*En ratio de la taille de spawn max*)
 (*En dessous de la taille minimale, un asteroide meurt*)
 let asteroid_min_size = 10.;;
+(*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
+let asteroid_max_moment = 3.;;
 (*Sert à déterminer la masse d'un astéroïde en se basant sur son radius, ou l'inverse*)
 let asteroid_density = 1.;;
 (*Sert à déterminer la health d'un astéroïde basé sur son rayon*)
@@ -89,16 +90,25 @@ let ship_direct_rotat = true;;
 (*valeurs du ship*)
 let ship_max_health = 100.;; (*health au spawn. Permet de l'appliquer au modèle physique.*)
 let ship_max_healths = 3;; (*Nombre de fois que le vaisseau peut réapparaître*)
-let ship_max_accel = 20.;; (*Toujours en px.s⁻¹. px.s⁻² si mode accélération*)
+let ship_max_depl = 50.;; (*En px.s⁻¹. Utile si contrôle direct du déplacement.*)
+let ship_max_accel = 20.;; (*En px.s⁻² Utile si contrôle de l'accélération*)
+let ship_friction = 0.;;
 let ship_max_tourn = 6.283;; (*En radian par seconde.*)
+let ship_rotat_friction = 0.1;; (*En ratio de la rotation par seconde*)
 let ship_mass = 100.;; (*Pour les calculs de recul lors de collisions physiques*)
 let ship_radius = 20.;; (*Pour la hitbox*)
+let ship_phys_res = 10.;;
+let ship_dam_res =1.;;
+let ship_death_damages = 50.;;
+let ship_death_radius = 500.;;
 
 (*Valeurs du projectile*)
+let projectile_cooldown = 0.5;;
 let projectile_max_vitesse = 500.;;(*Vitesse relative au lanceur lors du lancement*)
 let projectile_damage = 20.;;
 let projectile_radius = 5.;;
 let projectile_mass = 1.;;(*Pour calculate le recul du vaisseau lors du tir*)
+let projectile_health = 0.;;(*On considère la mort quand la santé descend sous zéro. On a ici la certitude que le projectile se détruira*)
 
 
 (*Paramètres caméra*)
@@ -177,10 +187,11 @@ type objet_physique = {
     friction_moment : float;
     proper_time : float;
 
-    color : color;
+    color : Graphics.color;
 };;
 
-
+(*Pi*)
+let pi = 4. *. atan 1. ;;
 
 (*Fonction de carre, pour écrire plus jolimment les formules de pythagore*)
 let carre v = v *. v;;
@@ -209,9 +220,9 @@ let distancecarre (x1, y1) (x2, y2) = carre (x2 -. x1) +. carre (y2 -. y1);;
 type etat = {
   score : int;
   (*Le cooldown est le temps restant avant de pouvoir de nouveau tirer*)
-  cooldown : float;
-  ship : objet_physique;
-  objets : objet_physique list;
+  mutable cooldown : float;
+  mutable ship : objet_physique;
+  mutable objets : objet_physique list;
 };;
 
 (*Fonction déplaçant un objet selon une vélocitée donnée.*)
@@ -228,7 +239,7 @@ let accel_objet objet (x, y) = objet.velocity <- proj objet.velocity (x, y) ((ga
 let inertie_objet objet = deplac_objet objet objet.velocity;;
 
 (*On calcule le changement de position de tous les objets en jeu*)
-let inertie_objects objets =  List.iter inertie_objet objets;;
+let inertie_objets objets =  List.iter inertie_objet objets;;
 
 (*On obtient le carré de la distance avec le théorème de pythagore*)
 (*a²+b²=c²*)
@@ -250,27 +261,93 @@ let consequences_collision objet1 objet2 = objet1.velocity <- objet2.velocity;;(
 let rec calculate_collisions_objet objet objets =
 if List.length objets = 0 then ()
 else if collision objet (List.hd objets) then consequences_collision objet (List.hd objets)
-else calculate_collisions_objet objet (List.tl objets);;
+else calculate_collisions_objet objet (List.tl objets); ();;
 
 let rec calculate_collisions_objets objets =
 if List.length objets <= 1 then ()
 else calculate_collisions_objet (List.hd objets) (List.tl objets);
-  calculate_collisions_objets (List.tl objets);;
+  calculate_collisions_objets (List.tl objets); ();;
 
 
 (* --- initialisations etat --- *)
 
 (* A DEFINIR : generation positions, deplacements initiaux ... *)
 
-let init_objet = {
+let spawn_ship = {
+    spawned = false;
+    objet = Ship;
+    radius = ship_radius;
+    mass = ship_mass;
+    health = ship_max_health;
+    resistance_damage = ship_dam_res;
+    resistance_physics = ship_phys_res;
+    damage_contact = 0.;
+    contact_radius = 0.;
+    damage_death = ship_death_damages ;
+    radius_death = ship_death_radius ;
+    position = (phys_width /. 2., phys_height /. 2.);
+    velocity = (0.,0.);
+    friction = ship_friction;
+    orientation = 0.;
+    moment = 0.;
+    friction_moment = ship_rotat_friction;
+    proper_time = 1.0;
+    color = Graphics.red ;
+};;
 
-}
+
+let spawn_projectile (x,y) (dx,dy) orientation = {
+    spawned = false;
+    objet = Projectile;
+    radius = projectile_radius;
+    mass = projectile_mass;
+    health = projectile_health;
+    resistance_damage = 0.;
+    resistance_physics = 0.;
+    damage_contact = 0.;
+    contact_radius = 0.;
+    damage_death = projectile_damage;
+    radius_death = projectile_radius;(*Pour l'instant, le missile ne fera de dégats qu'aux objets avec lesquels il est en collision*)
+    position = (x,y);
+    velocity = (dx, dy);
+    friction = 0.;
+    orientation = orientation;
+    moment = 0.;
+    friction_moment =0.;
+    proper_time =0.;
+
+    color = Graphics.yellow;
+};;
+
+let spawn_asteroid (x, y) (dx, dy) radius = {
+    spawned = false;
+    objet = Asteroid;
+    radius = radius;
+    mass = radius *. asteroid_density;
+    health = radius *. asteroid_radius_health;
+    resistance_damage = 0.;
+    resistance_physics = 0.;
+    damage_contact = 0.;
+    contact_radius = 0.;
+    damage_death = 0.;
+    radius_death = 0.;
+    position = (x, y);
+    velocity = (dx, dy);
+    friction = 0.0;
+    orientation = Random.float (2. *. pi);
+    moment = Random.float (2. *. asteroid_max_moment) -. asteroid_max_moment ;
+    friction_moment = 0.;
+    proper_time = 1.;
+    color = Graphics.rgb (63 + Random.int 64) (63 + Random.int 64) (63 + Random.int 64);
+};;
+
+
 
 let init_etat = {
 score=0;
 cooldown = 0.;
-ship = init_ship;
-objets = [] list;
+ship = spawn_ship;
+objets = [];
 };;
 
 (* --- changements d'etat --- *)
@@ -278,32 +355,32 @@ objets = [] list;
 (* acceleration du vaisseau *)
 let acceleration etat =
 if ship_direct_pos then
-(*Dans le cas du contrôle direct de la position, ce qui est pas génial*)
-deplac_objet etat.ship (polar_to_affine etat.ship.orientation max_accel)
+deplac_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_depl)
 else
 (*Dans le cas d'un contrôle de la vélocité et non de la position.*)
 (*C'est à dire en respectant le TP, et c'est bien mieux en terme d'expérience de jeu :) *)
-accel_objet etat.ship (polar_to_affine etat.ship.orientation max_accel);;
+accel_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_accel);;
 
 (* rotation vers la gauche et vers la droite du ship *)
-let rotation_gauche etat = etat;; (* A REDEFINIR *)
-let rotation_droite etat = etat;; (* A REDEFINIR *)
+let rotation_gauche etat = ();; (* A REDEFINIR *)
+let rotation_droite etat = ();; (* A REDEFINIR *)
 
 (* tir d'un nouveau projectile *)
-let tir etat = etat;; (* A REDEFINIR *)
+let tir etat =
+etat.objets <- spawn_projectile etat.ship.position etat.ship.velocity etat.ship.orientation :: etat.objets;
+etat.cooldown <- projectile_cooldown;;
 
 (* calcul de l'etat suivant, apres un pas de temps *)
 (* Cette fonction est de type unit, elle modifie l'etat mais ne rend rien*)
 let etat_suivant etat =
-  calculate_positions etat.objets;
-  calculate_position etat.ship;
+  inertie_objets etat.objets;
+  inertie_objet etat.ship;
   calculate_collisions_objets etat.objets;
-(*On calcule les collisions avec ship seulement après les autres objets,*)
-(*car dans le cas exceptionnel où un objet est détruit par une autre collision*)
-(*avant de toucher le ship, cela permet au joueur d'être sauvé in extremis*)
+(*On calcule les collisions avec le vaisseau seulement après les autres objets,*)
+(*car dans le cas exceptionnel où un objet est détruit par une autre collision
+avant de toucher le vaisseau, cela permet au joueur d'être sauvé in extremis*)
 (*et cela participe à une expérience de jeu plaisante.*)
-  calculate_collisions_objet etat.ship etat.objets;
-  etat;;
+  calculate_collisions_objet etat.ship etat.objets;;
 
 (* --- affichages graphiques --- *)
 
@@ -314,19 +391,17 @@ let affiche_etat etat = ();; (* A REDEFINIR *)
 
 (* --- boucle d'interaction --- *)
 
-let rec boucle_interaction ref_etat =
-  let status = wait_next_event [Key_pressed] in (* on attend une frappe clahealthr *)
-  let etat = !ref_etat in (* on recupere l'etat courant *)
-  let nouvel_etat = etat_suivant etat;(* on definit le nouvel etat... *)
+let rec boucle_interaction etat =
+  let status = Graphics.wait_next_event [Key_pressed] in (* on attend une frappe clavier *)
     match status.key with (* ...en fonction de la touche frappee *)
     | '1' | 'j' -> rotation_gauche etat (* rotation vers la gauche *)
     | '2' | 'k' -> acceleration etat (* acceleration vers l'avant *)
     | '3' | 'l' -> rotation_droite etat (* rotation vers la droite *)
     | ' ' -> tir etat (* tir d'un projectile *)
-    | 'q' -> print_endline "Bye bye!"; exit 0 (* on quitte le jeux *)
-    | _ -> etat in (* sinon, rien ne se passe *)
-  ref_etat := nouvel_etat; (* on enregistre le nouvel etat *)
-  boucle_interaction ref_etat;; (* on se remet en attente de frappe clahealthr *)
+    | 'q' -> print_endline "Bye bye!"; exit 0 (* on quitte le jeu *)
+    | _ -> ();
+    etat_suivant etat;(* on definit le nouvel etat... *)
+  boucle_interaction etat;; (* on se remet en attente de frappe clavier *)
 
 (* --- fonction principale --- *)
 
@@ -335,20 +410,18 @@ let main () =
   Random.self_init ();
   (* initialisation de la fenetre graphique et de l'affichage *)
   open_graph (" " ^ string_of_int width ^ "x" ^ string_of_int height);
-  Graphics.background = black;
-  foreground white;
   auto_synchronize false;
   (* initialisation de l'etat du jeu *)
-  let ref_etat = ref (init_etat ()) in
+  let etat = init_etat in
   (* programmation du refraichissement periodique de l'etat du jeu et de son affichage *)
   let _ = Unix.setitimer Unix.ITIMER_REAL
     { Unix.it_interval = 1. /. framerate_limit ; (* tous les 1/20eme de seconde par défaut. *)
       Unix.it_value = 1. /. framerate_limit } in
   Sys.set_signal Sys.sigalrm
     (Sys.Signal_handle (fun _ ->
-      affiche_etat !ref_etat; (* ...afficher l'etat courant... *)
+      affiche_etat etat; (* ...afficher l'etat courant... *)
       synchronize ();
-      ref_etat := etat_suivant !ref_etat)); (* ...puis calculate l'etat suivant *)
-  boucle_interaction ref_etat;; (* lancer la boucle d'interaction avec le joueur *)
+      etat_suivant etat)); (* ...puis calculate l'etat suivant *)
+  boucle_interaction etat;; (* lancer la boucle d'interaction avec le joueur *)
 
 let _ = main ();; (* demarrer le jeu *)
