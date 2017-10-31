@@ -1,6 +1,6 @@
 open Graphics;;
-
-(*#load "unix.cma";;
+(*
+#load "unix.cma";;
 #load "graphics.cma";;*)
 
 (*Certaines valeurs par défaut ne suivent pas les instructions du tp pour une meilleure expérience de jeu.*)
@@ -18,13 +18,13 @@ open Graphics;;
 let game_speed_target = 1. ;;
 (*Le game_speed est la vitesse réelle à laquelle le jeu tourne à l'heure actuelle.*)
 (*Cela permet notamment de faire des effets de ralenti ou d'accéléré*)
-let game_speed = 0.5;;
+let game_speed = ref 0.5;;
 (*Le game_speed_change détermine à quelle «vitesse» le game speed se rapproche de game_speed_target (en ratio par seconde)*)
 let game_speed_change = 0.8;;
 (*Le temps propre de l'observateur. *)
 (*En l'occurrence, on récupère celui du vaisseau.*)
 (*Cela permet d'avoir une relativité Einsteinienne.*)
-let observer_proper_time = 1.0;;(*En ratio du temps «absolu» de l'univers*)
+let observer_proper_time = ref 1.0;;(*En ratio du temps «absolu» de l'univers*)
 
 (*Le framerate demandé dans l'énoncé est de 20*)
 (*Un framerate plus élevé offre une meilleure expérience de jeu :*)
@@ -34,8 +34,8 @@ let framerate_limit = 60.;;
 
 (*On stocke le moment auquel la dernière frame a été calculée
 pour synchroniser correctement le moment de calcul de la frame suivante*)
-let time_last_frame = Unix.gettimeofday ();;
-let time_current_frame = Unix.gettimeofday ();;
+let time_last_frame = ref 0.;;
+let time_current_frame = ref 0.;;
 
 
 (*Dimensions fenêtre graphique.*)
@@ -50,14 +50,17 @@ let height = 720;;
 let phys_width = 1000. *. float_of_int width /. float_of_int height;;
 let phys_height = 1000. *. float_of_int height /. float_of_int width;;
 
+(*Le ratio de rendu détermine à quel point il faut grossir ou diminuer le rendu*)
+let ratio_rendu = float_of_int width /. phys_width;;
 
-(*L'antialiasing de jitter fait «trembler» l'espace de rendu*)
-(*afin de compenser la perte de précision de la rastérisation*)
-(*dans le placement des objets et le tracé des contours.*)
-let jitter_aa = true;;
+
+(*L'antialiasing de dither fait «trembler» l'espace de rendu*)
+(*afin de compenser la perte de précision due à la rastérisation*)
+(*lors du placement des objets et du tracé des contours.*)
+let dither_aa = true;;
 (*La puissance du jitter détermine à quel point le rendu peut se décaler.*)
 (*Déterminer à 1 ou moins pour éviter un effet de flou et de fatigue visuelle*)
-let jitter_aa_power = 1.;;(*En ratio de la taille d'un pixel*)
+let dither_power = 0.5;;(*En ratio de la taille d'un pixel*)
 
 
 
@@ -128,7 +131,7 @@ let camera_screenshake_damage = 1.;; (*En ratio des dégats bruts.*)
 let camera_screenshake_destruction = 0.1;; (*En ratio de la mass totale disparue lors de la destruction*)
 let camera_screenshake_death_ship = 10.;; (*En ratio de la mass totale disparue*)
 
-let camera_accel_max = 0.1;; (*En ratio de la distance entre centre et objectif*)
+let camera_accel_max = 0.5;; (*En ratio de la distance entre centre et objectif*)
 let camera_friction = 0.01;; (*En ratio de la vitesse*)
 
 (*Ces options de camera ne sont utiles qu'en mode infinitespace*)
@@ -159,12 +162,12 @@ type type_object = Asteroid | Projectile | Ship ;;
 type objet_physique = {
     (*La valeur spawned est fausse tant qu'un objet spawné n'a pas son centre dans l'espace de jeu.*)
     (*Et du système de rendu qui rend les objets à la fois en haut et en bas.*)
-    spawned : bool;
+    mutable spawned : bool;
     objet : type_object;
     (*TODO : Si le temps, définir une hitbox autre que circulaire*)
     radius : float;
     mass : float;
-    health : float;
+    mutable health : float;
     (*Réduction des dégats bruts.*)
     resistance_damage : float;
     (*Réduction des dégats physiques, pour que les collisions à faible vitesse ne fassent pas de dégats*)
@@ -194,8 +197,9 @@ type objet_physique = {
     friction_moment : float;
     proper_time : float;
 
-    color : Graphics.color;
+    color : color;
 };;
+
 
 (*Définition fonctions générales*)
 
@@ -208,8 +212,19 @@ let carre v = v *. v;;
 (*Toujours pratique pour faire du joli pythagore*)
 let hypothenuse (x, y) = sqrt (carre x +. carre y);;
 
+(*Permet l'addition de deux tuples*)
+let addtuple (x1, y1) (x2, y2) = (x1 +. x2, y1 +. y2);;
+
+(*Permet la multiplication d'un tuple par un float*)
+let multuple (x, y) ratio = (x *. ratio, y *. ratio);;
+
+
+let dither fl =
+  int_of_float (fl +. Random.float dither_power);;
+
+
 (*Permet l'addition de deux tuples, en poundérant le second par le ratio*)
-let proj (x1, y1) (x2, y2) ratio = (x1 +. ratio *. x2, y1 +. ratio *. y2);;
+let proj (x1, y1) (x2, y2) ratio = addtuple (x1, y1) (multuple (x2, y2) ratio);;
 
 (*Transfert d'un vecteur en angle*valeur en x*y*)
 let polar_to_affine angle valeur = (valeur *. cos angle, valeur *. sin angle);;
@@ -225,11 +240,21 @@ else (r, 2. *. atan (y /. (x +. r)));;
 let distancecarre (x1, y1) (x2, y2) = carre (x2 -. x1) +. carre (y2 -. y1);;
 
 
+  let render_objet objet =
+  set_color objet.color;
+  let (x,y) = multuple objet.position ratio_rendu in
+  fill_circle (dither x) (dither y) (dither (ratio_rendu *. objet.radius));
+  set_color white;
+  let (x2, y2) = multuple (polar_to_affine objet.orientation objet.radius) ratio_rendu in
+  Graphics.draw_segments (Array.of_list [dither x, dither y, dither (x +. x2),dither (y +. y2)]);;
+
+  let render_objets objets = List.iter render_objet objets;;
+
 
 (* États, positions, déplacements, etc… *)
 
 type etat = {
-  score : int;
+  mutable score : int;
   (*Le cooldown est le temps restant avant de pouvoir de nouveau tirer*)
   mutable cooldown : float;
   mutable ship : objet_physique;
@@ -239,23 +264,26 @@ type etat = {
 (*Fonction déplaçant un objet selon une vélocitée donnée.*)
 (*On tient compte du framerate et de la vitesse de jeu,*)
 (*mais également du temps propre de l'objet et de l'observateur*)
-let deplac_objet objet (x, y) = objet.position <- proj objet.position (x, y) ((time_current_frame -. time_last_frame) *. game_speed *. observer_proper_time /. objet.proper_time);;
+let deplac_objet objet (x, y) =
+objet.position <- proj objet.position (x, y) ((!time_current_frame -. !time_last_frame) *. !game_speed *. !observer_proper_time /. objet.proper_time);;
 
 (*Fonction accélérant un objet selon une accélération donnée.*)
 (*On tient compte du framerate et de la vitesse de jeu,*)
 (*mais également du temps propre de l'objet et de l'observateur*)
-let accel_objet objet (x, y) = objet.velocity <- proj objet.velocity (x, y) ((time_current_frame -. time_last_frame) *. game_speed *. observer_proper_time /. objet.proper_time);;
+let accel_objet objet (dx, dy) =
+objet.velocity <- proj objet.velocity (dx, dy) ((!time_current_frame -. !time_last_frame) *. !game_speed *. !observer_proper_time /. objet.proper_time);;
 
 (*Fonction de rotation d'objet, avec rotation en radian*s⁻¹*)
-let rotat_objet objet rotation = objet.orientation <- objet.orientation +. rotation *. ((time_current_frame -. time_last_frame) *. game_speed *. observer_proper_time /. objet.proper_time);;
+let rotat_objet objet rotation =
+objet.orientation <- objet.orientation +. rotation *. ((!time_current_frame -. !time_last_frame) *. !game_speed *. !observer_proper_time /. objet.proper_time);;
 
 (*Fonction de rotation d'objet, avec rotation en radian*s⁻²*)
-let couple_objet objet momentum = objet.moment <- objet.moment +. momentum *. ((time_current_frame -. time_last_frame) *. game_speed *. observer_proper_time /. objet.proper_time);;
+let couple_objet objet momentum = objet.moment <- objet.moment +. momentum *. ((!time_current_frame -. !time_last_frame) *. !game_speed *. !observer_proper_time /. objet.proper_time);;
 
 (*Fonction de calcul de changement de position inertiel d'un objet physique.*)
 let inertie_objet objet = deplac_objet objet objet.velocity;;
 
-(*On calcule le changement de position de tous les objets en jeu*)
+(*On calcule le changement de position inertiel de tous les objets en jeu*)
 let inertie_objets objets =  List.iter inertie_objet objets;;
 
 (*On calcule l'inertie en rotation des objets*)
@@ -275,19 +303,27 @@ let collision objet1 objet2 = distancecarre objet1.position objet2.position < ca
 (*Fonction appelée en cas de collision de deux objets.*)
 (*Conséquences à déterminer.*)
 (*TODO*)
-let consequences_collision objet1 objet2 = objet1.velocity <- objet2.velocity;;(*Faire les conséquences*)
+let consequences_collision objet1 objet2 =
+  if objet1.spawned && objet2.spawned then
+  let obj1cinet = multuple objet1.velocity objet1.mass in
+  let total_phys_damage = (hypothenuse objet1.velocity) *. objet1.mass +. (hypothenuse objet2.velocity) *. objet2.mass in
+  objet1.velocity <- multuple objet2.velocity objet2.mass;
+  objet2.velocity <- obj1cinet;
+  objet1.health <- objet1.health +. max 0. (total_phys_damage -. objet1.resistance_physics);
+  objet2.health <- objet2.health +. max 0. (total_phys_damage -. objet2.resistance_physics);
+else ();;
 
 (*Fonction vérifiant la collision entre un objet et les autres objets*)
 (*Dès la première collision détectée, déclencher les conséquences, on considère qu'un objet ne peut avoir qu'une collision à la fois*)
 let rec calculate_collisions_objet objet objets =
-if List.length objets = 0 then ()
+if objets = [] then ()
 else if collision objet (List.hd objets) then consequences_collision objet (List.hd objets)
 else calculate_collisions_objet objet (List.tl objets); ();;
 
 let rec calculate_collisions_objets objets =
 if List.length objets <= 1 then ()
-else calculate_collisions_objet (List.hd objets) (List.tl objets);
-  calculate_collisions_objets (List.tl objets); ();;
+else begin calculate_collisions_objet (List.hd objets) (List.tl objets);
+  calculate_collisions_objets (List.tl objets) end;;
 
 
 (* --- initialisations etat --- *)
@@ -309,11 +345,11 @@ let spawn_ship = {
     position = (phys_width /. 2., phys_height /. 2.);
     velocity = (0.,0.);
     friction = ship_friction;
-    orientation = 0.;
+    orientation = pi /. 2.;
     moment = 0.;
     friction_moment = ship_rotat_friction;
     proper_time = 1.0;
-    color = Graphics.red ;
+    color = red ;
 };;
 
 
@@ -337,7 +373,7 @@ let spawn_projectile (x,y) (dx,dy) orientation = {
     friction_moment =0.;
     proper_time =0.;
 
-    color = Graphics.yellow;
+    color = yellow;
 };;
 
 let spawn_asteroid (x, y) (dx, dy) radius = {
@@ -359,9 +395,10 @@ let spawn_asteroid (x, y) (dx, dy) radius = {
     moment = Random.float (2. *. asteroid_max_moment) -. asteroid_max_moment ;
     friction_moment = 0.;
     proper_time = 1.;
-    color = Graphics.rgb (63 + Random.int 64) (63 + Random.int 64) (63 + Random.int 64);
+    color = rgb (63 + Random.int 64) (63 + Random.int 64) (63 + Random.int 64);
 };;
 
+let spawn_random_asteroid = spawn_asteroid (Random.float phys_width, Random.float phys_height) (Random.float 1000., Random.float 1000.) asteroid_max_spawn_radius;;
 
 
 let init_etat = {
@@ -371,7 +408,10 @@ ship = spawn_ship;
 objets = [];
 };;
 
+
+
 (* --- changements d'etat --- *)
+
 
 (* acceleration du vaisseau *)
 let acceleration etat =
@@ -380,56 +420,89 @@ deplac_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_depl)
 else
 (*Dans le cas d'un contrôle de la vélocité et non de la position.*)
 (*C'est à dire en respectant le TP, et c'est bien mieux en terme d'expérience de jeu :) *)
-accel_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_accel);;
+accel_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_accel);
+etat;;
 
 (* rotation vers la gauche et vers la droite du ship *)
 let rotation_gauche etat =
 if ship_direct_pos then
-deplac_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_depl)
+rotat_objet etat.ship ship_max_tourn
 else
-(*Dans le cas d'un contrôle de la vélocité et non de la position.*)
-(*C'est à dire en respectant le TP, et c'est bien mieux en terme d'expérience de jeu :) *)
-accel_objet etat.ship (polar_to_affine etat.ship.orientation ship_max_accel);;
+(*Dans le cas d'un contrôle de la du couple et non de la rotation.
+Non recommandé de manière générale*)
+couple_objet etat.ship ship_max_tourn;
+etat;;
 
-let rotation_droite etat = ();; (* A REDEFINIR *)
+let rotation_droite etat =
+if ship_direct_pos then
+rotat_objet etat.ship (0. -. ship_max_tourn)
+else
+(*Dans le cas d'un contrôle de la du couple et non de la rotation.
+Non recommandé de manière générale*)
+couple_objet etat.ship (0. -. ship_max_tourn);
+etat;;
 
 (* tir d'un nouveau projectile *)
 let tir etat =
 etat.objets <- spawn_projectile etat.ship.position etat.ship.velocity etat.ship.orientation :: etat.objets;
-etat.cooldown <- projectile_cooldown;;
+etat.cooldown <- projectile_cooldown;
+etat;;
 
-(* calcul de l'etat suivant, apres un pas de temps *)
-(* Cette fonction est de type unit, elle modifie l'etat mais ne rend rien*)
-let etat_suivant etat =
-  inertie_objets etat.objets;
-  inertie_objet etat.ship;
-  calculate_collisions_objets etat.objets;
-(*On calcule les collisions avec le vaisseau seulement après les autres objets,*)
-(*car dans le cas exceptionnel où un objet est détruit par une autre collision
-avant de toucher le vaisseau, cela permet au joueur d'être sauvé in extremis*)
-(*et cela participe à une expérience de jeu plaisante.*)
-  calculate_collisions_objet etat.ship etat.objets;;
 
 (* --- affichages graphiques --- *)
 
 (* fonctions d'affichage du ship, d'un asteroide, etc. *)
 
-let affiche_etat etat = ();; (* A REDEFINIR *)
+let affiche_etat etat =
+  set_color (rgb 0 0 64);
+  fill_rect 0 0 width height;
+  render_objet etat.ship;
+  render_objets etat.objets;
+  set_color red;
+  fill_circle (Random.int width) (Random.int height) (Random.int 300);
+  synchronize ();;
+
+
+  (* calcul de l'etat suivant, apres un pas de temps *)
+  (* Cette fonction est de type unit, elle modifie l'etat mais ne rend rien*)
+  let etat_suivant etat =
+    time_last_frame := !time_current_frame;
+    (*On calcule tous les déplacements naturels dus à l'inertie des objets*)
+    inertie_objets etat.objets;
+    inertie_objet etat.ship;
+    moment_objets etat.objets;
+    moment_objet etat.ship;
+    calculate_collisions_objets etat.objets;
+  (*On calcule les collisions avec le vaisseau seulement après les autres objets,*)
+  (*car dans le cas exceptionnel où un objet est détruit par une autre collision
+  avant de toucher le vaisseau, cela permet au joueur d'être sauvé in extremis*)
+  (*et cela participe à une expérience de jeu plaisante.*)
+    calculate_collisions_objet etat.ship etat.objets;
+    etat.objets <- spawn_random_asteroid :: etat.objets;
+    affiche_etat etat;
+    time_current_frame := Unix.gettimeofday();
+    etat;;
 
 
 (* --- boucle d'interaction --- *)
 
-let rec boucle_interaction etat =
-  let status = Graphics.wait_next_event [Key_pressed] in (* on attend une frappe clavier *)
-    match status.key with (* ...en fonction de la touche frappee *)
-    | '1' | 'j' -> rotation_gauche etat (* rotation vers la gauche *)
-    | '2' | 'k' -> acceleration etat (* acceleration vers l'avant *)
-    | '3' | 'l' -> rotation_droite etat (* rotation vers la droite *)
-    | ' ' -> tir etat (* tir d'un projectile *)
-    | 'q' -> print_endline "Bye bye!"; exit 0 (* on quitte le jeu *)
-    | _ -> ();
-    etat_suivant etat;(* on definit le nouvel etat... *)
-  boucle_interaction etat;; (* on se remet en attente de frappe clavier *)
+let rec boucle_interaction ref_etat =
+  let status = wait_next_event [Poll] in (*On retourne le statut actuel de l'utilisateur*)
+  let etat = !ref_etat in
+  let nouvel_etat = etat in
+  if status.keypressed then
+    nouvel_etat =
+      match status.key with (* ...en fonction de la touche frappee *)
+     | 'u' -> rotation_gauche etat (* rotation vers la gauche *)
+     | 'p' -> acceleration etat (* acceleration vers l'avant *)
+     |  'e' -> rotation_droite etat (* rotation vers la droite *)
+     | ' ' -> tir etat (* tir d'un projectile *)
+     | 'q' -> print_endline "Bye bye!"; exit 0 (* on quitte le jeu *)
+     | _ -> etat_suivant etat;
+   else
+    nouvel_etat = etat_suivant etat;
+  ref_etat := nouvel_etat;
+  boucle_interaction ref_etat;; (* on se remet en attente de frappe clavier *)
 
 (* --- fonction principale --- *)
 
@@ -440,10 +513,8 @@ let main () =
   open_graph (" " ^ string_of_int width ^ "x" ^ string_of_int height);
   auto_synchronize false;
   (* initialisation de l'etat du jeu *)
-  let etat = init_etat in
-  (* programmation du refraichissement periodique de l'etat du jeu et de son affichage *)
-  affiche_etat etat; (* ...afficher l'etat courant... *)
-  synchronize ();
-  boucle_interaction etat ;; (* lancer la boucle d'interaction avec le joueur *)
+  let ref_etat = ref init_etat in
+  ref_etat := etat_suivant !ref_etat;
+  boucle_interaction ref_etat;; (* lancer la boucle d'interaction avec le joueur *)
 
 let _ = main ();; (* demarrer le jeu *)
