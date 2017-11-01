@@ -19,6 +19,7 @@ Run it with ./asteroids
 ## Changelog
 
 V1.6 - Interface update
+
 Features :
 - New rendering system, an object is now a list of colors and polygons
 - New ship, thanks to this :)
@@ -27,6 +28,7 @@ Features :
 - Score is now displayed with big letters :)
 - The stage number too
 - Changed game scale and various values
+
 Bugs :
 - Hitbox performance hit. Can be disabled in the menu
 
