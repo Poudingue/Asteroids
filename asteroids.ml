@@ -2,8 +2,10 @@
 (*spécifique à windows*)
 (*
 #load "unix.cma";;
+
 #load "graphics.cma";;
 *)
+
 
 open Graphics;;
 
@@ -88,10 +90,6 @@ let motion_blur = true;;
 let shutter_speed = 1.;;
 let motion_sample_density = 10.;;
 
-(*Paramètres de flou de mouvement pour les objets brillants*)
-let motion_bright = true;; (*Activable*)
-let sample_count_bright = 10;; (*Nombre de sprites à dessiner*)
-
 (******************************************************************************)
 (*Paramètres de jeu*)
 
@@ -112,7 +110,7 @@ let ratio_phys_deg = 0.005;;
 (*Paramètres des astéroïdes*)
 
 let asteroid_max_spawn_radius = 100.;;(*Taille max d'astéroïde au spawn.*)
-let asteroid_min_spawn_radius = 80.;;(*Taille min, en ratio de la taille de spawn max*)
+let asteroid_min_spawn_radius = 50.;;(*Taille min, en ratio de la taille de spawn max*)
 let asteroid_min_size = 10.;;(*En dessous de la taille minimale, un asteroide ne se divise pas à sa mort*)
 let asteroid_max_moment = 1.;;(*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
 let asteroid_max_velocity = 100.;; (*Velocité max au spawn (sens aléatoire)*)
@@ -146,7 +144,7 @@ let ship_max_tourn = 4.;; (*En radian.s⁻¹*)
 let ship_max_moment = 0.5;; (*En radian.s⁻²*)
 let ship_half_stop_rotat = 2.;;(*En temps nécessaire pour perdre la moitié du moment angulaire*)
 let ship_density = 7.;; (*Pour calcul de la masse du vaisseau, qui a un impact sur la physique*)
-let ship_radius = 20.;; (*Pour la hitbox*)
+let ship_radius = 15.;; (*Pour la hitbox et le rendu*)
 (*Réduction des dégats et dégats physiques*)
 let ship_dam_ratio = 0.8;;
 let ship_dam_res = 10.;;
@@ -161,14 +159,19 @@ let projectile_recoil = 1.;;
 let projectile_cooldown = 0.001;;
 let projectile_max_speed = 1000.;;(*Vitesse relative au lanceur lors du lancement*)
 let projectile_min_speed = 800.;;
-let projectile_deviation = 0.1;;(*Déviation possible de la trajectoire des projectiles*)
-let projectile_radius = 10.;;
+let projectile_deviation = 0.2;;(*Déviation possible de la trajectoire des projectiles*)
+let projectile_radius = 15.;;
 let projectile_health = 0.;;(*On considère la mort quand la santé descend sous zéro. On a ici la certitude que le projectile se détruira*)
 
 (*Valeur des explosions*)
-let explosion_max_radius = 100.;;
-let explosion_min_radius = 80.;;
+let explosion_max_radius = 50.;;
+let explosion_min_radius = 25.;;
 let explosion_damages = 50.;;
+
+(*Valeur de la fumée*)
+let smoke_half_life = 0.1;; (*Vitesse de la décroissance de la couleur*)
+let smoke_radius_decay = 20.;; (*Diminution du rayon des particules de fumée*)
+let smoke_max_speed = 150.;;(*Vitesse random dans une direction random de la fumée*)
 
 (*Paramètres caméra*)
 
@@ -200,9 +203,9 @@ let pi = 4. *. atan 1. ;;
 (*Fonction de carre, pour écrire plus jolimment les formules de pythagore*)
 let carre v = v *. v;;
 
-(*Fonction de décroissance exponentielle au bout de t secondes en float*)
-let expo_decay n half_life t =
-  n *. 2. ** (~-.t /. half_life);;
+(*Fonction de décroissance exponentielle de n au bout de t secondes en float*)
+let expo_decay n half_life =
+  n *. 2. ** ((!time_last_frame -. !time_current_frame) /. half_life);;
 
 (*Toujours pratique pour faire du joli pythagore*)
 let hypothenuse (x, y) = sqrt (carre x +. carre y);;
@@ -222,8 +225,7 @@ let inttuple (x, y) = (int_of_float x, int_of_float y);;
 (*Permet de convertir un tuple de int en float*)
 let floattuple (x, y) = (float_of_int x, float_of_int y);;
 
-let dither fl =
-  int_of_float (fl +. Random.float dither_power);;
+let dither fl = if dither_aa then int_of_float (fl +. Random.float dither_power) else int_of_float fl;;
 
 
 (*Permet l'addition de deux tuples, en poundérant le second par le ratio*)
@@ -293,31 +295,14 @@ type camera = {
 };;
 
 
-type smoke = {
-  mutable position : (float*float);
-  mutable velocity : (float*float);
-  mutable radius : float;
-  radius_decrease : float;
-}
-
-
-type explosion = {
-  mutable position : (float*float);
-  mutable velocity : (float*float);
-  mutable radius : float;
-  mutable damage_done : float;(*Les dommages déjà infligés*)
-  damages_left:float;
-
-}
-
-(*On pourrait ajouter des types différents, par exemple des astéroïdes à tête chercheuse, des vaisseaux ennemis…*)
+(*On pourrait ajouter des types différents, par exemple des missiles à tête chercheuse, des vaisseaux ennemis…*)
 (*À faire plus tard si le temps*)
-type type_object = Asteroid | Projectile | Ship ;;
+type type_object = Asteroid | Projectile | Ship | Explosion | Smoke ;;
 
 type objet_physique = {
   objet : type_object;
   (*TODO : Si le temps, définir une hitbox autre que circulaire*)
-  radius : float;
+  mutable radius : float;
   mass : float;
   mutable health : float;
   max_health : float;
@@ -341,6 +326,7 @@ type objet_physique = {
   proper_time : float;
 
   hdr_color : hdr;
+  mutable hdr_exposure : float;
 };;
 
 
@@ -357,25 +343,20 @@ let render_chiffre xmin xmax ymin ymax integer =
 
 (*permet le rendu de motion blur sur des objets sphériques*)
 (*Part de l'endroit où un objet était à l'état précédent pour décider*)
-let rec render_n_circle pos radius velocity n hdr intensity_ratio =
-  if n = 0 then () else (
+let rec render_light_trail radius pos velocity color =
+  set_color color;
+  set_line_width (dither radius);
   let (x,y) = multuple pos ratio_rendu in
-  set_color (rgb_of_hdr (intensify hdr intensity_ratio));
-  fill_circle (dither x) (dither y) (dither (ratio_rendu *. radius));
-  (*Appel récursif*)
-  render_n_circle
-  (addtuple pos (multuple velocity (shutter_speed /. (framerate_render *. float_of_int n))))
-  radius
-  velocity
-  (n - 1)
-  (intensify hdr intensity_ratio)
-  intensity_ratio);;
+  moveto (dither x) (dither y);
+  let (dx,dy) = multuple velocity ~-.(max (shutter_speed /. framerate_render) (shutter_speed *.(!time_current_frame -. !time_last_frame))) in
+  lineto (dither (x +. dx)) (dither (y +. dy));
+  ();;
 
 
 let render_objet ref_objet =
   let objet = !ref_objet in
   let (x,y) = multuple objet.position ratio_rendu in
-  set_color (rgb_of_hdr objet.hdr_color);
+  set_color (rgb_of_hdr (intensify objet.hdr_color objet.hdr_exposure));
   fill_circle (dither x) (dither y) (dither (ratio_rendu *. objet.radius));
   (*Lorsqu'on est pas en mode infinispace, les objets allant d'un côté de l'écran repartent de l'autre*)
   (*if infinitespace = false then begin*)
@@ -391,6 +372,7 @@ let render_objet ref_objet =
   fill_circle ((dither x) - width) ((dither y) - height)  (dither (ratio_rendu *. objet.radius));
   (*Dessin du trait blanc, qui sert à montrer l'orientation d'un objet*)
   set_color white;
+  set_line_width 0;
   let (x2, y2) = multuple (polar_to_affine objet.orientation objet.radius) ratio_rendu in
   (*Dessiner au centre de l'écran*)
   Graphics.draw_segments (Array.of_list [dither x, dither y, dither (x +. x2),dither (y +. y2)]);
@@ -410,10 +392,10 @@ let render_objet ref_objet =
 let render_unspawned ref_objet =
   let objet = !ref_objet in
   let (x,y) = multuple objet.position ratio_rendu in
-  set_color (rgb_of_hdr objet.hdr_color);
+  set_color (rgb_of_hdr (intensify objet.hdr_color objet.hdr_exposure));
   (*Dessiner au centre de l'écran*)
   fill_circle (dither x) (dither y) (dither (ratio_rendu *. objet.radius));
-  if (objet.objet != Projectile)
+  if (objet.objet != Projectile && objet.objet != Explosion)
   then begin
     set_color white;
     let (x2, y2) = multuple (polar_to_affine objet.orientation objet.radius) ratio_rendu in
@@ -424,15 +406,12 @@ let render_unspawned ref_objet =
 
 let render_projectile ref_projectile =
   let objet = !ref_projectile in
-  let (x,y) = multuple objet.position ratio_rendu in
-
-
-  let full_size_bullet = 0.8 *. objet.radius +. 0.2 *. (Random.float objet.radius) in
-
-  render_n_circle objet.position (1.00 *. full_size_bullet) (soustuple (0.,0.) objet.velocity) sample_count_bright objet.hdr_color 0.1;
-  render_n_circle objet.position (0.75 *. full_size_bullet) (soustuple (0.,0.) objet.velocity) sample_count_bright objet.hdr_color 0.2;
-  render_n_circle objet.position (0.50 *. full_size_bullet) (soustuple (0.,0.) objet.velocity) sample_count_bright objet.hdr_color 0.4;
-  render_n_circle objet.position (0.25 *. full_size_bullet) (soustuple (0.,0.) objet.velocity) sample_count_bright objet.hdr_color 0.8;;
+  let full_size_bullet = 0.5 *. objet.radius +. 0.5 *. (Random.float objet.radius) in
+  (*On rend le halo qui ne fait pas partie de la hitbox*)
+  (*Puis le dégradé d'intérieur de la bullet, qui est fait de 3 trainées concentriques de luminosités différentes*)
+  render_light_trail full_size_bullet objet.position objet.velocity (rgb_of_hdr (intensify objet.hdr_color (objet.hdr_exposure *.0.5)));
+  render_light_trail (full_size_bullet *. 0.75) objet.position objet.velocity (rgb_of_hdr objet.hdr_color);
+  render_light_trail (full_size_bullet *. 0.33) objet.position objet.velocity white;;
 
 
 
@@ -454,6 +433,9 @@ type etat = {
   mutable ref_objets : objet_physique ref list;
   mutable ref_projectiles : objet_physique ref list;
   mutable ref_explosions : objet_physique ref list;
+  mutable ref_smoke : objet_physique ref list;
+  mutable tir : bool; (*État indicant si il y a un tir en cours*)
+  mutable tir_position : (float*float); (*Lieu du tir*)
 };;
 
 
@@ -502,6 +484,15 @@ let moment_objets ref_objets = List.iter moment_objet ref_objets;;
 
 
 
+let decay_smoke ref_smoke =
+  let smoke = !ref_smoke in
+  smoke.radius <- smoke.radius -. (smoke_radius_decay *. (!time_current_frame -. !time_last_frame));
+  (*Si l'exposition est déjà minimale, ne pas encombrer par un calcul de décroissance expo*)
+  if smoke.hdr_exposure > 0.01 then  smoke.hdr_exposure <- (expo_decay smoke.hdr_exposure smoke_half_life);
+  ref smoke;;
+
+
+
 let damage ref_objet damage =
   let objet = !ref_objet in
   objet.health <- objet.health -. (max 0. (objet.dam_ratio *. damage -. objet.dam_res));
@@ -543,16 +534,17 @@ let close_enough ref_objet =
   let (x, y) = !ref_objet.position in
   (x < 1.5 *. phys_width) && (x > 0. -. (0.5 *. phys_width)) && (y < 1.5 *. phys_height) && (y > 0. -. (0.5 *. phys_height));;
 
-(*Fonction despawnant les objets trop lointains et morts*)
+
+let positive_radius ref_objet = !ref_objet.radius > 0.;;
+
+(*Fonction despawnant les objets trop lointains et morts, ou avec rayon négatif*)
 let despawn ref_etat =
   let etat = !ref_etat in
-    etat.ref_objets <- (List.filter close_enough etat.ref_objets);
-    etat.ref_objets_unspawned <- (List.filter close_enough etat.ref_objets_unspawned);
-    etat.ref_projectiles <- (List.filter close_enough etat.ref_projectiles);
-
     etat.ref_objets <- (List.filter is_alive etat.ref_objets);
     etat.ref_objets_unspawned <- (List.filter is_alive etat.ref_objets_unspawned);
     etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
+    etat.ref_projectiles <- (List.filter close_enough etat.ref_projectiles);
+    etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
   ref_etat := etat;;
 
 
@@ -725,10 +717,11 @@ let spawn_ship = {
     half_stop_rotat = ship_half_stop_rotat;
     proper_time = 1.;
     hdr_color = {r=300.;v=0.;b=0.};
+    hdr_exposure = 1.;
 };;
 
 
-let spawn_projectile (x,y) (dx, dy) orientation = {
+let spawn_projectile position velocity = {
     objet = Projectile;
     radius = projectile_radius;
     mass = 0.;
@@ -740,8 +733,8 @@ let spawn_projectile (x,y) (dx, dy) orientation = {
     phys_res = 0.;
     phys_ratio = 1.;
 
-    position = addtuple (x,y) (polar_to_affine orientation ship_radius);
-    velocity = addtuple (dx,dy) (polar_to_affine (((Random.float 1.) -. 0.5) *. projectile_deviation +. orientation) (projectile_min_speed +. Random.float (projectile_max_speed -. projectile_min_speed)));
+    position = position;
+    velocity = velocity;
     half_stop = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
 
     orientation = 0.;
@@ -750,39 +743,59 @@ let spawn_projectile (x,y) (dx, dy) orientation = {
 
     proper_time = 1.;
 
-    hdr_color = {r=2000.;v=500.;b=250.};
+    hdr_color = {r=2000.;v=300.;b=0.};
+    hdr_exposure = 1.;
 };;
 
-let spawn_explosion (x, y) = {
-  position = (x, y);
-  velocity = (0.,0.);
+(*Spawne une explosion sous la forme d'une référence*)
+let spawn_explosion ref_projectile = ref {
+  objet = Explosion;
   radius = explosion_min_radius +. (Random.float (explosion_max_radius -. explosion_min_radius));
-  damage_done = 0.;
-  damages_left = explosion_damages;
+  mass = 0.;
+  health = 0.;
+  max_health = 0.;
+
+  dam_res = 0.;
+  dam_ratio = 0.;
+  phys_res = 0.;
+  phys_ratio = 0.;
+
+  position = !ref_projectile.position;
+  (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
+  velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
+  half_stop = 0.;
+  orientation = 0.;
+  moment = 0.;
+  half_stop_rotat = 0.;
+
+  proper_time = 1.;
+  hdr_color = {r = 1500. ; v = 500. ; b = 250. };
+  hdr_exposure = 1.;
 
 }
 
 let spawn_asteroid (x, y) (dx, dy) radius = {
-    objet = Asteroid;
-    radius = radius;
-    mass = pi *. (carre radius) *. asteroid_density;
-    health = radius *. asteroid_radius_health;
-    max_health = radius *. asteroid_radius_health;
+  objet = Asteroid;
+  radius = radius;
+  mass = pi *. (carre radius) *. asteroid_density;
+  health = radius *. asteroid_radius_health;
+  max_health = radius *. asteroid_radius_health;
 
-    dam_res = asteroid_dam_res;
-    dam_ratio = asteroid_dam_ratio;
-    phys_res = asteroid_phys_res;
-    phys_ratio = asteroid_phys_ratio;
+  dam_res = asteroid_dam_res;
+  dam_ratio = asteroid_dam_ratio;
+  phys_res = asteroid_phys_res;
+  phys_ratio = asteroid_phys_ratio;
 
-    position = (x, y);
-    velocity = (dx, dy);
-    half_stop = ~-. 1.;(*On le définit en négatif pour l'ignorer lors du calcul*)
-    orientation = Random.float (2. *. pi);
-    moment = Random.float (2. *. asteroid_max_moment) -. asteroid_max_moment ;
-    half_stop_rotat = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
+  position = (x, y);
+  velocity = (dx, dy);
+  half_stop = ~-. 1.;(*On le définit en négatif pour l'ignorer lors du calcul*)
+  orientation = Random.float (2. *. pi);
+  moment = Random.float (2. *. asteroid_max_moment) -. asteroid_max_moment ;
+  half_stop_rotat = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
 
-    proper_time = 1.;
-    hdr_color = {r = 64. +. Random.float 64. ; v = 64. +. Random.float 64. ; b = 64. +. Random.float 64. };
+  proper_time = 1.;
+  hdr_color = {r = 64. +. Random.float 64. ; v = 64. +. Random.float 64. ; b = 64. +. Random.float 64. };
+  hdr_exposure = 1.;
 };;
 
 
@@ -803,6 +816,9 @@ let init_etat = {
   ref_objets = [];
   ref_projectiles = [];
   ref_explosions = [];
+  ref_smoke = [];
+  tir = false;
+  tir_position = (0.,0.);
 };;
 
 
@@ -810,30 +826,31 @@ let init_etat = {
 (* Affichage des états*)
 
 
-
 let affiche_etat ref_etat =
   (*Fond d'espace*)
-  set_color (rgb 0 0 32);
+  set_color space_color;
   fill_rect 0 ~-1 width height;
-
   let etat = !ref_etat in
 
+
   List.iter render_projectile etat.ref_projectiles;
+  List.iter render_unspawned etat.ref_smoke;
   render_objet etat.ref_ship;
   List.iter render_objet etat.ref_objets;
   List.iter render_unspawned etat.ref_objets_unspawned;
+  List.iter render_unspawned etat.ref_explosions;
 
   (*Affichage du framerate*)
   (*draw_string (string_of_int (int_of_float (1. /. !time_one_frame)));*)
 
   set_color white;
-  set_text_size 100000;
   draw_string (string_of_int (int_of_float (1000. *. !time_one_frame)));
   let (width_score, height_score) = text_size (string_of_int etat.score) in
   moveto 0 (height - height_score -200);
   draw_string (string_of_int etat.score);
 
   synchronize ();;
+
 
 
   (* calcul de l'etat suivant, apres un pas de temps *)
@@ -852,6 +869,7 @@ let etat_suivant ref_etat =
   inertie_objets etat.ref_objets;
   inertie_objets etat.ref_objets_unspawned;
   inertie_objets etat.ref_projectiles;
+  inertie_objets etat.ref_smoke;
 
   moment_objet etat.ref_ship;
   moment_objets etat.ref_objets;
@@ -877,9 +895,10 @@ let etat_suivant ref_etat =
   calculate_collisions_modulos etat.ref_objets;
   (*Collisions entre objets spawnés et «non spawnés» - modulo pour le coup*)
   calculate_collisions_modulo_listes etat.ref_objets etat.ref_objets_unspawned;
-(*
-  calculate_collisions_objet etat.ref_ship etat.ref_projectiles;
-*)
+  (*Les explosions sont ajoutées à la fumée, et la fumée précédente avec decay*)
+  etat.ref_smoke <- List.append (List.map decay_smoke etat.ref_smoke) etat.ref_explosions;
+  (*On fait apparaitre les explosions correspondant aux projectiles détruits*)
+  etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
 
 
 (*Recentrage des objets sortis de l'écran*)
@@ -952,17 +971,20 @@ let tir ref_etat =
 ce qui est une approximation généralement correcte*)
   if etat.cooldown < 0. || etat.cooldown < Random.float (!time_current_frame -. !time_last_frame)
   then (
-  let ship = !(etat.ref_ship) in
-  let orientation = ship.orientation in
-  let projectile = spawn_projectile ship.position ship.velocity orientation in
+    let ship = !(etat.ref_ship) in
+    let position_tir = addtuple ship.position (polar_to_affine ship.orientation ship_radius) in
+    let velocity_tir = addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. projectile_deviation +. ship.orientation) (projectile_min_speed +. Random.float (projectile_max_speed -. projectile_min_speed))) in
+    let projectile = spawn_projectile position_tir velocity_tir in
 
-  etat.ref_projectiles <- (ref projectile) :: etat.ref_projectiles ;
-  etat.cooldown <- etat.cooldown +. projectile_cooldown;
-  ship.velocity <- addtuple ship.velocity (polar_to_affine (orientation +. pi) projectile_recoil);
+    etat.tir <- true;
+    etat.tir_position <- position_tir;
+    etat.ref_projectiles <- (ref projectile) :: etat.ref_projectiles ;
+    etat.cooldown <- etat.cooldown +. projectile_cooldown;
+    ship.velocity <- addtuple ship.velocity (polar_to_affine (ship.orientation +. pi) projectile_recoil);
 
-  etat.ref_ship := ship;
-  ref_etat := etat;
-  etat_suivant ref_etat;
+    etat.ref_ship := ship;
+    ref_etat := etat;
+    etat_suivant ref_etat;
 ) else ();;
 
 
@@ -972,7 +994,10 @@ let controle_souris ref_etat =
   let ship = !(etat.ref_ship) in
   let status = wait_next_event[Poll] in
   let (xv,yv) = ship.position in
-  let (theta, r) = affine_to_polar ((float_of_int status.mouse_x) /. ratio_rendu -. xv,(float_of_int status.mouse_y) /. ratio_rendu -. yv) in
+  let (theta, r) =
+    affine_to_polar
+      ((float_of_int status.mouse_x) /. ratio_rendu -. xv,
+      (float_of_int status.mouse_y) /. ratio_rendu -. yv) in
   ship.orientation <- theta;
   etat.ref_ship :=  ship;
   ref_etat := etat;
@@ -994,7 +1019,8 @@ let rec boucle_interaction ref_etat =
      | 'q' -> print_endline "Bye bye!"; exit 0 (* on quitte le jeu *)
      | _ -> etat_suivant ref_etat;boucle_interaction ref_etat
  else
-etat_suivant ref_etat;
+  etat_suivant ref_etat;
+  !ref_etat.tir <- false;
   boucle_interaction ref_etat;; (* on se remet en attente de frappe clavier *)
 
 (* --- fonction principale --- *)
