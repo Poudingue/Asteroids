@@ -13,6 +13,7 @@ let pi = 4. *. atan 1.(*Pi*)
 
 (******************************************************************************)
 (*Paramètres affichage*)
+let oldschool = ref false
 
 
 (*Paramètres temporels*)
@@ -49,7 +50,7 @@ let locked_framerate = ref false
 Un framerate plus élevé offre une meilleure expérience de jeu :
 Des contrôles plus réactifs, un meilleur confort visuel, et une physique plus précise.
 Bien sûr, il est possible de le changer ci-dessous*)
-let framerate_limit = 60.
+let framerate_limit = 300.
 (*Le framerate de rendu permet de déterminer la longueur du motion blur.
 Réglez au framerate réel de votre écran,
 et shutter_speed contrôle la longueur du flou comme une caméra réelle*)
@@ -97,7 +98,7 @@ let buttonframewidth = int_of_float (10. *. ratio_rendu)
 (*Paramètres de flou de mouvement*)
 (*Fonctionne déjà pour les bullets
 TODO l'implémenter pour les autres objets*)
-let motion_blur = true
+let motion_blur = ref false
 let shutter_speed = 1.
 
 (******************************************************************************)
@@ -118,8 +119,8 @@ let ratio_phys_deg = ref 0.002
 (*Paramètres des astéroïdes*)
 let asteroid_spawn_delay = 5. (*Temps s'écoulant entre l'apparition de deux astéroïdes*)
 let asteroid_max_spawn_radius = 500. (*Taille max d'astéroïde au spawn.*)
-let asteroid_min_spawn_radius = 20. (*Taille min de spawn*)
-let asteroid_min_size = 15. (*En dessous de la taille minimale, un asteroide ne se divise pas à sa mort*)
+let asteroid_min_spawn_radius = 50. (*Taille min de spawn*)
+let asteroid_min_size = 20. (*En dessous de la taille minimale, un asteroide ne se divise pas à sa mort*)
 let asteroid_max_moment = 1. (*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
 let asteroid_max_velocity = 200. (*Velocité max au spawn*)
 let asteroid_min_velocity = 10. (*Velocité min au spawn*)
@@ -130,11 +131,15 @@ let asteroid_mass_health = 0.01(*Sert à déterminer la vie d'un astéroïde bas
 let asteroid_dam_ratio = 1.
 let asteroid_dam_res = 0.
 let asteroid_phys_ratio = 2.
-let asteroid_phys_res = 5.
+let asteroid_phys_res = 1.
 let asteroid_min_lum = 20.
 let asteroid_max_lum = 150.
 let asteroid_min_satur = 0.1
 let asteroid_max_satur = 0.4
+
+let asteroid_polygon_sides = 20 (*Nombre de côtés d'un polygone représentant un astéroïde*)
+let asteroid_polygon_min = 0.9
+let asteroid_polygon_max = 1.2
 
 (*Caractéristiques des fragments. Principalement hérité des parents.*)
 let fragment_max_velocity = 400. (*Velocité max au spawn*)
@@ -143,6 +148,8 @@ let fragment_max_size = 0.7(*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_size = 0.4 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.5 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
 let fragment_max_exposure = 2.0
+let fragment_number = ref 5
+let chunk_radius_decay = 5. (*Pour la décroissance des particules n'ayant pas de collisions*)
 
 
 (*Paramètres du vaisseau*)
@@ -160,7 +167,7 @@ let ship_phys_res = 5.
 let ship_death_max_momentum = 2.
 (*Contrôles de déplacement*)
 let ship_max_depl = 50. (*En px.s⁻¹. Utile si contrôle direct du déplacement.*)
-let ship_max_accel = 1200. (*En px.s⁻² Utile si contrôle de l'accélération*)
+let ship_max_accel = 1500. (*En px.s⁻² Utile si contrôle de l'accélération*)
 let ship_max_boost = 100. (*En px.s⁻¹. Utile si contrôle par boost.*)
 let ship_half_stop = 10. (*En temps nécessaire pour perdre la moitié de l'inertie*)
 (*Contrôles de rotation*)
@@ -178,6 +185,7 @@ let projectile_min_speed = 1500.
 let projectile_deviation = 0.2(*Déviation possible de la trajectoire des projectiles*)
 let projectile_radius = 6.
 let projectile_health = 0.(*On considère la mort quand la santé descend sous zéro. On a ici la certitude que le projectile se détruira*)
+let projectile_number = ref 5
 
 (*Valeurs des explosions*)
 let explosion_max_radius = 40.
@@ -213,11 +221,13 @@ let smoke_max_speed = 40.(*Vitesse random dans une direction random de la fumée
 (*Valeurs des étoiles*)
 let star_min_prox = 0.4 (*Prox min des étoiles. 0 = étoile à l'infini, paraît immobile quel que soit le mouvement.*)
 let star_max_prox = 0.8 (*Prox max. 1 = même profondeur que le vaisseau *)
-let star_prox_lum = 10.
+let star_prox_lum = 15.
 let star_min_lum = 0.
 let star_max_lum = 5.
 let star_rand_lum = 1. (*Effet de scintillement des étoiles*)
-let stars_nb = 1000
+let stars_nb_default = 500
+let stars_nb = ref 500
+let stars_nb_previous = ref 500
 
 
 (*Effet de scanlines pour imiter les moniteurs crt qui projetait l'image ligne par ligne.*)
@@ -227,14 +237,15 @@ en activant une ligne sur deux une image sur deux, mais il passe mal
 à 60 pile avec le moteur d'ocaml. Tester à vos risques *)
 let scanlines = false
 let scanlines_period = 2
-let animated_scanlines = true
+let animated_scanlines = false
 let scanlines_offset = ref 0
 
 (*La camera predictive oriente la camera vers l'endroit où le vaisseau va,
 pour le garder tant que possible au centre de l'écran*)
 let dynamic_camera = ref true
-let camera_prediction = 5. (*En secondes de déplacement du vaisseau dans le futur.*)
-let camera_half_depl = 4. (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
+let camera_prediction = 7. (*En secondes de déplacement du vaisseau dans le futur.*)
+let camera_half_depl = 5. (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
+let camera_ratio_objects = 0.3
 
 (*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
 let screenshake = ref true
@@ -358,7 +369,6 @@ let modulo_3reso (x, y) =
    (modulo_float (y +. phys_height) (phys_height *. 3.)) -. phys_height)
 
 
-
 (******************************************************************************)
 (*Définition types pour état du jeu*)
 
@@ -407,17 +417,27 @@ type sliderfloat = {
 
 (*Fonction permettant l'affichage du bouton et son activation*)
 let applique_button button =
-  if !(button.boolean) = true then set_color truecolor else set_color falsecolor;
+  ignore (button.boolean); (*Obligé de faire ça pour que la fonction n'essaye pas de l'appliquer à sliderfloat*)
   let (x1,y1) = inttuple (multuple button.pos1 ratio_rendu) and (l,h) = inttuple (multuple (soustuple button.pos2 button.pos1) ratio_rendu)in
-  fill_rect x1 y1 l h; (*Intérieur du bouton*)
-  set_color buttonframe; set_line_width buttonframewidth; draw_rect x1 y1 l h; (*Contour du bouton*)
-  let (wtext,htext) = text_size button.text in
-  set_color black; moveto (x1 + (l - wtext)/2 -1) (y1 + (h - htext)/2 -1); draw_string button.text;
-  set_color white; moveto (x1 + (l - wtext)/2 ) (y1 + (h - htext)/2 ); draw_string button.text;
+  if !oldschool then (
+    if !(button.boolean) = true then set_color white else set_color black;
+    fill_rect x1 y1 l h; (*Intérieur du bouton*)
+    set_color white; set_line_width 0; draw_rect x1 y1 l h; (*Contour du bouton*)
+    let (wtext,htext) = text_size button.text in
+    if !(button.boolean) = true then set_color black else set_color white;
+    moveto (x1 + (l - wtext)/2 ) (y1 + (h - htext)/2 ); draw_string button.text)
+  else (
+    if !(button.boolean) = true then set_color truecolor else set_color falsecolor;
+    fill_rect x1 y1 l h; (*Intérieur du bouton*)
+    set_color buttonframe; set_line_width buttonframewidth; draw_rect x1 y1 l h; (*Contour du bouton*)
+    let (wtext,htext) = text_size button.text in
+    set_color black; moveto (x1 + (l - wtext)/2 -1) (y1 + (h - htext)/2 -1); draw_string button.text;
+    set_color white; moveto (x1 + (l - wtext)/2 ) (y1 + (h - htext)/2 ); draw_string button.text
+  );
   (*Si la souris est cliquée, ne l'était pas à la frame précédente, et est dans la surface du bouton*)
   if button_down () && not button.lastmousestate && (entretuple (multuple (floattuple (mouse_pos ())) (1. /. ratio_rendu)) button.pos1 button.pos2)
     then button.boolean := not !(button.boolean);(*TODO TODO TODO NAAAAA*)
-  button.lastmousestate <- button_down ()
+  button.lastmousestate <- button_down ();;
 
 (*Fonction permettant l'affichage du bouton et son activation*)
 let applique_slider ref_slider =
@@ -462,7 +482,7 @@ type objet_physique = {
 
   proper_time : float;
 
-  polygon : (float*float) list; (*Polygone pour le rendu. Liste de points en coordonées polaires autour du centre de l'objet.*)
+  mutable polygon : (float*float) list; (*Polygone pour le rendu. Liste de points en coordonées polaires autour du centre de l'objet.*)
   mutable hdr_color : hdr;
   mutable hdr_exposure : float;
 }
@@ -492,6 +512,7 @@ plutôt que de vérifier le type d'objet à la volée*)
   mutable ref_fragments_unspawned : objet_physique ref list; (*Pour les fragments d'objets unspawned, pour éviter de les recentrer*)
   mutable ref_objets : objet_physique ref list;
   mutable ref_objets_unspawned : objet_physique ref list;
+  mutable ref_chunks : objet_physique ref list;
   mutable ref_projectiles : objet_physique ref list;
   mutable ref_explosions : objet_physique ref list;
   mutable ref_smoke : objet_physique ref list;
@@ -516,8 +537,9 @@ let poly_to_affine poly rotat scale = List.map polar_to_affine_tuple (scale_poly
 let rec depl_affine_poly poly pos = if poly = [] then [] else (addtuple (List.hd poly) pos) :: (depl_affine_poly (List.tl poly) pos)
 let render_poly poly pos rotat color =
   let poly_to_render = depl_affine_poly (poly_to_affine poly rotat ratio_rendu) pos in
-  set_color color; set_line_width 0;
-  fill_poly (Array.of_list (List.map dither_tuple poly_to_render))
+  if !oldschool
+    then (set_color white; set_line_width 0;draw_poly (Array.of_list (List.map dither_tuple poly_to_render)))
+    else (set_color color; set_line_width 0;fill_poly (Array.of_list (List.map dither_tuple poly_to_render)))
 
 (*Permet de rendre un polygone ayant des points déterminés en pourcentage de largeur et hauteur
 en points en int. (Avec dither le cas échéant)*)
@@ -578,7 +600,7 @@ let render_modulo x y radius color =
   let x = dither x
   and y = dither y
   and rad = dither radius in
-  (*Dessiner l'objet*)
+  (*Dissiner l'objet*)
   fill_circle x y rad;
   (*En mode infinitespace, il n'y a pas de rebouclage.
   On vérifie que l'objet a une raison d'être visible de deux côtés à la fois avant d'en rendre 9.*)
@@ -603,44 +625,61 @@ let render_objet ref_objet =
   and col = (intensify objet.hdr_color (!game_exposure *. objet.hdr_exposure)) in
   (*On dessine le polygone de l'objet.*)
   if objet.polygon != [] then
-    render_poly objet.polygon (x, y) objet.orientation (rgb_of_hdr col);
+    render_poly objet.polygon (x, y) objet.orientation (rgb_of_hdr (intensify col 0.75));
+  (*En mode oldschool, on se contente du polygone*)
+  if not !oldschool then (
+    (*Rendu de la vie de l'objet -> Deux cercles l'un dans l'autres, plus ou moins sombres*)
+    render_modulo x y rad (rgb_of_hdr (intensify col 0.75));
+    (*Partie intérieure de la vie*)
+    render_modulo x y (max 0.  ((objet.health /. objet.max_health) *. rad)) (rgb_of_hdr col);
 
-  (*Rendu de la vie de l'objet -> Deux cercles l'un dans l'autres, plus ou moins sombres*)
-  render_modulo x y rad (rgb_of_hdr (intensify col 0.75));
-  (*Partie intérieure de la vie*)
-  render_modulo x y (max 0.  ((objet.health /. objet.max_health) *. rad)) (rgb_of_hdr col);
-
-  if objet.objet = Ship then (
-    set_color (rgb_of_hdr (intensify col 10.));
-    set_line_width 0;
-    let (x2, y2) = multuple (polar_to_affine objet.orientation objet.radius) ratio_rendu in
-    Graphics.draw_segments (Array.of_list [dither x, dither y, dither (x +. x2),dither (y +. y2)]);
-    fill_circle (dither x) (dither y) (dither (ratio_rendu *. objet.radius *. 0.3)))
+    if objet.objet = Ship then (
+      set_color (rgb_of_hdr (intensify col 10.));
+      set_line_width 0;
+      let (x2, y2) = multuple (polar_to_affine objet.orientation objet.radius) ratio_rendu in
+      Graphics.draw_segments (Array.of_list [dither x, dither y, dither (x +. x2),dither (y +. y2)]);
+      fill_circle (dither x) (dither y) (dither (ratio_rendu *. objet.radius *. 0.3)))
+  );;
 
 
 (*Rendu des objets non spawnés - ne rend pas de duplicatas modulo l'écran*)
 let render_unspawned ref_objet =
   let objet = !ref_objet in
-  let (x,y) = dither_tuple (multuple (addtuple objet.position !game_screenshake_pos) ratio_rendu) in
-  (*Rendu de la vie de l'objet*)
-  set_color (rgb_of_hdr (intensify objet.hdr_color (0.5 *. !game_exposure *. objet.hdr_exposure)));
-  fill_circle x y (dither (ratio_rendu *. objet.radius));
-  set_color (rgb_of_hdr (intensify objet.hdr_color (!game_exposure *. objet.hdr_exposure)));
-  fill_circle x y (max 0 (dither ((objet.health /. objet.max_health) *. ratio_rendu *. objet.radius)))
+  if objet.polygon != [] then
+    render_poly objet.polygon (multuple (addtuple objet.position !game_screenshake_pos) ratio_rendu) objet.orientation (rgb_of_hdr (intensify objet.hdr_color (!game_exposure *. objet.hdr_exposure *. 0.75)));
+  (*En mode oldschool, on se contente du polygone*)
+  if not !oldschool then (
+    let (x,y) = dither_tuple (multuple (addtuple objet.position !game_screenshake_pos) ratio_rendu) in
+    (*Rendu de la vie de l'objet*)
+    set_color (rgb_of_hdr (intensify objet.hdr_color (0.75 *. !game_exposure *. objet.hdr_exposure)));
+    fill_circle x y (dither (ratio_rendu *. objet.radius));
+    set_color (rgb_of_hdr (intensify objet.hdr_color (!game_exposure *. objet.hdr_exposure)));
+    fill_circle x y (max 0 (dither ((objet.health /. objet.max_health) *. ratio_rendu *. objet.radius))));;
+
+
+(*Rendu des chunks. Pas de duplicatas, pas d'affichage de la vie, et l'objet est plus sombre*)
+let render_chunk ref_objet =
+  let (x,y) = dither_tuple (multuple (addtuple !ref_objet.position !game_screenshake_pos) ratio_rendu) in
+  set_color (rgb_of_hdr (intensify !ref_objet.hdr_color (0.25 *. !game_exposure *. !ref_objet.hdr_exposure)));
+  fill_circle x y (dither (ratio_rendu *. !ref_objet.radius))
 
 
 (*Rendu des projectiles. Dessine des trainées de lumière.*)
 let render_projectile ref_projectile =
   let objet = !ref_projectile in
   let rad = ratio_rendu *. (randfloat 0.5 1.) *. objet.radius in
-  (*On récupère les valeurs qu'on va utiliser plusieurs fois *)
-  let last = objet.last_position and pos = objet.position and vel = objet.velocity
-  and col = intensify objet.hdr_color (objet.hdr_exposure *. !game_exposure) in
-  (*On rend plusieurs traits concentriques pour un effet de dégradé*)
-  render_light_trail rad last pos vel (intensify col 0.25);
-  render_light_trail (rad *. 0.75) last pos vel (intensify col 0.5);
-  render_light_trail (rad *. 0.5) last pos vel col;
-  render_light_trail (rad *. 0.25) last pos vel (intensify col 2.)
+  if !oldschool
+    then (let (x,y) = dither_tuple (multuple objet.position ratio_rendu) in
+      set_color white; fill_circle x y (dither rad))
+    else (
+      (*On récupère les valeurs qu'on va utiliser plusieurs fois *)
+      let last = objet.last_position and pos = objet.position and vel = objet.velocity
+      and col = intensify objet.hdr_color (objet.hdr_exposure *. !game_exposure) in
+      (*On rend plusieurs traits concentriques pour un effet de dégradé*)
+      render_light_trail rad last pos vel (intensify col 0.25);
+      render_light_trail (rad *. 0.75) last pos vel (intensify col 0.5);
+      render_light_trail (rad *. 0.5) last pos vel col;
+      render_light_trail (rad *. 0.25) last pos vel (intensify col 2.))
 
 let render_spark ref_spark =
   let objet = !ref_spark in
@@ -751,16 +790,25 @@ let decay_smoke ref_smoke =
   if smoke.hdr_exposure > 0.005 then  smoke.hdr_exposure <- (exp_decay smoke.hdr_exposure smoke_half_col);
   ref smoke
 
+let decay_chunk ref_chunk =
+  let chunk = !ref_chunk in
+  chunk.radius <- chunk.radius -. (!game_speed *. chunk_radius_decay *. (!time_current_frame -. !time_last_frame));
+  ref chunk
+
 let damage ref_objet damage =
   let objet = !ref_objet in
-  objet.health <- objet.health -. (max 0. (objet.dam_ratio *. damage -. objet.dam_res));
+  if (!oldschool)
+    then (objet.health <- ~-.0.1)
+    else (objet.health <- objet.health -. (max 0. (objet.dam_ratio *. damage -. objet.dam_res)));
   game_screenshake := !game_screenshake +. damage *. screenshake_dam_ratio;
   if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_damage;
   ref_objet := objet
 
 let phys_damage ref_objet damage =
   let objet = !ref_objet in
-  objet.health <- objet.health -. (max 0. (objet.phys_ratio *. damage -. objet.phys_res));
+  if (!oldschool)
+    then (objet.health <- ~-.0.1)
+    else (objet.health <- objet.health -. (max 0. (objet.phys_ratio *. damage -. objet.phys_res)));
   game_screenshake := !game_screenshake +. damage *. screenshake_phys_ratio *. objet.mass /. screenshake_phys_mass;
   ref_objet := objet
 
@@ -810,14 +858,36 @@ let close_enough_bullet ref_objet =
 let positive_radius ref_objet = !ref_objet.radius > 0.
 
 let big_enough ref_objet = !ref_objet.radius > asteroid_min_size
+let too_small ref_objet = not (big_enough ref_objet)
+
+
+(*Fonctions permettant de calculer une caméra dynamique suivant en priorité les objets massifs et proches*)
+let rec sum_center ref_objets pos =
+  match ref_objets with
+  |[] -> (0.,0.)
+  |hd::tl -> addtuple (multuple !hd.position (!hd.mass /. (1. +. (distancecarre !hd.position pos)))) (sum_center tl pos)
+
+let rec sum_mass ref_objets pos =
+  match ref_objets with
+  |[] -> 0.
+  |hd::tl -> (!hd.mass /. (1. +. (distancecarre !hd.position pos))) +. (sum_mass tl pos)
+
+let center_of_attention ref_objets pos = if ref_objets = [] then (0.,0.) else (multuple (sum_center ref_objets pos) (1. /. (sum_mass ref_objets pos)))
 
 (*Fonction despawnant les objets trop lointains et morts, ou avec rayon négatif*)
 let despawn ref_etat =
   let etat = !ref_etat in
+  (*On met les objets dans la liste de chunks, qui ne sont que décoratif et pour lesquels on ne calculera pas les collisions*)
+    etat.ref_chunks <- (List.append (List.map decay_chunk etat.ref_chunks) (List.append
+      (List.append (List.filter too_small etat.ref_objets) (List.filter too_small etat.ref_objets_unspawned))
+      (List.append (List.filter too_small etat.ref_fragments) (List.filter too_small etat.ref_fragments_unspawned))));
     (*Pas besoin de checker close_enough pour les objets spawnés, on les recentre.
     C'est la même chose pour les objets non spawnés, car ils sont recentrés par une fenêtre de 3x la taille de la surface de jeu.*)
     etat.ref_objets <- (List.filter is_alive etat.ref_objets);
     etat.ref_objets <- (List.filter big_enough etat.ref_objets);
+
+    etat.ref_objets_unspawned <- (List.filter is_alive etat.ref_objets_unspawned);
+    etat.ref_objets_unspawned <- (List.filter big_enough etat.ref_objets_unspawned);
 
     etat.ref_fragments <- (List.filter is_alive etat.ref_fragments);
     etat.ref_fragments <- (List.filter big_enough etat.ref_fragments);
@@ -825,13 +895,13 @@ let despawn ref_etat =
     etat.ref_fragments_unspawned <- (List.filter is_alive etat.ref_fragments_unspawned);
     etat.ref_fragments_unspawned <- (List.filter big_enough etat.ref_fragments_unspawned);
 
-    etat.ref_objets_unspawned <- (List.filter is_alive etat.ref_objets_unspawned);
 
     etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
     (*TODO permettre un missile ne despawnant pas après mort, mais provoquant plusieurs explosions sur son passage*)
     etat.ref_projectiles <- (List.filter close_enough_bullet etat.ref_projectiles);
 
     etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
+    etat.ref_chunks <- (List.filter positive_radius etat.ref_chunks);
   ref_etat := etat
 
 
@@ -1058,6 +1128,12 @@ let spawn_projectile position velocity = {
     hdr_exposure = 4.;
 }
 
+let rec spawn_n_projectiles ship n =
+  if n = 0 then [] else (
+  let vel = addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. projectile_deviation +. ship.orientation) (projectile_min_speed +. Random.float (projectile_max_speed -. projectile_min_speed)))
+  and pos = addtuple ship.position (polar_to_affine ship.orientation ship.radius) in (*On fait spawner les projectiles au bout du vaisseau*)
+  ref (spawn_projectile pos vel) :: spawn_n_projectiles ship (n-1))
+
 
 (*Spawne une explosion d'impact de projectile*)
 let spawn_explosion ref_projectile = ref {
@@ -1177,6 +1253,12 @@ let spawn_fire ref_ship = ref {
 }
 
 
+let rec polygon_asteroid radius n =
+  if n = 1
+    then ([(2. *. pi *. (float_of_int n) /. (float_of_int asteroid_polygon_sides)),radius *. (randfloat asteroid_polygon_min asteroid_polygon_max)])
+    else ((2. *. pi *. (float_of_int n) /. (float_of_int asteroid_polygon_sides)),radius *. (randfloat asteroid_polygon_min asteroid_polygon_max)) :: polygon_asteroid radius (n-1);;
+
+
 let spawn_asteroid (x, y) (dx, dy) radius = {
   objet = Asteroid;
   radius = radius;
@@ -1198,7 +1280,7 @@ let spawn_asteroid (x, y) (dx, dy) radius = {
   half_stop_rotat = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
 
   proper_time = 1.;
-polygon = [];(*
+polygon = polygon_asteroid radius asteroid_polygon_sides;(*
   polygon = [(0.,radius +. Random.float (radius *. 0.5));(pi /.2.,radius +. Random.float (radius *. 0.5));(pi,radius +. Random.float (radius *. 0.5));((~-.pi /. 2.),radius +. Random.float (radius *. 0.5))];*)
   hdr_color = saturate {
     r = asteroid_min_lum +. Random.float (asteroid_max_lum -. asteroid_min_lum) ;
@@ -1213,6 +1295,8 @@ polygon = [];(*
 let rec random_out_of_screen radius =
   let (x,y) = ((Random.float ( 3. *. phys_width)) -. phys_width, (Random.float ( 3. *. phys_height)) -. phys_height) in
   if (y +. radius > 0. && y -. radius < phys_height && x +. radius > 0. && x -. radius < phys_width) then  random_out_of_screen radius else (x,y)
+
+
 
 (*TODO maintenant, faire spawner les astéroïdes seulement en dehors de l'écran de jeu*)
 let spawn_random_asteroid ref_etat =
@@ -1235,6 +1319,7 @@ let frag_asteroid ref_asteroid =
   fragment.health <- asteroid_mass_health *. fragment.mass +. asteroid_min_health;
   fragment.max_health <- fragment.health;
   fragment.velocity <- addtuple fragment.velocity (polar_to_affine orientation (fragment_min_velocity +. Random.float (fragment_max_velocity -. fragment_min_velocity)));
+  fragment.polygon <- polygon_asteroid new_radius asteroid_polygon_sides;
   fragment.hdr_color <- asteroid.hdr_color;
   fragment.hdr_exposure <- fragment.hdr_exposure *. (fragment_min_exposure +. Random.float (fragment_max_exposure -. fragment_min_exposure));
   ref fragment
@@ -1243,12 +1328,12 @@ let frag_asteroid ref_asteroid =
 let spawn_random_star () = {
   last_pos = (Random.float phys_width, Random.float phys_height);
   pos = (Random.float phys_width, Random.float phys_height);
-  proximity = (randfloat star_min_prox star_max_prox) ** 4.;
+  proximity = (randfloat star_min_prox star_max_prox) ** 6.;
   lum = randfloat star_min_lum star_max_lum;
 }
 
-let rec add_n_stars ref_stars n =
-  if n=0 then ref_stars else ref (spawn_random_star ()) :: add_n_stars ref_stars (n-1)
+let rec n_stars n =
+  if n=0 then [] else (ref (spawn_random_star ()) :: n_stars (n-1));;
 
 let button_screenshake={
   pos1 = (0.02*.phys_width,0.9*.phys_height);
@@ -1292,8 +1377,22 @@ let button_framerate={
   boolean = locked_framerate;
   lastmousestate = false;}
 
+let button_oldschool={
+  pos1 = (0.02*.phys_width,0.3*.phys_height);
+  pos2 = (0.12*.phys_width,0.35*.phys_height);
+  text = "oldschool mode";
+  boolean = oldschool;
+  lastmousestate = false;}
+
+let button_motionblur={
+  pos1 = (0.02*.phys_width,0.2*.phys_height);
+  pos2 = (0.12*.phys_width,0.25*.phys_height);
+  text = "motion blur";
+  boolean = motion_blur;
+  lastmousestate = false;}
+
 let init_etat () = {
-  buttonboolean = [button_screenshake;button_dynamic_camera;button_infinitespace;button_mousecontrol;button_smoke;button_framerate];
+  buttonboolean = [button_screenshake;button_dynamic_camera;button_infinitespace;button_mousecontrol;button_smoke;button_framerate;button_oldschool;button_motionblur];
   lifes = 3;
   score = 0;
   cooldown = 0.;
@@ -1303,11 +1402,12 @@ let init_etat () = {
   ref_objets_unspawned = [];
   ref_fragments = [];
   ref_fragments_unspawned = [];
+  ref_chunks = [];
   ref_projectiles = [];
   ref_explosions = [];
   ref_smoke = [];
   ref_sparks = [];
-  ref_stars = add_n_stars [] stars_nb;
+  ref_stars = n_stars !stars_nb;
 }
 
 
@@ -1337,7 +1437,6 @@ let rec render_scanlines nb=
   lineto width nb;
   render_scanlines (nb + scanlines_period))
 
-
 (*Rendu de cœur*)
 let draw_heart (x0,y0) (x1,y1) =
   let (x0,y0) = multuple (x0,y0) ratio_rendu and (x1,y1) = multuple (x1,y1) ratio_rendu in
@@ -1363,15 +1462,17 @@ let affiche_hud ref_etat =
   moveto 0 (height/2);
   draw_string (string_of_int etat.score);
 
-  draw_n_hearts (0.95*.phys_width) etat.lifes;
-
   let ship = !(etat.ref_ship) in
-  etat.last_health <- (max 0. ship.health) +. (exp_decay (etat.last_health -. (max 0. ship.health)) 0.5);
-  affiche_barre 1. [(0.95,0.9);(0.95,0.85);(0.6,0.85);(0.55,0.9)] black;
-  affiche_barre (etat.last_health /. ship_max_health) [(0.95,0.9);(0.95,0.85);(0.6,0.85);(0.55,0.9)] yellow;
-  affiche_barre ((max 0. ship.health) /. ship_max_health) [(0.95,0.9);(0.95,0.85);(0.6,0.85);(0.55,0.9)] red;
-  set_line_width buttonframewidth; set_color buttonframe;
-  draw_poly (Array.of_list (relative_poly[(0.95,0.9);(0.95,0.85);(0.6,0.85);(0.55,0.9)]));
+
+  if not !oldschool then (
+    draw_n_hearts (0.95*.phys_width) etat.lifes;
+    etat.last_health <- (max 0. ship.health) +. (exp_decay (etat.last_health -. (max 0. ship.health)) 0.5);
+    affiche_barre 1. [(0.95,0.9);(0.95,0.85);(0.6,0.85);(0.55,0.9)] black;
+    affiche_barre (etat.last_health /. ship_max_health) [(0.95,0.9);(0.95,0.85);(0.6,0.85);(0.55,0.9)] yellow;
+    affiche_barre ((max 0. ship.health) /. ship_max_health) [(0.95,0.9);(0.95,0.85);(0.6,0.85);(0.55,0.9)] red;
+    set_line_width buttonframewidth; set_color buttonframe;
+    draw_poly (Array.of_list (relative_poly[(0.95,0.9);(0.95,0.85);(0.6,0.85);(0.55,0.9)]))
+  );
 
   if scanlines then (
     if animated_scanlines then
@@ -1401,7 +1502,13 @@ let affiche_etat ref_etat =
   (*On actualise la caméra en fonction du vaisseau.
   Dans les faits on bouge les objets, mais tous de la même valeur donc pas de réel impact*)
     (*On calcule les déplacements de la caméra pour le rendu de caméra dynamique*)
-    let (next_x, next_y) = addtuple !(etat.ref_ship).position  (multuple !(etat.ref_ship).velocity camera_prediction) in
+    let (next_x, next_y) =
+      addtuple
+        (addtuple !(etat.ref_ship).position (multuple !(etat.ref_ship).velocity camera_prediction))
+        (multuple (center_of_attention
+          (List.append (List.append etat.ref_objets etat.ref_objets_unspawned) (List.append etat.ref_fragments etat.ref_fragments_unspawned))
+          !(etat.ref_ship).position)
+        camera_ratio_objects) in
     (*move_camera décrit plutôt un déplacement de la totalité des objets en jeu.*)
     let move_camera = (((phys_width /. 2.) -. next_x) -. (exp_decay ((phys_width /. 2.) -. next_x) camera_half_depl), ((phys_height/. 2.) -. next_y) -. (exp_decay ((phys_height/. 2.) -. next_y) camera_half_depl)) in
     ignore (deplac_stars etat.ref_stars move_camera);
@@ -1410,27 +1517,30 @@ let affiche_etat ref_etat =
     deplac_objets_abso  etat.ref_objets_unspawned move_camera;
     deplac_objets_abso  etat.ref_fragments move_camera;
     deplac_objets_abso  etat.ref_fragments_unspawned move_camera;
+    deplac_objets_abso  etat.ref_chunks move_camera;
     deplac_objets_abso  etat.ref_projectiles move_camera;
     deplac_objets_abso  etat.ref_explosions move_camera;
     deplac_objets_abso  etat.ref_smoke move_camera;
 
   (*Fond d'espace*)
+  if !oldschool then set_color black else
   set_color (rgb_of_hdr (intensify {r=space_r; v=space_g; b=space_b} !game_exposure));
   fill_rect 0 ~-1 width height;
   (*On calcule éventuellement le motion blur si il est activé*)
-  if motion_blur then (
+  if !motion_blur then (
     List.iter render_motion_blur etat.ref_fragments_unspawned;
     List.iter render_motion_blur etat.ref_fragments;
     List.iter render_motion_blur etat.ref_objets_unspawned;
     List.iter render_motion_blur etat.ref_objets;
     set_line_width 2;
     List.iter render_star_trail etat.ref_stars;(*On rend les étoiles derrière la fumée, mais derrière les autres objets moins lumineux.*)
-    (*List.iter render_motion_blur etat.ref_smoke;*)(*TODO régler le fait que le blur soit appliqué qu'une fois sur deux.*)
+    (*List.iter render_motion_blur etat.ref_smoke;*)(*TODO régler le fait que le blur soit appliqué ou non de manière erratique.*)
   )else (
     set_line_width 2; List.iter render_star_trail etat.ref_stars);(*Avec ou sans motion blur, on rend les étoiles comme il faut*)
   set_line_width 0;
 
-  List.iter render_objet etat.ref_smoke;
+  if not !oldschool then (List.iter render_chunk etat.ref_chunks;
+  List.iter render_objet etat.ref_smoke);
   List.iter render_projectile etat.ref_projectiles;
   render_objet etat.ref_ship;
   List.iter render_unspawned etat.ref_fragments_unspawned;
@@ -1448,6 +1558,25 @@ let affiche_etat ref_etat =
 (* calcul de l'etat suivant, apres un pas de temps *)
 let etat_suivant ref_etat =
   let etat = !ref_etat in
+  if !oldschool
+    then (
+      projectile_number := 1;
+      fragment_number := 2;
+      stars_nb := 0;
+      screenshake := false;
+      dynamic_camera := false;
+      infinitespace := false;
+      smoke := false;
+      motion_blur := false;
+      mousecontrol := false)
+    else (
+      stars_nb := stars_nb_default;
+      projectile_number := 5;
+      fragment_number := 5);
+
+  if !infinitespace then dynamic_camera := true;
+
+  if !stars_nb != !stars_nb_previous then (etat.ref_stars <- n_stars !stars_nb; stars_nb_previous := !stars_nb);
 
   (*On calcule le changement de vitesse naturel du jeu. Basé sur le temps réel et non le temps ingame pour éviter les casi-freeze*)
   game_speed := !game_speed_target +. abso_exp_decay (!game_speed -. !game_speed_target) half_speed_change;
@@ -1476,6 +1605,7 @@ let etat_suivant ref_etat =
   inertie_objets etat.ref_objets_unspawned;
   inertie_objets etat.ref_fragments;
   inertie_objets etat.ref_fragments_unspawned;
+  inertie_objets etat.ref_chunks;
   inertie_objets etat.ref_projectiles;
   inertie_objets etat.ref_smoke;
 
@@ -1531,14 +1661,16 @@ let etat_suivant ref_etat =
   (*On fait apparaitre les explosions correspondant aux projectiles détruits*)
   etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
 
-  (*On fait apparaitre les explosions correspondant aux objets détruits*)
+  (*On fait apparaitre les explosions correspondant aux objets détruits,
+  sauf en mode oldschool*)
+  if not ! oldschool then (
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
-  etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_unspawned));
-  (*On ne fait pas exploser les fragments, car ils sont tous superposés, et en quelques frames ils memurent tous.
+  etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_unspawned)));
+  (*On ne fait pas exploser les fragments, car ils sont tous superposés, et en quelques frames ils meurent tous.
   On fait par contre entrer les explosions dans les effets de fumée, pour l'effet visuel.*)
   if !smoke then(
-    etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
-    etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_unspawned)));(*Le vaisseau génère aussi une trainée d'explosions après sa mort*)
+    etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments));
+    etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments_unspawned)));(*Le vaisseau génère aussi une trainée d'explosions après sa mort*)
   if (is_dead etat.ref_ship) then etat.ref_explosions <- (spawn_explosion etat.ref_ship) :: etat.ref_explosions;
 
   (*On ralentit le temps selon le nombre d'explosions*)
@@ -1549,14 +1681,14 @@ let etat_suivant ref_etat =
     if n=0 then ref_dest else List.append (spawn_n_frags ref_source ref_dest (n-1)) (List.map frag_asteroid (List.filter is_dead ref_source))
 ) in
 
-  (*On fait apparaitre 5 fragments des astéroïdes détruits*)
-  etat.ref_fragments <- spawn_n_frags etat.ref_objets etat.ref_fragments 5;
+  (*On fait apparaitre les fragments des astéroïdes détruits*)
+  etat.ref_fragments <- spawn_n_frags etat.ref_objets etat.ref_fragments !fragment_number;
   (*Pareil pour les astéroïdes «non spawnés»*)
-  etat.ref_fragments_unspawned <- spawn_n_frags etat.ref_objets_unspawned etat.ref_fragments_unspawned 5;
+  etat.ref_fragments_unspawned <- spawn_n_frags etat.ref_objets_unspawned etat.ref_fragments_unspawned !fragment_number;
   (*Pareil pour les fragments déjà cassés*)
-  etat.ref_fragments <- spawn_n_frags etat.ref_fragments etat.ref_fragments 5;
+  etat.ref_fragments <- spawn_n_frags etat.ref_fragments etat.ref_fragments !fragment_number;
   (*Pareil pour les fragments unspawned déjà cassés*)
-  etat.ref_fragments_unspawned <- spawn_n_frags etat.ref_fragments_unspawned etat.ref_fragments_unspawned 5;
+  etat.ref_fragments_unspawned <- spawn_n_frags etat.ref_fragments_unspawned etat.ref_fragments_unspawned !fragment_number;
 
   (*On ralentit le temps selon le nombre d'astéroïde détruits*)
   (*TODO : Baser le ralentissement de temps non sur la quantité d'astéroïdes détruits et le nombre d'explosions,
@@ -1577,12 +1709,13 @@ let etat_suivant ref_etat =
   (*Recentrage des objets sortis de l'écran.
   Ne pas appeler en infinitespace*)
   if not !infinitespace then (recenter_objet etat.ref_ship;
+  List.iter recenter_objet etat.ref_chunks;
   List.iter recenter_objet etat.ref_objets;
   List.iter recenter_objet etat.ref_fragments);
   (*On reboucle les objets arrivant aux extrémités de 3 fois la hauteur et largeur de l'écran
   pour éviter que le joueur se débarrasse d'unspawned objects en s'écartant simplement*)
   List.iter recenter_objet_unspawned etat.ref_objets_unspawned;
-  List.iter recenter_objet_unspawned etat.ref_fragments;
+  List.iter recenter_objet_unspawned etat.ref_fragments_unspawned;
   (*On ne recentre pas les projectiles car ils doivent despawner une fois sortis de l'espace de jeu*)
 
 (*TODO faire un système de spawn d'astéroides propre. Pas encore bon pour l'instant.*)
@@ -1686,7 +1819,6 @@ let strafe_right ref_etat =
 ref_etat:=etat;
 etat_suivant ref_etat;;
 
-
 (* tir d'un nouveau projectile *)
 let tir ref_etat =
   game_screenshake := !game_screenshake +. screenshake_tir_ratio;
@@ -1700,26 +1832,11 @@ ce qui est une approximation généralement correcte*)
   if etat.cooldown < 0. || etat.cooldown < Random.float (!time_current_frame -. !time_last_frame)
   then (
     let ship = !(etat.ref_ship) in
-    let position_tir = addtuple ship.position (polar_to_affine ship.orientation (2. *. ship_radius)) in
-    (*Quintuple tir*) (*TODO une fonction nuple tir, qui crée un tableau avec n projectiles.
-    Sera utile pour des fonctions générales d'arme pour les powerups.*)
-    (*TODO permettre une fréquence de tir supérieure au framerate.*)
-    let velocity_tir1 = addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. projectile_deviation +. ship.orientation) (projectile_min_speed +. Random.float (projectile_max_speed -. projectile_min_speed))) in
-    let velocity_tir2 = addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. projectile_deviation +. ship.orientation) (projectile_min_speed +. Random.float (projectile_max_speed -. projectile_min_speed))) in
-    let velocity_tir3 = addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. projectile_deviation +. ship.orientation) (projectile_min_speed +. Random.float (projectile_max_speed -. projectile_min_speed))) in
-    let velocity_tir4 = addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. projectile_deviation +. ship.orientation) (projectile_min_speed +. Random.float (projectile_max_speed -. projectile_min_speed))) in
-    let velocity_tir5 = addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. projectile_deviation +. ship.orientation) (projectile_min_speed +. Random.float (projectile_max_speed -. projectile_min_speed))) in
-    (*Cinq projectiles*)
-    let projectile1 = ref (spawn_projectile position_tir velocity_tir1) in
-    let projectile2 = ref (spawn_projectile position_tir velocity_tir2) in
-    let projectile3 = ref (spawn_projectile position_tir velocity_tir3) in
-    let projectile4 = ref (spawn_projectile position_tir velocity_tir4) in
-    let projectile5 = ref (spawn_projectile position_tir velocity_tir5) in
-    (* Muzzleflash. On utilise List.append pour que le Muzzleflash soit au dessus de la fumée déjà en jeu.*)
-    if !smoke then etat.ref_smoke <- List.append etat.ref_smoke [spawn_muzzle projectile1];
-
-    (*On ajoute les cinq projectiles*)
-    etat.ref_projectiles <- List.append [projectile1 ; projectile2 ; projectile3 ; projectile4 ; projectile5] etat.ref_projectiles;
+    (*On ajoute les projectiles *)
+    let projs = (spawn_n_projectiles ship !projectile_number) in
+    etat.ref_projectiles <- List.append projs etat.ref_projectiles;
+    (*Ajout du muzzleflash correspondant aux tirs*)
+    if !smoke && not !oldschool then etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_muzzle projs);
 
     etat.cooldown <- etat.cooldown +. projectile_cooldown;
     ship.velocity <- addtuple ship.velocity (polar_to_affine (ship.orientation +. pi) projectile_recoil);
@@ -1756,26 +1873,28 @@ let controle_souris ref_etat =
 
 
 (*État une fois mort*)
-let rec mort ref_etat =(*
-  tir ref_etat;*)
-    rotation_droite ref_etat;
+let rec mort ref_etat =
+  game_speed_target := game_speed_target_death;
+  game_exposure_target := game_exposure_target_death;
+  if not !oldschool then (
     acceleration ref_etat;
-    !(!ref_etat.ref_ship).mass <- 10000.;
-    game_speed_target := game_speed_target_death;
-    game_exposure_target := game_exposure_target_death;
-    if (Unix.gettimeofday () < !time_of_death +. time_stay_dead) then (
-      if key_pressed  ()then (
-        let status = wait_next_event[Key_pressed] in
-          match status.key  with (* ...en fonction de la touche frappee *)
-          | 'r' -> ref_etat := init_etat ()(*R permet de recommencer une partie de zéro rapidement. TODO : Le faire fonctionner*)
-          | 'k' -> print_endline "Bye bye!"; exit 0 (* on quitte le jeu *)
-          | _ -> mort ref_etat)
-      else mort ref_etat)
-    else (
-    if (!ref_etat).lifes = 0 then (print_endline "Bye bye!"; exit 0) else (
-    !ref_etat.ref_ship <- ref (spawn_ship ());
-    game_speed_target := game_speed_target_boucle;
-    game_exposure_target := game_exposure_target_boucle))
+    !(!ref_etat.ref_ship).mass <- 10000.
+  );
+  rotation_droite ref_etat;
+  etat_suivant ref_etat;
+  if (Unix.gettimeofday () < !time_of_death +. time_stay_dead) then (
+    if key_pressed  ()then (
+      let status = wait_next_event[Key_pressed] in
+        match status.key  with (* ...en fonction de la touche frappee *)
+        | 'r' -> ref_etat := init_etat ()(*R permet de recommencer une partie de zéro rapidement. TODO : Le faire fonctionner*)
+        | 'k' -> print_endline "Bye bye!"; exit 0 (* on quitte le jeu *)
+        | _ -> mort ref_etat)
+    else mort ref_etat)
+  else (
+  if (!ref_etat).lifes = 0 then (print_endline "Bye bye!"; exit 0) else (
+  !ref_etat.ref_ship <- ref (spawn_ship ());
+  game_speed_target := game_speed_target_boucle;
+  game_exposure_target := game_exposure_target_boucle))
 
 (* --- boucle d'interaction --- *)
 
