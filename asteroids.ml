@@ -37,7 +37,7 @@ let observer_proper_time = ref 1.0;;(*En ratio du temps «absolu» de l'univers*
 (*Un framerate plus élevé offre une meilleure expérience de jeu :*)
 (*Des contrôles plus réactifs, un meilleur confort visuel, et une physique plus précise.*)
 (*Bien sûr, il est possible de le changer ci-dessous :)*)
-let framerate_limit = 600.;;
+let framerate_limit = 200.;;
 (*Il est également possible de désactiver purement et simplement la limitation de framerate*)
 let locked_framerate = false;;
 
@@ -56,8 +56,8 @@ let time_render = ref 0.;;
 
 (*Dimensions fenêtre graphique.*)
 
-let width = 1280;;
-let height = 600;;
+let width = 1200;;
+let height = 700;;
 
 (*Dimensions de l'espace physique dans lequel les objets évoluent.*)
 (*On s'assure que la surface de jeu soit la même quelle que soit la résolution.*)
@@ -113,17 +113,21 @@ let asteroid_max_spawn_radius = 100.;;(*Taille max d'astéroïde au spawn.*)
 let asteroid_min_spawn_radius = 50.;;(*Taille min, en ratio de la taille de spawn max*)
 let asteroid_min_size = 10.;;(*En dessous de la taille minimale, un asteroide ne se divise pas à sa mort*)
 let asteroid_max_moment = 1.;;(*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
-let asteroid_max_velocity = 100.;; (*Velocité max au spawn (sens aléatoire)*)
-let asteroid_min_velocity = 50.;;(*TODO implémenter ça*)
+let asteroid_max_velocity = 100.;; (*Velocité max au spawn*)
+let asteroid_min_velocity = 50.;; (*Velocité min au spawn*)
 let asteroid_density = 1.;;(*Sert à déterminer la masse d'un astéroïde en se basant sur sa surface*)
-let asteroid_radius_health = 1.;;(*Sert à déterminer la health d'un astéroïde basé sur son rayon*)
+let asteroid_mass_health = 0.01;;(*Sert à déterminer la vie d'un astéroïde basé sur son rayon*)
 
 (*Dam : dommmages. phys : dommages physiques. Ratio : Multiplicateur du dégat. res : résistance aux dégats (soustraction)*)
 let asteroid_dam_ratio = 1.;;
-let asteroid_dam_res = 10.;;
-let asteroid_phys_ratio = 0.8;;
-let asteroid_phys_res = 200.;;
+let asteroid_dam_res = 0.;;
+let asteroid_phys_ratio = 0.3;;
+let asteroid_phys_res = 2000.;;
 
+let fragment_max_velocity = 200.;; (*Velocité max au spawn*)
+let fragment_min_velocity = 100.;;  (*Velocité min au spawn*)
+let fragment_max_size = 0.7;;(*En ratio de la taille de l'astéroïde parent*)
+let fragment_min_size = 0.5;; (*En ratio de la taille de l'astéroïde parent*)
 
 
 (*Paramètres ship*)
@@ -138,7 +142,7 @@ let ship_max_health = 100.;; (*health au spawn. Permet de l'appliquer au modèle
 let ship_max_healths = 3;; (*Nombre de fois que le vaisseau peut réapparaître*)
 
 let ship_max_depl = 50.;; (*En px.s⁻¹. Utile si contrôle direct du déplacement.*)
-let ship_max_accel = 200.;; (*En px.s⁻² Utile si contrôle de l'accélération*)
+let ship_max_accel = 500.;; (*En px.s⁻² Utile si contrôle de l'accélération*)
 let ship_half_stop =1000.;; (*En temps nécessaire pour perdre la moitié de l'inertie*)
 let ship_max_tourn = 4.;; (*En radian.s⁻¹*)
 let ship_max_moment = 0.5;; (*En radian.s⁻²*)
@@ -149,7 +153,7 @@ let ship_radius = 15.;; (*Pour la hitbox et le rendu*)
 let ship_dam_ratio = 0.8;;
 let ship_dam_res = 10.;;
 let ship_phys_ratio = 1.;;
-let ship_phys_res = 1000.;;
+let ship_phys_res = 2000.;;
 
 let ship_death_damages = 50.;;
 let ship_death_radius = 500.;;
@@ -166,7 +170,7 @@ let projectile_health = 0.;;(*On considère la mort quand la santé descend sous
 (*Valeur des explosions*)
 let explosion_max_radius = 50.;;
 let explosion_min_radius = 25.;;
-let explosion_damages = 50.;;
+let explosion_damages = 2.;;
 
 (*Valeur de la fumée*)
 let smoke_half_life = 0.1;; (*Vitesse de la décroissance de la couleur*)
@@ -303,7 +307,7 @@ type objet_physique = {
   objet : type_object;
   (*TODO : Si le temps, définir une hitbox autre que circulaire*)
   mutable radius : float;
-  mass : float;
+  mutable mass : float;
   mutable health : float;
   max_health : float;
 
@@ -325,7 +329,7 @@ type objet_physique = {
 
   proper_time : float;
 
-  hdr_color : hdr;
+  mutable hdr_color : hdr;
   mutable hdr_exposure : float;
 };;
 
@@ -348,7 +352,7 @@ let rec render_light_trail radius pos velocity color =
   set_line_width (dither radius);
   let (x,y) = multuple pos ratio_rendu in
   moveto (dither x) (dither y);
-  let (dx,dy) = multuple velocity ~-.(max (shutter_speed /. framerate_render) (shutter_speed *.(!time_current_frame -. !time_last_frame))) in
+  let (dx,dy) = multuple velocity ~-. (ratio_rendu *. (max (shutter_speed /. framerate_render) (shutter_speed *.(!time_current_frame -. !time_last_frame)))) in
   lineto (dither (x +. dx)) (dither (y +. dy));
   ();;
 
@@ -430,6 +434,7 @@ type etat = {
 (*Les objets sont des listes de référence, pour la simplicité de la gestion*)
 (*Il est plus simple de gérer la physique en séparant les objets spawnés et objets non spawnés*)
   mutable ref_objets_unspawned : objet_physique ref list;
+  mutable ref_fragments : objet_physique ref list; (*On fait apparaître les fragments dans une liste séparée pour éviter qu'ils ne s'entre-collisionnent*)
   mutable ref_objets : objet_physique ref list;
   mutable ref_projectiles : objet_physique ref list;
   mutable ref_explosions : objet_physique ref list;
@@ -537,13 +542,23 @@ let close_enough ref_objet =
 
 let positive_radius ref_objet = !ref_objet.radius > 0.;;
 
+let big_enough ref_objet = !ref_objet.radius > asteroid_min_size;;
+
 (*Fonction despawnant les objets trop lointains et morts, ou avec rayon négatif*)
 let despawn ref_etat =
   let etat = !ref_etat in
     etat.ref_objets <- (List.filter is_alive etat.ref_objets);
+    etat.ref_objets <- (List.filter big_enough etat.ref_objets);
+
+    etat.ref_fragments <- (List.filter is_alive etat.ref_fragments);
+    etat.ref_fragments <- (List.filter big_enough etat.ref_fragments);
+
     etat.ref_objets_unspawned <- (List.filter is_alive etat.ref_objets_unspawned);
+    etat.ref_objets_unspawned <- (List.filter is_alive etat.ref_objets_unspawned);
+
     etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
     etat.ref_projectiles <- (List.filter close_enough etat.ref_projectiles);
+
     etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
   ref_etat := etat;;
 
@@ -562,21 +577,53 @@ ref_objet := objet;;
 
 (*Fonction vérifiant la collision entre deux objets*)
 let collision objet1 objet2 =
-(*Ces premières vérifications sont censées optimiser le temps de calcul, mais je ne suis pas sûr que ça soit le cas*)
-(*Je n'ai pas encore benchmarké ça, mais les hitbox sont amenées à évoluer, je verrai ça plus tard*)
-  let (x1, y1) = objet1.position in
-  let (x2, y2) = objet2.position in
-  if ((x1 +. objet1.radius > x2 -. objet2.radius) || (x2 +. objet2.radius > x1 -. objet1.radius))
-  && ((y1 +. objet1.radius > y2 -. objet2.radius) || (y2 +. objet2.radius > y1 -. objet1.radius))
-  then
-  distancecarre objet1.position objet2.position < carre (objet1.radius +. objet2.radius)
+(*Si on essaye de collisionner un objet avec lui-même, ça ne fonctionne pas*)
+if objet1 = objet2 then false else distancecarre objet1.position objet2.position < carre (objet1.radius +. objet2.radius);;
+
+
+(*Vérifie la collision entre un objet et une liste d'objets*)
+let rec collision_objet_liste ref_objet ref_objets =
+  if List.length ref_objets > 0 then (
+  collision !ref_objet !(List.hd ref_objets) || collision_objet_liste ref_objet (List.tl ref_objets))
   else false;;
+
+
+(*Retourne les objets de la liste 1 étant en collision avec des objets de la liste 2*)
+let rec collision_objets_listes ref_objets1 ref_objets2 =
+  if List.length ref_objets1 > 0  && List.length ref_objets1 > 0 then (
+    if collision_objet_liste (List.hd ref_objets1) ref_objets2
+      then List.hd ref_objets1 :: collision_objets_listes (List.tl ref_objets1) ref_objets2
+      else collision_objets_listes (List.tl ref_objets1) ref_objets2;
+  )else [];;
+
+
+
+(*Retourne les objets de la liste 1 n'étant pas en collision avec des objets de la liste 2*)
+let rec no_collision_objets_listes ref_objets1 ref_objets2 =
+  if List.length ref_objets1 > 0  && List.length ref_objets1 > 0 then (
+    if collision_objet_liste (List.hd ref_objets1) ref_objets2
+      then no_collision_objets_listes (List.tl ref_objets1) ref_objets2
+      else List.hd ref_objets1 :: no_collision_objets_listes (List.tl ref_objets1) ref_objets2;
+  )else [];;
+
+
+
+(*Retourne tous les objets d'une liste étant en collision avec au moins un autre*)
+let rec collisions_sein_liste ref_objets = collision_objets_listes ref_objets ref_objets;;
+
+(*Retourne tous les objets au sein d'une liste n'étant pas en collision avec les autres*)
+let rec no_collisions_liste ref_objets = no_collision_objets_listes ref_objets ref_objets;;
+
+
 
 
 (*Fonction appelée en cas de collision de deux objets.*)
 (*Conséquences à compléter et améliorer*)
 (*TODO*)
 let consequences_collision ref_objet1 ref_objet2 =
+  if !ref_objet1.objet = Explosion
+    (*On applique les dégats de l'explosion*)
+    then damage ref_objet2 explosion_damages else
   if !ref_objet1.objet = Projectile
     (*On endommage le projectile pour qu'il meure*)
     then damage ref_objet1 0.1
@@ -747,6 +794,9 @@ let spawn_projectile position velocity = {
     hdr_exposure = 1.;
 };;
 
+
+
+
 (*Spawne une explosion sous la forme d'une référence*)
 let spawn_explosion ref_projectile = ref {
   objet = Explosion;
@@ -774,12 +824,14 @@ let spawn_explosion ref_projectile = ref {
 
 }
 
+
+
 let spawn_asteroid (x, y) (dx, dy) radius = {
   objet = Asteroid;
   radius = radius;
   mass = pi *. (carre radius) *. asteroid_density;
-  health = radius *. asteroid_radius_health;
-  max_health = radius *. asteroid_radius_health;
+  health = asteroid_mass_health *. pi *. (carre radius) *. asteroid_density;
+  max_health = asteroid_mass_health *. pi *. (carre radius) *. asteroid_density;
 
   dam_res = asteroid_dam_res;
   dam_ratio = asteroid_dam_ratio;
@@ -808,12 +860,27 @@ let spawn_random_asteroid ref_etat =
 
 
 
+(*Diminution de la taille d'un astéroide*)
+(*Permet de spawner plusieurs sous-asteroides lors de la fragmentation*)
+let frag_asteroid ref_asteroid =
+  let asteroid = !ref_asteroid in
+  let fragment = spawn_asteroid asteroid.position asteroid.velocity asteroid.radius in
+  fragment.radius <- (fragment_min_size +. Random.float (fragment_max_size -. fragment_min_size)) *. fragment.radius;
+  fragment.mass <- asteroid_density *. (carre fragment.radius);
+  fragment.health <- asteroid_mass_health *. fragment.mass;
+  fragment.velocity <- addtuple fragment.velocity (polar_to_affine (Random.float 2. *. pi) (fragment_min_velocity +. Random.float (fragment_max_velocity -. fragment_min_velocity)));
+  fragment.hdr_color <- asteroid.hdr_color;
+  ref fragment;;
+
+
+
 let init_etat = {
   score = 0;
   cooldown = 0.;
   ref_ship = ref spawn_ship;
   ref_objets_unspawned = [];
   ref_objets = [];
+  ref_fragments = [];
   ref_projectiles = [];
   ref_explosions = [];
   ref_smoke = [];
@@ -836,8 +903,9 @@ let affiche_etat ref_etat =
   List.iter render_projectile etat.ref_projectiles;
   List.iter render_unspawned etat.ref_smoke;
   render_objet etat.ref_ship;
-  List.iter render_objet etat.ref_objets;
+  List.iter render_objet etat.ref_fragments;
   List.iter render_unspawned etat.ref_objets_unspawned;
+  List.iter render_objet etat.ref_objets;
   List.iter render_unspawned etat.ref_explosions;
 
   (*Affichage du framerate*)
@@ -868,43 +936,65 @@ let etat_suivant ref_etat =
   inertie_objet etat.ref_ship;
   inertie_objets etat.ref_objets;
   inertie_objets etat.ref_objets_unspawned;
+  inertie_objets etat.ref_fragments;
   inertie_objets etat.ref_projectiles;
   inertie_objets etat.ref_smoke;
 
   moment_objet etat.ref_ship;
   moment_objets etat.ref_objets;
   moment_objets etat.ref_objets_unspawned;
-(*Inutile de calculer le moment des projectiles, comme leur rotation n'a aucune importance*)
-
-  (*On calcule les collisions avec le vaisseau seulement après les autres objets,*)
-  (*car dans le cas exceptionnel où un objet est détruit par une autre collision
-  avant de toucher le vaisseau, cela permet au joueur d'être sauvé in extremis*)
-  (*et cela participe à une expérience de jeu plaisante.*)
+  moment_objets etat.ref_fragments;
+  (*Inutile de calculer le moment des projectiles, explosions ou fumée, comme leur rotation n'a aucune importance*)
 
   (*Collisions entre le vaisseau et les objets*)
   calculate_collisions_modulo etat.ref_ship etat.ref_objets;
   (*Collisions entre le vaisseau et les objets «non spwanés»*)
   calculate_collisions_objet etat.ref_ship etat.ref_objets_unspawned;
+  (*Collisions entre le vaisseau et les fragments*)
+  calculate_collisions_modulo etat.ref_ship etat.ref_fragments;
 
   (*Collisions entre projectiles et objets*)
   calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets;
   (*Collisions entre projectiles et objets «non spawnés» - non modulo*)
   calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_unspawned;
+  (*Collisions entre les projectiles et les fragments*)
+  calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_fragments;
+
+  (*Collisions entre explosions et objets*)
+  calculate_collisions_modulo_listes etat.ref_explosions etat.ref_objets;
+  (*Collisions entre explosions et objets «non spawnés» - non modulo*)
+  calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_unspawned;
+  (*Collisions entre explosions et les fragments*)
+  calculate_collisions_modulo_listes etat.ref_explosions etat.ref_fragments;
 
   (*Collisions entre objets*)
   calculate_collisions_modulos etat.ref_objets;
   (*Collisions entre objets spawnés et «non spawnés» - modulo pour le coup*)
   calculate_collisions_modulo_listes etat.ref_objets etat.ref_objets_unspawned;
+  (*Collisions entre objets et fragments*)
+  calculate_collisions_modulo_listes etat.ref_objets etat.ref_fragments;
+
+
   (*Les explosions sont ajoutées à la fumée, et la fumée précédente avec decay*)
   etat.ref_smoke <- List.append (List.map decay_smoke etat.ref_smoke) etat.ref_explosions;
   (*On fait apparaitre les explosions correspondant aux projectiles détruits*)
   etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
+  (*On fait apparaitre 4 fragments des astéroïdes détruits*)
+  etat.ref_fragments <- List.append (List.map frag_asteroid (List.filter is_dead etat.ref_objets)) etat.ref_fragments ;
+  etat.ref_fragments <- List.append (List.map frag_asteroid (List.filter is_dead etat.ref_objets)) etat.ref_fragments ;
+  etat.ref_fragments <- List.append (List.map frag_asteroid (List.filter is_dead etat.ref_objets)) etat.ref_fragments ;
+  etat.ref_fragments <- List.append (List.map frag_asteroid (List.filter is_dead etat.ref_objets)) etat.ref_fragments ;
+
+  (*On transfère les fragments qui ne sont pas en collision avec les autres dans les objets physiques*)
+  etat.ref_objets <- List.append (no_collisions_liste etat.ref_fragments) etat.ref_objets ;
+  etat.ref_fragments <- collisions_sein_liste etat.ref_fragments;
 
 
 (*Recentrage des objets sortis de l'écran*)
   recentre_objet etat.ref_ship;
   List.iter recentre_objet etat.ref_objets;
-(*On ne recentre pas les projectiles car ils doivent despawner une fois hors de l'écran*)
+  List.iter recentre_objet etat.ref_fragments;
+  (*On ne recentre pas les projectiles car ils doivent despawner une fois hors de l'écran*)
   (*On ne recentre pas les unspawned car ils ne sont pas encore dans l'espace de jeu*)
 
 (*TODO faire un système de spawn d'astéroides propre. Pas encore bon pour l'instant.*)
@@ -918,7 +1008,7 @@ let etat_suivant ref_etat =
   et ce sera compensé par un projectile tiré trop tôt, afin d'équilibrer.*)
   if etat.cooldown > 0. then etat.cooldown <- etat.cooldown -. elapsed_time;
   ref_etat := etat;
-  (*Suppression des objets trop loin de la surface de jeu*)
+  (*Suppression des objets qu'il faut*)
   despawn ref_etat;
   (*On spawne ce qui doit spawner*)
   checkspawn_etat ref_etat;
