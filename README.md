@@ -30,6 +30,6 @@ Features :
 - Changed game scale and various values
 
 Bugs :
-- Hitbox performance hit. Can be disabled in the menu
+- Advanced hitbox performance hit. Can be disabled in the menu
 
 For all changelogs, see changelog.txt
