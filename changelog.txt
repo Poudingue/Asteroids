@@ -1,3 +1,15 @@
+v1.7 - MORE FUN update
+Features :
+  -Everything is faster !
+  -Light flashes for events (Shooting, teleporting and explosions)
+  -Tweaked screenshake, game speed change and exposure for a better game feel.
+  -More forgiving physics damages (allows easy asteroid-pushing :D)
+  -The default gamemode is now infinitespace
+  -The default weapon is now a powerfull shotgun
+Fixed :
+  -Infinitespace now works properly, with objects that are too far coming back the other side
+  -Better performances thanks to a higher asteroid minimum radius and default infinitespace
+
 V1.6 - Interface update
 Features :
   -New rendering system, an object is now a list of colors and polygons

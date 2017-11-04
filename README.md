@@ -6,7 +6,7 @@ I ended up adding many features, including collision physics with energy conserv
 
 Even though i used oCaml, a language i'm not really a big fan of, it worked out pretty good. I know the code is pretty clunky and repetitive sometimes, with some ugly workarounds, but it works !
 
-I'll maybe work on it on my spare time, but for now, i'll just make the source code available to everyone, for fun and/or learning.
+I'll work on it on my spare time, and make the source code available to everyone, for fun and/or learning.
 
 ## Compilation and Launch
 
@@ -18,18 +18,18 @@ Run it with ./asteroids
 
 ## Changelog
 
-V1.6 - Interface update
+v1.7 - MORE FUN update
 
 Features :
-- New rendering system, an object is now a list of colors and polygons
-- New ship, thanks to this :)
-- New hitbox system, takes a list of points into account. Still not perfect, but does the job most of the time.
-- New pause menu, accesible by pressing p
-- Score is now displayed with big letters :)
-- The stage number too
-- Changed game scale and various values
+- Everything is faster !
+- Light flashes for events (Shooting, teleporting and explosions)
+- Tweaked screenshake, game speed change and exposure for a better game feel.
+- More forgiving physics damages (allows easy asteroid-pushing :D)
+- The default gamemode is now infinitespace
+- The default weapon is now a powerfull shotgun
 
-Bugs :
-- Advanced hitbox performance hit. Can be disabled in the menu
+Fixed :
+- Infinitespace now works properly, with objects that are too far coming back the other side
+- Better performances thanks to a higher asteroid minimum radius and default infinitespace
 
 For all changelogs, see changelog.txt
