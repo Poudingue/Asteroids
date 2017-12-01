@@ -6,13 +6,14 @@ I ended up adding many features, including collision physics with energy conserv
 
 Even though i used oCaml, a language i'm not really a big fan of, it worked out pretty good. I know the code is pretty clunky and repetitive sometimes, with some ugly workarounds, but it works !
 
-I'll work on it on my spare time, and make the source code available to everyone, for fun and/or learning.
+I work on it on my spare time, and make the source code available to everyone, for fun and/or learning.
 
 ## Compilation and Launch
 
 You can compile this game using the command line :
 
-ocamlc -o asteroids unix.cma graphics.cma asteroids.ml
+ocamlc -o asteroids unix.cma graphics.cma parameters.ml functions.ml colors.ml objects.ml asteroids.ml
+(Not sure it works in windows)
 
 Run it with ./asteroids
 
