@@ -12,7 +12,7 @@ I work on it on my spare time, and make the source code available to everyone, f
 
 You can compile this game using the command line :
 
-ocamlc -o asteroids unix.cma graphics.cma parameters.ml functions.ml colors.ml objects.ml asteroids.ml
+ocamlc -o asteroids unix.cma graphics.cma parameters.ml functions.ml colors.ml objects.ml buttons.ml asteroids.ml
 (Not sure it works in windows)
 
 Run it with ./asteroids
