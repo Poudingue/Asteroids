@@ -1,20 +1,3 @@
-v1.7 - MORE FUN update
-Features :
-  -Everything is bigger and faster !
-  -Light flashes for events (Shooting, teleporting and explosions)
-  -Color correction, star colors and space color change from one stage to the next
-  -Tweaked screenshake, game speed change and exposure for a better game feel.
-  -More forgiving physics damages (allows easy asteroid-pushing :D)
-  -The default gamemode is now infinitespace
-  -The default weapon is now a powerfull shotgun
-  -Overexposed colors become whiter. A very intense red will look orange, or yellow, and a very intense blue will look cyan.
-Fixed :
-  -Infinitespace now works properly, with objects that are too far coming back the other side
-  -Better performance thanks to a higher asteroid minimum radius and default infinitespace
-  -No more intricated asteroids and physics bugs.
-Bugs :
-  -Momentum of objects still not taken into account for physics
-
 V1.6 - Interface update
 Features :
   -New rendering system, an object is now a list of colors and polygons
@@ -25,7 +8,7 @@ Features :
   -The stage number too
   -Changed game scale and various values
 Bugs :
-  -«Advanced» hitbox performance hit. Can be disabled in the menu
+  -Hitbox performance hit. Can be disabled in the menu
 
 V1.5 - Oldschool update
 Features :

@@ -240,7 +240,7 @@ let spawn_explosion ref_projectile =
 (*Spawne une explosion héritant d'un objet d'une taille au choix.*)
 let spawn_explosion_object ref_objet =
   let rad = explosion_ratio_radius *. !ref_objet.hitbox.int_radius in (*On récupère le rayon de l'objet*)
-  add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color explosion_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
+  if !flashes then add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color flashes_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
   ref {
   objet = Explosion;
   visuals = {
@@ -444,4 +444,3 @@ let spawn_asteroid (x, y) (dx, dy) radius =
 let rec random_out_of_screen radius =
   let (x,y) = ((Random.float ( 3. *. !phys_width)) -. !phys_width, (Random.float ( 3. *. !phys_height)) -. !phys_height) in
   if (y +. radius > 0. && y -. radius < !phys_height && x +. radius > 0. && x -. radius < !phys_width) then  random_out_of_screen radius else (x,y)
-

@@ -68,8 +68,8 @@ let last_count = ref 0
 let current_count = ref 0
 
 (*Dimensions fenêtre graphique.*)
-let width = 1900
-let height = 1000
+let width = 1360
+let height = 760
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
 let infinitespace = ref true
 let max_dist = 6000.
@@ -117,7 +117,7 @@ let explosion_max_exposure = 2.
 let explosion_damages = 150.
 (*Pour les explosions héritant d'un objet*)
 let explosion_ratio_radius = 1.5
-let explosion_saturate = 5.
+let explosion_saturate = 10.
 let explosion_min_exposure_heritate = 6.(*Détermine la luminosité max et min des explosions héritant d'objets au spawn*)
 let explosion_max_exposure_heritate = 8.
 
@@ -143,14 +143,13 @@ let smoke_max_speed = 40.(*Vitesse random dans une direction random de la fumée
 (*Valeurs des étoiles*)
 let star_min_prox = 0.4 (*Prox min des étoiles. 0 = étoile à l'infini, paraît immobile quel que soit le mouvement.*)
 let star_max_prox = 0.8 (*Prox max. 1 = même profondeur que le vaisseau *)
-let star_prox_lum = 10.(*Pour ajouter de la luminosité aux étoiles plus proches*)
+let star_prox_lum = 0.5 (*Pour ajouter de la luminosité aux étoiles plus proches*)
 let star_min_lum = 0.1
-let star_max_lum = 1.
-let star_rand_lum = 5. (*Effet de scintillement des étoiles*)
+let star_max_lum = 0.5
+let star_rand_lum = 1. (*Effet de scintillement des étoiles*)
 let stars_nb_default = 500
 let stars_nb = ref 200
 let stars_nb_previous = ref 200
-
 
 (*Effet de scanlines pour imiter les moniteurs crt qui projetait l'image ligne par ligne.*)
 (*Activer l'effet animated_scanlines permet l'animation imitant les vidéos interlacées,
@@ -222,9 +221,10 @@ let flashes_tir = 2.
 let flashes_teleport = 1000.
 let flashes_half_life = 0.05
 
-
-
 let filter_half_life = 1.
+let filter_saturation = 0.5
+
+let space_half_life = 1.
 
 let ratio_rendu = ref (sqrt ((float_of_int width) *. (float_of_int height) /. (game_surface *. 1000000.)))
 (*Tailles «physiques» du terrain*)
@@ -235,10 +235,12 @@ let phys_height = ref (float_of_int height /. !ratio_rendu)
 (******************************************************************************)
 (*Paramètres graphiques avancés*)
 
-(*Couleurs du fond d'espace*)
-let space_r = 0.
-let space_g = 0.
-let space_b = 10.
+(*Coleurs random par stage*)
+let rand_min_lum = 0.5
+let rand_max_lum = 1.5
+let space_saturation = 2.
+let star_saturation = 20.
+let dyn_color = ref true
 
 (*Couleurs des boutons*)
 let truecolor = rgb 0 128 0
@@ -274,24 +276,25 @@ let advanced_hitbox = ref true
 
 (*Let objets physiques en contact se repoussent un peu plus que normal pour éviter d'être imbriqués*)
 let min_repulsion = 5.
+let min_bounce = 50.
 
 (*Paramètres des astéroïdes*)
-let asteroid_spawn_delay = 5. (*Temps s'écoulant entre l'apparition de deux astéroïdes*)
+let asteroid_spawn_delay = 0.01 (*Temps s'écoulant entre l'apparition de deux astéroïdes*)
 let asteroid_max_spawn_radius = 700. (*Taille max d'astéroïde au spawn.*)
-let asteroid_min_spawn_radius = 100. (*Taille min de spawn*)
+let asteroid_min_spawn_radius = 400. (*Taille min de spawn*)
 let asteroid_min_size = 50. (*En dessous de la taille minimale, un asteroide se transforme en chunk*)
-let asteroid_max_moment = 3. (*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
-let asteroid_max_velocity = 1000. (*Velocité max au spawn*)
-let asteroid_min_velocity = 500. (*Velocité min au spawn*)
-let asteroid_stage_velocity = 100. (*Permet aux astéroïdes de stages plus avancés d'aller plus vite*)
+let asteroid_max_moment = 2. (*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
+let asteroid_max_velocity = 2000. (*Velocité max au spawn*)
+let asteroid_min_velocity = 1500. (*Velocité min au spawn*)
+let asteroid_stage_velocity = 500. (*Permet aux astéroïdes de stages plus avancés d'aller plus vite*)
 let asteroid_density = 1. (*Sert à déterminer la masse d'un astéroïde en se basant sur sa surface*)
-let asteroid_min_health = 20. (*Évite les astéroïdes trop fragiles à cause d'une masse trop faible. S'additionne au calcul.*)
+let asteroid_min_health = 200. (*Évite les astéroïdes trop fragiles à cause d'une masse trop faible. S'additionne au calcul.*)
 let asteroid_mass_health = 0.01(*Sert à déterminer la vie d'un astéroïde basé sur sa masse*)
 (*Dam : dommmages. phys : dommages physiques. Ratio : Multiplicateur du dégat. res : résistance aux dégats (soustraction)*)
 let asteroid_dam_ratio = 1. (*La sensibilité aux dégats d'explosions*)
 let asteroid_dam_res = 0. (*La résistance aux dégats d'explosions*)
-let asteroid_phys_ratio = 0.5 (*Sensibilité aux chocs physiques*)
-let asteroid_phys_res = 10. (*Résistance aux chocs physiques*)
+let asteroid_phys_ratio = 1. (*Sensibilité aux chocs physiques*)
+let asteroid_phys_res = 100. (*Résistance aux chocs physiques*)
 (*Paramètres pour les couleurs d'astéroïdes à la naissance*)
 let asteroid_min_lum = 20.
 let asteroid_max_lum = 150.
@@ -299,19 +302,19 @@ let asteroid_min_satur = 0.3
 let asteroid_max_satur = 0.5
 (*Paramètres de la hitbox et des visuels polygonaux*)
 let asteroid_polygon_min_sides = 7(*Nombre minimum de côtés qu'un astéroïde peut avoir*)
-let asteroid_polygon_size_ratio = 0.04 (*Permet de déterminer le nombre de côtés qu'un astéroïde aura pour sa hitbox et son rendu. Permet de rendre les gros projectiles plus détaillés, et les petits moins consommateurs en perfs.*)
+let asteroid_polygon_size_ratio = 0.02 (*Permet de déterminer le nombre de côtés qu'un astéroïde aura pour sa hitbox et son rendu. Permet de rendre les gros projectiles plus détaillés, et les petits moins consommateurs en perfs.*)
 let asteroid_polygon_min = 1. (*En ratio du rayon*)
 let asteroid_polygon_max = 1.3 (*En ratio du rayon*)
 (*Contrôle du nombre d'astéroïde apparaissant à chaque vague*)
-let asteroid_min_nb = 10
-let asteroid_stage_nb = 5
+let asteroid_min_nb = 1
+let asteroid_stage_nb = 2
 (*Paramètres pour rapprocher l'air de rien les objets trop lointains (plus utilisé)*)
 let half_close = 10. (*Demi-temps de rapprochement d'un objet par rapport au centre de l'écran*)
 let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le centre de l'écran*)
 
 (*Caractéristiques des fragments. Principalement hérité des parents.*)
-let fragment_max_velocity = 1000. (*Velocité max au spawn*)
-let fragment_min_velocity = 500. (*Velocité min au spawn*)
+let fragment_max_velocity = 2000. (*Velocité max au spawn*)
+let fragment_min_velocity = 1000. (*Velocité min au spawn*)
 let fragment_max_size = 0.6 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_size = 0.3 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.6 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
@@ -323,7 +326,7 @@ let chunk_radius_decay = 2. (*Pour la décroissance des particules n'ayant pas d
 (*valeurs du vaisseau*)
 let ship_max_health = 100. (*health au spawn. Permet de l'appliquer au modèle physique.*)
 let ship_max_healths = 3 (*Nombre de fois que le vaisseau peut réapparaître*)
-let ship_density = 100. (*Pour calcul de la masse du vaisseau, qui a un impact sur la physique*)
+let ship_density = 50. (*Pour calcul de la masse du vaisseau, qui a un impact sur la physique*)
 let ship_radius = 20. (*Pour la hitbox et le rendu*)
 (*Réduction des dégats et dégats physiques*)
 let ship_dam_ratio = 0.8
@@ -359,7 +362,7 @@ let projectile_number = ref 50
 let projectile_number_default = 10
 
 (*Shotgun*)
-let shotgun_recoil = 100.
+let shotgun_recoil = 1000.
 let shotgun_cooldown = 0.3
 let shotgun_max_speed = 15000.
 let shotgun_min_speed = 10000.
@@ -425,7 +428,7 @@ let star_max_prox = 0.8 (*Prox max. 1 = même profondeur que le vaisseau *)
 let star_prox_lum = 10.(*Pour ajouter de la luminosité aux étoiles plus proches*)
 let star_min_lum = 0.1
 let star_max_lum = 1.
-let star_rand_lum = 5. (*Effet de scintillement des étoiles*)
+let star_rand_lum = 1. (*Effet de scintillement des étoiles*)
 let stars_nb_default = 500
 let stars_nb = ref 200
 let stars_nb_previous = ref 200
@@ -444,10 +447,10 @@ let scanlines_offset = ref 0
 (*La camera predictive oriente la camera vers l'endroit où le vaisseau va,
 pour le garder tant que possible au centre de l'écran*)
 let dynamic_camera = ref true
-let camera_prediction = 1.9 (*En secondes de déplacement du vaisseau dans le futur.*)
-let camera_half_depl = 1.5 (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
-let camera_ratio_objects = 0.2 (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
-let camera_ratio_vision = 0.2 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
+let camera_prediction = 1.5 (*En secondes de déplacement du vaisseau dans le futur.*)
+let camera_half_depl = 1. (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
+let camera_ratio_objects = 0. (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
+let camera_ratio_vision = 0.1 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
 
 (*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
 let screenshake = ref true
@@ -455,7 +458,7 @@ let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse
 let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
 let screenshake_tir_ratio = 200.
 let screenshake_dam_ratio = 0.01
-let screenshake_phys_ratio = 0.02
+let screenshake_phys_ratio = 0.01
 let screenshake_phys_mass = 20000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
 let screenshake_half_life = 0.2
 let game_screenshake = ref 0.
@@ -484,20 +487,20 @@ let current_jitter_double = ref (0.,0.)
 (*L'exposition variable permet des variations de luminosité en fonction des évènements*)
 let variable_exposure = true
 let exposure_ratio_damage = 0.99
-let exposure_tir = 0.95
-let exposure_half_life = 2.
-let game_exposure_target_death = 0.
-let game_exposure_target_boucle = 3.
-let game_exposure_target_tp = 0.
-let game_exposure_target = ref 1.5
+let exposure_tir = 0.97
+let exposure_half_life = 1.
+let game_exposure_target_death = 0.5
+let game_exposure_target_boucle = 2.
+let game_exposure_target_tp = 0.5
+let game_exposure_target = ref 2.
 let game_exposure = ref 0.
 
 (*Flashes lumineux lors d'évènements*)
 let flashes = ref true
 let flashes_damage = 0.
 let flashes_explosion = 0.05
+let flashes_saturate = 8.
 let flashes_normal_mass = 100000.
-let flashes_tir = 2.
+let flashes_tir = 0.5
 let flashes_teleport = 1000.
 let flashes_half_life = 0.05
-

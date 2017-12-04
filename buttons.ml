@@ -68,3 +68,126 @@ let applique_slider ref_slider =
   if (button_down () && (entretuple (multuple (floattuple (mouse_pos ())) (1. /. !ratio_rendu)) slider.pos1 slider.pos2))
     then (let (x,y) = mouse_pos () in slider.valeur := (moyfloat slider.maxval slider.minval (float_of_int (x-x0)))) else();
   ref_slider := slider;;
+
+
+  let button_new_game={
+    pos1 = ((4./.16.) *. !phys_width,(20./.24.) *. !phys_height);
+    pos2 = ((6./.16.) *. !phys_width,(22./.24.) *. !phys_height);
+    text = "New Game";
+    text_over = "Start a new game with current parameters";
+    boolean = restart;
+    lastmousestate = false;}
+
+  let button_resume={
+    pos1 = ((7./.16.) *. !phys_width,(20./.24.) *. !phys_height);
+    pos2 = ((9./.16.) *. !phys_width,(22./.24.) *. !phys_height);
+    text = "resume";
+    text_over = "Resume current game";
+    boolean = pause;
+    lastmousestate = false;}
+
+  let button_quit={
+    pos1 = ((10./.16.) *. !phys_width,(20./.24.) *. !phys_height);
+    pos2 = ((12./.16.) *. !phys_width,(22./.24.) *. !phys_height);
+    text = "quit";
+    text_over = "Quit the game and go outside";
+    boolean = quit;
+    lastmousestate = false;}
+
+  let button_oldschool={
+    pos1 = ((4./.16.) *. !phys_width,(12./.24.) *. !phys_height);
+    pos2 = ((6./.16.) *. !phys_width,(14./.24.) *. !phys_height);
+    text = "oldschool mode";
+    text_over = "Play like in the old days.";
+    boolean = oldschool;
+    lastmousestate = false;}
+
+  let button_retro={
+    pos1 = ((7./.16.) *. !phys_width,(12./.24.) *. !phys_height);
+    pos2 = ((9./.16.) *. !phys_width,(14./.24.) *. !phys_height);
+    text = "retro visuals";
+    text_over = "White vectors on black background design";
+    boolean = retro;
+    lastmousestate = false;}
+
+  let button_scanlines={
+    pos1 = ((10./.16.) *. !phys_width,(12./.24.) *. !phys_height);
+    pos2 = ((12./.16.) *. !phys_width,(14./.24.) *. !phys_height);
+    text = "scanlines";
+    text_over = "Imitates the look of old CRT monitors.\nLowers luminosity.";
+    boolean = scanlines;
+    lastmousestate = false;}
+
+
+
+  let button_infinitespace={
+    pos1 = ((4./.16.) *. !phys_width,(9./.24.) *. !phys_height);
+    pos2 = ((6./.16.) *. !phys_width,(11./.24.) *. !phys_height);
+    text = "infinitespace";
+    text_over = "To infinity and beyond !";
+    boolean = infinitespace;
+    lastmousestate = false;}
+
+  let button_dynamic_camera={
+    pos1 = ((7./.16.) *. !phys_width,(9./.24.) *. !phys_height);
+    pos2 = ((9./.16.) *. !phys_width,(11./.24.) *. !phys_height);
+    text = "dynamic camera";
+    text_over = "Intelligent camera";
+    boolean = dynamic_camera;
+    lastmousestate = false;}
+
+  let button_hitbox={
+    pos1 = ((10./.16.) *. !phys_width,(9./.24.) *. !phys_height);
+    pos2 = ((12./.16.) *. !phys_width,(11./.24.) *. !phys_height);
+    text = "Advanced hitbox";
+    text_over = "A more precise hitbox.";
+    boolean = advanced_hitbox;
+    lastmousestate = false;}
+
+  let button_flashes={
+    pos1 = ((10./.16.) *. !phys_width,(6./.24.) *. !phys_height);
+    pos2 = ((12./.16.) *. !phys_width,(8./.24.) *. !phys_height);
+    text = "Light Flashes";
+    text_over = "Activates light flashes for events";
+    boolean = flashes;
+    lastmousestate = false;}
+
+  let button_color={
+    pos1 = ((10./.16.) *. !phys_width,(3./.24.) *. !phys_height);
+    pos2 = ((12./.16.) *. !phys_width,(5./.24.) *. !phys_height);
+    text = "Color Effects";
+    text_over = "Color changes and correction";
+    boolean = dyn_color;
+    lastmousestate = false;}
+
+  let button_screenshake={
+    pos1 = ((4./.16.) *. !phys_width,(6./.24.) *. !phys_height);
+    pos2 = ((6./.16.) *. !phys_width,(8./.24.) *. !phys_height);
+    text = "screenshake";
+    text_over = "Feel the impacts and explosions.";
+    boolean = screenshake;
+    lastmousestate = false;}
+
+  let button_smoke={
+    pos1 = ((7./.16.) *. !phys_width,(6./.24.) *. !phys_height);
+    pos2 = ((9./.16.) *. !phys_width,(8./.24.) *. !phys_height);
+    text = "smoke particles";
+    text_over = "Allows smoke. Disable for better performance.";
+    boolean = smoke;
+    lastmousestate = false;}
+
+  let button_mousecontrol={
+    pos1 = ((4./.16.) *. !phys_width,(3./.24.) *. !phys_height);
+    pos2 = ((6./.16.) *. !phys_width,(5./.24.) *. !phys_height);
+    text = "mouse control";
+    text_over = "Mouse to aim. Click to accelerate. Hold spacebar to shoot.";
+    boolean = mousecontrol;
+    lastmousestate = false;}
+
+  let button_framerate={
+    pos1 = ((7./.16.) *. !phys_width,(3./.24.) *. !phys_height);
+    pos2 = ((9./.16.) *. !phys_width,(5./.24.) *. !phys_height);
+    text = "locked framerate";
+    text_over = "Avoids calculating extra images, at the cost of fluidity";
+    boolean = locked_framerate;
+    lastmousestate = false;}

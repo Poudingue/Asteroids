@@ -25,11 +25,20 @@ let half_color col1 col2 half_life = (hdr_add col2 {
 	v = (exp_decay (col1.v -. col2.v) half_life);
 	b = (exp_decay (col1.b -. col2.b) half_life)})
 
+let redirect_spectre col = {
+	r = if col.v > 255. then col.r +. col.v -. 255. else col.r;
+	v = if col.b > 255. && col.r > 255. then col.v +. col.r +. col.b -. 510.
+	    else if col.r > 255. then col.v +. col.r -. 255.
+	    else if col.b > 255. then col.v +. col.b -. 255.
+	    else col.v;
+	b = if col.v > 255. then col.b +. col.v -. 255. else col.b}
+
+
 (*Conversion de couleur_hdr vers couleur*)
 let rgb_of_hdr hdr =
-  let hdr_mod = hdr_mul (hdr_add hdr (intensify !add_color !game_exposure)) !mul_color in
-  let normal_color fl = max 0 (min 255 (int_of_float fl)) in (*Fonction ramenant entre 0 et 255, qui sont les bornes du sRGB*)
-  rgb (normal_color hdr_mod.r) (normal_color hdr_mod.v) (normal_color hdr_mod.b)
+  let hdr_mod = redirect_spectre (hdr_mul (hdr_add hdr (intensify !add_color !game_exposure)) !mul_color)in
+	let normal_color fl = max 0 (min 255 (int_of_float fl)) in (*Fonction ramenant entre 0 et 255, qui sont les bornes du sRGB*)
+	rgb (normal_color hdr_mod.r) (normal_color hdr_mod.v) (normal_color hdr_mod.b)
 
 (*Fonction de saturation de la couleur*)
 (*i un ratio entre 0 (N&B) et ce que l'on veut comme intensité des couleurs.*)
@@ -38,4 +47,7 @@ let saturate hdr_in i =
   let value = (hdr_in.r +. hdr_in.v +. hdr_in.b) /. 3. in
   {r = i *. hdr_in.r +. ((1. -. i) *. value); v = i *. hdr_in.v +. ((1. -. i) *. value); b= i *. hdr_in.b +. ((1. -. i) *. value)}
 
-let space_color = {r = space_r; v = space_g; b = space_b}
+let space_color = ref {r = 0.; v = 0.; b = 0.}
+let space_color_goal = ref {r = 0.; v = 0.; b = 0.}
+let star_color = ref {r = 0.; v = 0.; b = 0.}
+let star_color_goal = ref {r = 0.; v = 0.; b = 0.}
