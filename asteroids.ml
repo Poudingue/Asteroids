@@ -526,10 +526,13 @@ if objet1 = objet2 then false
   else (
   let hitbox1 = objet1.hitbox and hitbox2 = objet2.hitbox
   and pos1 = objet1.position and pos2 = objet2.position in
+  if (not !advanced_hitbox) then
   collision_circles pos1 hitbox1.int_radius pos2 hitbox2.int_radius
-  || !advanced_hitbox &&(  collision_circles pos1 hitbox1.ext_radius pos2 hitbox2.ext_radius
-  && (( collision_poly pos1 hitbox1.points objet1.orientation pos2 hitbox2.int_radius)
-     ||(collision_poly pos2 hitbox2.points objet2.orientation pos1 hitbox1.int_radius))))
+  else
+  (collision_circles pos1 hitbox1.int_radius pos2 hitbox2.int_radius)
+  ||(collision_circles pos1 hitbox1.ext_radius pos2 hitbox2.ext_radius)
+  &&(( collision_poly pos1 hitbox1.points objet1.orientation pos2 hitbox2.int_radius)
+     ||(collision_poly pos2 hitbox2.points objet2.orientation pos1 hitbox1.int_radius)))
 
 (*Vérifie la collision entre un objet et une liste d'objets*)
 let rec collision_objet_liste ref_objet ref_objets =
