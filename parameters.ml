@@ -140,16 +140,6 @@ let smoke_max_speed = 40.(*Vitesse random dans une direction random de la fumée
 
 (*Valeurs des étincelles TODO*)
 
-(*Valeurs des étoiles*)
-let star_min_prox = 0.4 (*Prox min des étoiles. 0 = étoile à l'infini, paraît immobile quel que soit le mouvement.*)
-let star_max_prox = 0.8 (*Prox max. 1 = même profondeur que le vaisseau *)
-let star_prox_lum = 0.5 (*Pour ajouter de la luminosité aux étoiles plus proches*)
-let star_min_lum = 0.1
-let star_max_lum = 0.5
-let star_rand_lum = 1. (*Effet de scintillement des étoiles*)
-let stars_nb_default = 500
-let stars_nb = ref 200
-let stars_nb_previous = ref 200
 
 (*Effet de scanlines pour imiter les moniteurs crt qui projetait l'image ligne par ligne.*)
 (*Activer l'effet animated_scanlines permet l'animation imitant les vidéos interlacées,
@@ -201,25 +191,6 @@ let dither_power_radius = 0.5
 Cela permet de s'assurer une consistance spatiale dans tout le rendu.*)
 let current_jitter_double = ref (0.,0.)
 
-(*L'exposition variable permet des variations de luminosité en fonction des évènements*)
-let variable_exposure = true
-let exposure_ratio_damage = 0.99
-let exposure_tir = 0.95
-let exposure_half_life = 2.
-let game_exposure_target_death = 0.
-let game_exposure_target_boucle = 3.
-let game_exposure_target_tp = 1.
-let game_exposure_target = ref 1.5
-let game_exposure = ref 0.
-
-(*Flashes lumineux lors d'évènements*)
-let flashes = ref true
-let flashes_damage = 0.
-let flashes_explosion = 0.05
-let flashes_normal_mass = 100000.
-let flashes_tir = 2.
-let flashes_teleport = 1000.
-let flashes_half_life = 0.05
 
 let filter_half_life = 1.
 let filter_saturation = 0.5
@@ -469,7 +440,7 @@ let game_screenshake_pos = ref (0.,0.)
 let game_screenshake_previous_pos = ref (0.,0.) (*Permet d'avoir un rendu correct des trainées de lumières lors du screenshake*)
 (*Utilisation de l'augmentation du score pour faire trembler les chiffres*)
 let shake_score = ref 0.
-let shake_score_ratio = 1.
+let shake_score_ratio = 0.5
 let shake_strength = 0.05
 let shake_score_half_life = 1.
 

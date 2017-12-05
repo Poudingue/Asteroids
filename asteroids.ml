@@ -195,7 +195,7 @@ let render_star_trail ref_star =
   let lum = star.lum +. Random.float star_rand_lum in
   let star_color_tmp = intensify !star_color (lum *. !game_exposure)  in
   if (x1 = x2 && y1 = y2) then ( (*Dans le cas où l'étoile n'a pas bougé, on rend plusieurs points, plutôt qu'une ligne.*)
-    set_line_width 2;
+  
     set_color (rgb_of_hdr (intensify (hdr_add star_color_tmp !space_color) !game_exposure ));
     plot x1 y1;
       set_color (rgb_of_hdr (intensify star_color_tmp (0.25)));
@@ -207,7 +207,7 @@ let render_star_trail ref_star =
 	(hdr_add
 		(intensify star_color_tmp (sqrt (1. /. (1. +. hypothenuse (soustuple pos1 pos2)))))
 		(hdr_add (intensify !space_color !game_exposure) (intensify !add_color !game_exposure))));(*Plus la trainée de lumière est grande par rapport au rayon de l'objet, moins la lumière est intense*)
-    moveto x1 y1 ; lineto x2 y2);;
+    set_line_width 2 ; moveto x1 y1 ; lineto x2 y2);;
 
 
 let render_motion_blur ref_objet = (*TODO : Fonction ajouter, pour fondre avec le background*)
@@ -763,7 +763,6 @@ let render_string str pos l_char h_char l_space shake= (render_characs (list_car
 qui projetaient l'image ligne par ligne.*)
 let rec render_scanlines nb=
   set_color black;
-  set_line_width 0;
   if nb < height then (
   moveto 0 nb;
   lineto width nb;
@@ -826,7 +825,7 @@ let affiche_hud ref_etat =
     set_line_width buttonframewidth; set_color buttonframe;
     draw_poly (Array.of_list (relative_poly[(0.95,0.6);(0.95,0.55);(0.9,0.55);(0.85,0.6)]));
     (*Affichage du score*)
-    set_color (rgb_of_hdr (intensify {r=10000.;v=1000.;b=100.} (1. /. (1. +. 0.9 *. !shake_score))));
+    set_color (rgb_of_hdr (intensify {r=10000.;v=1000.;b=300.} (1. /. (1. +. 0.9 *. !shake_score))));
     set_line_width 0;
     render_string ("SCORE " ^ string_of_int etat.score) (*(string_of_int etat.score)*)
       (0.02 *. !phys_width, 0.82 *. !phys_height *. (1. -. (0.05 *. !shake_score *.0.08)))
@@ -909,7 +908,7 @@ let affiche_etat ref_etat =
     List.iter render_motion_blur etat.ref_fragments;
     List.iter render_motion_blur etat.ref_objets_unspawned;
     List.iter render_motion_blur etat.ref_objets;
-    set_line_width 2;
+    set_line_width 0;
     List.iter render_star_trail etat.ref_stars;(*On rend les étoiles derrière la fumée, mais derrière les autres objets moins lumineux.*)
     (*List.iter render_motion_blur etat.ref_smoke;*)(*TODO régler le fait que le blur soit appliqué ou non de manière erratique.*)
   )else if not !retro then (set_line_width 2; List.iter render_star_trail etat.ref_stars);(*Avec ou sans motion blur, on rend les étoiles comme il faut*)
