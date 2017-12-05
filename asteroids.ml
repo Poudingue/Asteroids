@@ -195,6 +195,7 @@ let render_star_trail ref_star =
   let lum = star.lum +. Random.float star_rand_lum in
   let star_color_tmp = intensify !star_color (lum *. !game_exposure)  in
   if (x1 = x2 && y1 = y2) then ( (*Dans le cas où l'étoile n'a pas bougé, on rend plusieurs points, plutôt qu'une ligne.*)
+    set_line_width 2;
     set_color (rgb_of_hdr (intensify (hdr_add star_color_tmp !space_color) !game_exposure ));
     plot x1 y1;
       set_color (rgb_of_hdr (intensify star_color_tmp (0.25)));
@@ -202,7 +203,10 @@ let render_star_trail ref_star =
       set_color (rgb_of_hdr (intensify star_color_tmp (0.125)));
       plot (x1+1) (y1+1) ; plot (x1+1) (y1-1) ; plot (x1-1)  (y1+1) ; plot (x1-1)  (y1-1);
   )else (
-    set_color (rgb_of_hdr (hdr_add (intensify star_color_tmp (sqrt (1. /. (1. +. hypothenuse (soustuple pos1 pos2))))) (intensify !space_color !game_exposure)));(*Plus la trainée de lumière est grande par rapport au rayon de l'objet, moins la lumière est intense*)
+    set_color (rgb_of_hdr
+	(hdr_add
+		(intensify star_color_tmp (sqrt (1. /. (1. +. hypothenuse (soustuple pos1 pos2)))))
+		(hdr_add (intensify !space_color !game_exposure) (intensify !add_color !game_exposure))));(*Plus la trainée de lumière est grande par rapport au rayon de l'objet, moins la lumière est intense*)
     moveto x1 y1 ; lineto x2 y2);;
 
 
@@ -378,6 +382,7 @@ let phys_damage ref_objet damage =
     else (objet.health <- objet.health -. (max 0. (objet.phys_ratio *. damage -. objet.phys_res)));
   game_screenshake := !game_screenshake +. damage *. screenshake_phys_ratio *. objet.mass /. screenshake_phys_mass;
   ref_objet := objet
+
 
 let is_alive ref_objet = !ref_objet.health >= 0.
 let is_dead ref_objet = !ref_objet.health <0.
@@ -821,7 +826,7 @@ let affiche_hud ref_etat =
     set_line_width buttonframewidth; set_color buttonframe;
     draw_poly (Array.of_list (relative_poly[(0.95,0.6);(0.95,0.55);(0.9,0.55);(0.85,0.6)]));
     (*Affichage du score*)
-    set_color (rgb_of_hdr (intensify {r=10000.;v=1000.;b=300.} (1. /. (1. +. 0.9 *. !shake_score))));
+    set_color (rgb_of_hdr (intensify {r=10000.;v=1000.;b=100.} (1. /. (1. +. 0.9 *. !shake_score))));
     set_line_width 0;
     render_string ("SCORE " ^ string_of_int etat.score) (*(string_of_int etat.score)*)
       (0.02 *. !phys_width, 0.82 *. !phys_height *. (1. -. (0.05 *. !shake_score *.0.08)))
@@ -1154,6 +1159,10 @@ let etat_suivant ref_etat =
   if etat.cooldown > 0. then etat.cooldown <- etat.cooldown -. !game_speed *. elapsed_time;
   if etat.cooldown_tp > 0. then etat.cooldown_tp <- etat.cooldown_tp -. !game_speed *. elapsed_time;
   ref_etat := etat;
+  if autoregen then let ship = !(etat.ref_ship) in
+  ship.health <- ship.health +. elapsed_time *. autoregen_health;
+  if ship.health > ship_max_health then ship.health <- ship_max_health;
+  etat.ref_ship := ship;
   (*Suppression des objets qu'il faut*)
   despawn ref_etat;
   (*On spawne ce qui doit spawner*)
@@ -1275,7 +1284,7 @@ ce qui est une approximation généralement correcte*)
 let random_teleport ref_etat =
   let etat = !ref_etat in
   if etat.cooldown_tp <= 0. then (
-    if !flashes then add_color := hdr_add !add_color (intensify {r=6.25;v=50.;b=400.} flashes_teleport);
+    if !flashes then add_color := hdr_add !add_color (intensify {r=0.;v=4.;b=40.} flashes_teleport);
     game_exposure := game_exposure_target_tp;
     let ship = !(etat.ref_ship) in
     ship.position <- (Random.float !phys_width, Random.float !phys_height);

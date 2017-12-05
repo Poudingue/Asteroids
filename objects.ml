@@ -283,7 +283,7 @@ let spawn_explosion_tp objet =
   ref {
   objet = Explosion;
   visuals = {
-    color = {r = 300.; v = 1000.; b = 10000.};
+    color = {r = 0.; v = 4000.; b = 40000.};
     radius = rad;
     shapes = [];
   };

@@ -175,7 +175,7 @@ let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse
 let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
 let screenshake_tir_ratio = 200.
 let screenshake_dam_ratio = 0.01
-let screenshake_phys_ratio = 0.02
+let screenshake_phys_ratio = 0.01
 let screenshake_phys_mass = 20000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
 let screenshake = 0.2
 let game_screenshake = ref 0.
@@ -208,7 +208,7 @@ let exposure_tir = 0.95
 let exposure_half_life = 2.
 let game_exposure_target_death = 0.
 let game_exposure_target_boucle = 3.
-let game_exposure_target_tp = 0.
+let game_exposure_target_tp = 1.
 let game_exposure_target = ref 1.5
 let game_exposure = ref 0.
 
@@ -347,6 +347,9 @@ let ship_max_rotat = pi /. 6.(*En radians*)
 let ship_half_stop_rotat = 0.2(*En temps nécessaire pour perdre la moitié du moment angulaire*)
 (*Temps min entre deux téléportations aléatoires*)
 let cooldown_tp = 10.
+(*Pour l'autoregen*)
+let autoregen = true
+let autoregen_health = 2. (*Regain de vie par seconde*)
 
 (*Valeurs du projectile*)
 let projectile_recoil = ref 100. (*Recul appliqué au vaisseau*)
@@ -455,18 +458,19 @@ let camera_ratio_vision = 0.1 (*La caméra va vers là où regarde le vaisseau, 
 (*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
 let screenshake = ref true
 let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse et réaliste physiquement. Sorte de passe-bas sur les mouvements*)
-let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
+let screenshake_smoothness = 0.8 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
 let screenshake_tir_ratio = 200.
-let screenshake_dam_ratio = 0.01
-let screenshake_phys_ratio = 0.01
+let screenshake_dam_ratio = 0.001
+let screenshake_phys_ratio = 0.001
 let screenshake_phys_mass = 20000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
-let screenshake_half_life = 0.2
+let screenshake_half_life = 0.1
 let game_screenshake = ref 0.
 let game_screenshake_pos = ref (0.,0.)
 let game_screenshake_previous_pos = ref (0.,0.) (*Permet d'avoir un rendu correct des trainées de lumières lors du screenshake*)
 (*Utilisation de l'augmentation du score pour faire trembler les chiffres*)
 let shake_score = ref 0.
-let shake_score_ratio = 0.25
+let shake_score_ratio = 1.
+let shake_strength = 0.05
 let shake_score_half_life = 1.
 
 

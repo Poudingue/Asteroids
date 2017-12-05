@@ -25,6 +25,7 @@ let half_color col1 col2 half_life = (hdr_add col2 {
 	v = (exp_decay (col1.v -. col2.v) half_life);
 	b = (exp_decay (col1.b -. col2.b) half_life)})
 
+(*Redirige la saturation d'une couleur vers les couleurs proches*)
 let redirect_spectre col = {
 	r = if col.v > 255. then col.r +. col.v -. 255. else col.r;
 	v = if col.b > 255. && col.r > 255. then col.v +. col.r +. col.b -. 510.
@@ -33,10 +34,27 @@ let redirect_spectre col = {
 	    else col.v;
 	b = if col.v > 255. then col.b +. col.v -. 255. else col.b}
 
+(*Même chose, mais redirige encore plus loin en cas de saturation extrème*)
+let redirect_spectre_wide col = {
+	r = if col.b > 510. then (
+		if col.v > 255. then col.r +. col.v +. col.b -. 765. else col.r +. col.b -. 510.
+	    ) else (
+		if col.v > 255. then col.r +. col.v -. 255. else col.r
+	    );
+	v = if col.b > 255. && col.r > 255. then col.v +. col.r +. col.b -. 510.
+	    else if col.r > 255. then col.v +. col.r -. 255.
+	    else if col.b > 255. then col.v +. col.b -. 255.
+	    else col.v;
+	b = if col.r > 510. then (
+		if col.v > 255. then col.r +. col.v +. col.b -. 765. else col.v +. col.b -. 510.
+	    ) else (
+		if col.v > 255. then col.v +. col.b -. 255. else col.b
+	    );}
+
 
 (*Conversion de couleur_hdr vers couleur*)
 let rgb_of_hdr hdr =
-  let hdr_mod = redirect_spectre (hdr_mul (hdr_add hdr (intensify !add_color !game_exposure)) !mul_color)in
+  let hdr_mod = redirect_spectre_wide (hdr_mul (hdr_add hdr (intensify !add_color !game_exposure)) !mul_color)in
 	let normal_color fl = max 0 (min 255 (int_of_float fl)) in (*Fonction ramenant entre 0 et 255, qui sont les bornes du sRGB*)
 	rgb (normal_color hdr_mod.r) (normal_color hdr_mod.v) (normal_color hdr_mod.b)
 
