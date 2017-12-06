@@ -11,9 +11,10 @@ I work on it on my spare time, and make the source code available to everyone, f
 ## Compilation and Launch
 
 You can compile this game using the command line :
+(You will need ocamlc)
 
 ocamlc -o asteroids unix.cma graphics.cma parameters.ml functions.ml colors.ml objects.ml buttons.ml asteroids.ml
-(Not sure it works in windows)
+(On windows write asteroids.exe instead of asteroids)
 
 Run it with ./asteroids
 
@@ -22,15 +23,19 @@ Run it with ./asteroids
 v1.7 - MORE FUN update
 
 Features :
-- Everything is faster !
+- Everything is bigger and faster !
 - Light flashes for events (Shooting, teleporting and explosions)
+- Color correction, star colors and space color change from one stage to the next
 - Tweaked screenshake, game speed change and exposure for a better game feel.
 - More forgiving physics damages (allows easy asteroid-pushing :D)
 - The default gamemode is now infinitespace
 - The default weapon is now a powerfull shotgun
-
+- Overexposed colors become whiter. A very intense red will look orange, or yellow, and a very intense blue will look cyan.
 Fixed :
 - Infinitespace now works properly, with objects that are too far coming back the other side
-- Better performances thanks to a higher asteroid minimum radius and default infinitespace
+- Better performance thanks to a higher asteroid minimum radius and default infinitespace
+- No more intricated asteroids and physics bugs.
+Bugs :
+- Momentum of objects still not taken into account for physics
 
 For all changelogs, see changelog.txt
