@@ -195,7 +195,7 @@ let render_star_trail ref_star =
   let lum = star.lum +. Random.float star_rand_lum in
   let star_color_tmp = intensify !star_color (lum *. !game_exposure)  in
   if (x1 = x2 && y1 = y2) then ( (*Dans le cas où l'étoile n'a pas bougé, on rend plusieurs points, plutôt qu'une ligne.*)
-  
+
     set_color (rgb_of_hdr (intensify (hdr_add star_color_tmp !space_color) !game_exposure ));
     plot x1 y1;
       set_color (rgb_of_hdr (intensify star_color_tmp (0.25)));
@@ -1159,6 +1159,7 @@ let etat_suivant ref_etat =
   if etat.cooldown_tp > 0. then etat.cooldown_tp <- etat.cooldown_tp -. !game_speed *. elapsed_time;
   ref_etat := etat;
   if autoregen then let ship = !(etat.ref_ship) in
+  if ship.health <= ship_max_health && ship.health > 0. then
   ship.health <- ship.health +. elapsed_time *. autoregen_health;
   if ship.health > ship_max_health then ship.health <- ship_max_health;
   etat.ref_ship := ship;
