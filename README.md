@@ -31,10 +31,12 @@ Features :
 - The default gamemode is now infinitespace
 - The default weapon is now a powerfull shotgun
 - Overexposed colors become whiter. A very intense red will look orange, or yellow, and a very intense blue will look cyan.
+
 Fixed :
 - Infinitespace now works properly, with objects that are too far coming back the other side
 - Better performance thanks to a higher asteroid minimum radius and default infinitespace
 - No more intricated asteroids and physics bugs.
+
 Bugs :
 - Momentum of objects still not taken into account for physics
 
