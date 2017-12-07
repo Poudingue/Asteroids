@@ -72,21 +72,21 @@ type star = {
 
 (*Aspect visuel du vaisseau*)
 let visuals_ship = {
-  color = {r=400.;v=100.;b=25.};
+  color = {r=1000.;v=100.;b=25.};
   radius = ship_radius *. 0.9;
   shapes =
-    [({r=100.;v=50.;b=50.},
+    [({r=200.;v=50.;b=50.},
       [(0.,3.*.ship_radius);
       (3. *. pi /. 4.,2.*.ship_radius);
       (pi,ship_radius);
       (~-.3. *. pi /. 4.,2.*.ship_radius)]);
 
-    ({r=150.;v=30.;b=30.},
+    ({r=300.;v=30.;b=30.},
       [(0.,3.*.ship_radius);
       (pi,ship_radius);
       (~-.3. *. pi /. 4.,2.*.ship_radius)]);
 
-    ({r=60.;v=5.;b=5.},
+    ({r=120.;v=5.;b=5.},
       [(0.,3.*.ship_radius);
       (3. *. pi /. 4.,2.*.ship_radius);
       (pi,ship_radius)]);

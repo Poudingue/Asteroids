@@ -33,8 +33,9 @@ let game_speed = ref 1.
 let half_speed_change = 0.5
 
 (*Ratios de changement de vitesse en fonction des évènements*)
-let ratio_time_explosion = 0.99
-let ratio_time_destr_asteroid = 0.95
+let ratio_time_explosion = 0.999
+let ratio_time_destr_asteroid = 0.99
+let ratio_time_tp = 0.5
 
 (*Timer pour la mort*)
 let time_of_death = ref 0.
@@ -68,8 +69,8 @@ let last_count = ref 0
 let current_count = ref 0
 
 (*Dimensions fenêtre graphique.*)
-let width = 1900
-let height = 1000
+let width = 2500
+let height = 1400
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
 let infinitespace = ref true
 let max_dist = 6000.
@@ -151,33 +152,6 @@ let scanlines_period = 5
 let animated_scanlines = true
 let scanlines_offset = ref 0
 
-(*La camera predictive oriente la camera vers l'endroit où le vaisseau va,
-pour le garder tant que possible au centre de l'écran*)
-let dynamic_camera = ref true
-let camera_prediction = 1.9 (*En secondes de déplacement du vaisseau dans le futur.*)
-let camera_half_depl = 1.5 (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
-let camera_ratio_objects = 0.2 (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
-let camera_ratio_vision = 0.2 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
-
-(*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
-let screenshake = ref true
-let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse et réaliste physiquement. Sorte de passe-bas sur les mouvements*)
-let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
-let screenshake_tir_ratio = 200.
-let screenshake_dam_ratio = 0.01
-let screenshake_phys_ratio = 0.01
-let screenshake_phys_mass = 20000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
-let screenshake = 0.2
-let game_screenshake = ref 0.
-let game_screenshake_pos = ref (0.,0.)
-let game_screenshake_previous_pos = ref (0.,0.) (*Permet d'avoir un rendu correct des trainées de lumières lors du screenshake*)
-(*Utilisation de l'augmentation du score pour faire trembler les chiffres*)
-let shake_score = ref 0.
-let shake_score_ratio = 0.25
-let shake_score_half_life = 1.
-
-
-
 (*L'antialiasing de jitter fait «trembler» l'espace de rendu.
 C'est une forme de dithering spatial
 afin de compenser la perte de précision due à la rastérisation
@@ -250,16 +224,16 @@ let min_repulsion = 5.
 let min_bounce = 50.
 
 (*Paramètres des astéroïdes*)
-let asteroid_spawn_delay = 0.01 (*Temps s'écoulant entre l'apparition de deux astéroïdes*)
-let asteroid_max_spawn_radius = 700. (*Taille max d'astéroïde au spawn.*)
-let asteroid_min_spawn_radius = 400. (*Taille min de spawn*)
+let asteroid_spawn_delay = 1.01 (*Temps s'écoulant entre l'apparition de deux astéroïdes*)
+let asteroid_max_spawn_radius = 800. (*Taille max d'astéroïde au spawn.*)
+let asteroid_min_spawn_radius = 600. (*Taille min de spawn*)
 let asteroid_min_size = 50. (*En dessous de la taille minimale, un asteroide se transforme en chunk*)
 let asteroid_max_moment = 2. (*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
 let asteroid_max_velocity = 2000. (*Velocité max au spawn*)
 let asteroid_min_velocity = 1500. (*Velocité min au spawn*)
 let asteroid_stage_velocity = 500. (*Permet aux astéroïdes de stages plus avancés d'aller plus vite*)
 let asteroid_density = 1. (*Sert à déterminer la masse d'un astéroïde en se basant sur sa surface*)
-let asteroid_min_health = 200. (*Évite les astéroïdes trop fragiles à cause d'une masse trop faible. S'additionne au calcul.*)
+let asteroid_min_health = 50. (*Évite les astéroïdes trop fragiles à cause d'une masse trop faible. S'additionne au calcul.*)
 let asteroid_mass_health = 0.01(*Sert à déterminer la vie d'un astéroïde basé sur sa masse*)
 (*Dam : dommmages. phys : dommages physiques. Ratio : Multiplicateur du dégat. res : résistance aux dégats (soustraction)*)
 let asteroid_dam_ratio = 1. (*La sensibilité aux dégats d'explosions*)
@@ -285,25 +259,25 @@ let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le
 
 (*Caractéristiques des fragments. Principalement hérité des parents.*)
 let fragment_max_velocity = 2000. (*Velocité max au spawn*)
-let fragment_min_velocity = 1000. (*Velocité min au spawn*)
+let fragment_min_velocity = 1500. (*Velocité min au spawn*)
 let fragment_max_size = 0.6 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_size = 0.3 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.6 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
 let fragment_max_exposure = 1.4 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
 let fragment_number = ref 2
-let chunk_radius_decay = 2. (*Pour la décroissance des particules n'ayant pas de collisions*)
+let chunk_radius_decay = 3. (*Pour la décroissance des particules n'ayant pas de collisions*)
 
 (*Paramètres du vaisseau*)
 (*valeurs du vaisseau*)
 let ship_max_health = 100. (*health au spawn. Permet de l'appliquer au modèle physique.*)
-let ship_max_healths = 3 (*Nombre de fois que le vaisseau peut réapparaître*)
+let ship_max_lives = 5 (*Nombre de fois que le vaisseau peut réapparaître*)
 let ship_density = 50. (*Pour calcul de la masse du vaisseau, qui a un impact sur la physique*)
 let ship_radius = 20. (*Pour la hitbox et le rendu*)
 (*Réduction des dégats et dégats physiques*)
 let ship_dam_ratio = 0.8
 let ship_dam_res = 10.
-let ship_phys_ratio = 0.01
-let ship_phys_res = 5.
+let ship_phys_ratio = 0.005
+let ship_phys_res = 10.
 let ship_death_max_momentum = 2.
 (*Contrôles de déplacement*)
 let ship_max_depl = 50. (*En px.s⁻¹. Utile si contrôle direct du déplacement.*)
@@ -423,8 +397,10 @@ pour le garder tant que possible au centre de l'écran*)
 let dynamic_camera = ref true
 let camera_prediction = 1.5 (*En secondes de déplacement du vaisseau dans le futur.*)
 let camera_half_depl = 1. (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
-let camera_ratio_objects = 0. (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
-let camera_ratio_vision = 0.1 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
+let camera_ratio_objects = 2. (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
+let camera_ratio_vision = 0.3 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
+let camera_start_bound = 0.3 (*En ratio de la taille de l'écran : distance du bord à laquelle la caméra commence à se recentrer*)
+let camera_max_force = 1. (*En ratio de la taille de l'écran : vitesse appliquée à la caméra pour la recentrer si on ATTEINT le bord de l'écran*)
 
 (*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
 let screenshake = ref true
@@ -440,9 +416,9 @@ let game_screenshake_pos = ref (0.,0.)
 let game_screenshake_previous_pos = ref (0.,0.) (*Permet d'avoir un rendu correct des trainées de lumières lors du screenshake*)
 (*Utilisation de l'augmentation du score pour faire trembler les chiffres*)
 let shake_score = ref 0.
-let shake_score_ratio = 0.5
-let shake_strength = 0.05
-let shake_score_half_life = 1.
+let shake_score_ratio = 0.2
+let shake_strength = 0.01
+let shake_score_half_life = 0.2
 
 
 

@@ -90,7 +90,7 @@ let init_etat () =  game_screenshake:=0. ;{
      button_hitbox ; button_dynamic_camera ; button_infinitespace ;
      button_smoke ; button_screenshake ;
     button_framerate ; button_mousecontrol ; button_flashes ; button_color];
-  lifes = 3;
+  lifes = ship_max_lives;
   score = 0;
   stage = 0;
   cooldown = 0.;
@@ -436,18 +436,14 @@ let big_enough ref_objet = !ref_objet.hitbox.int_radius > asteroid_min_size
 let too_small ref_objet = not (big_enough ref_objet)
 
 
-(*Fonctions permettant de calculer une caméra dynamique suivant en priorité les objets massifs et proches*)
-let rec sum_center ref_objets pos =
-  match ref_objets with
-  |[] -> (0.,0.)
-  |hd::tl -> addtuple (multuple !hd.position (!hd.mass /. ((distancecarre !hd.position pos)))) (sum_center tl pos)
 
-let rec sum_mass ref_objets pos =
-  match ref_objets with
-  |[] -> 0.
-  |hd::tl -> (!hd.mass /. (1. +. (distancecarre !hd.position pos))) +. (sum_mass tl pos)
 
-let center_of_attention ref_objets pos = if ref_objets = [] then (0.,0.) else (multuple (sum_center ref_objets pos)  (1. /. (1. +. sum_mass ref_objets pos)))
+let rec center_of_attention ref_objets pos =
+  match ref_objets with
+  | [] -> (0.,0.)
+  | hd::tl ->
+    let rel_pos = (soustuple (!hd).position pos) in
+      addtuple (multuple (soustuple (!hd).position (!phys_width /. 2., !phys_height /. 2.)) ((!hd).mass /. (1. +. (distancecarre rel_pos (0.,0.)))))  (center_of_attention tl pos)
 
 (*Fonction despawnant les objets trop lointains et morts, ou avec rayon négatif*)
 let despawn ref_etat =
@@ -825,7 +821,7 @@ let affiche_hud ref_etat =
     set_line_width buttonframewidth; set_color buttonframe;
     draw_poly (Array.of_list (relative_poly[(0.95,0.6);(0.95,0.55);(0.9,0.55);(0.85,0.6)]));
     (*Affichage du score*)
-    set_color (rgb_of_hdr (intensify {r=10000.;v=1000.;b=300.} (1. /. (1. +. 0.9 *. !shake_score))));
+    set_color (rgb_of_hdr (intensify {r=10000.;v=1000.;b=300.} (1. /. (1. +. 10. *. !shake_score))));
     set_line_width 0;
     render_string ("SCORE " ^ string_of_int etat.score) (*(string_of_int etat.score)*)
       (0.02 *. !phys_width, 0.82 *. !phys_height *. (1. -. (0.05 *. !shake_score *.0.08)))
@@ -880,13 +876,29 @@ let affiche_etat ref_etat =
       addtuple
         (addtuple ship.position (multuple ship.velocity camera_prediction))
         (multuple (center_of_attention
-          (List.append (List.append etat.ref_objets etat.ref_objets_unspawned) (List.append etat.ref_fragments etat.ref_fragments_unspawned))
+          (List.append etat.ref_objets etat.ref_objets_unspawned)
           ship.position)
           camera_ratio_objects)) in
     (*move_camera décrit plutôt un déplacement de la totalité des objets en jeu.*)
-    let move_camera =
-      (((!phys_width /. 2.) -. next_x) -. (exp_decay ((!phys_width /. 2.) -. next_x) camera_half_depl),
-       ((!phys_height/. 2.) -. next_y) -. (exp_decay ((!phys_height/. 2.) -. next_y) camera_half_depl)) in
+  let elapsed_time = !game_speed *. (!time_last_frame -. !time_current_frame) in
+
+  let move_camera =
+    (((!phys_width /. 2.) -. next_x) -. (exp_decay ((!phys_width /. 2.) -. next_x) camera_half_depl),
+   ((!phys_height/. 2.) -. next_y) -. (exp_decay ((!phys_height/. 2.) -. next_y) camera_half_depl)) in
+
+  let (movex, movey) = move_camera in
+  let (x, y) = ship.position in
+  let move_camera = (
+    (if x +. movex < camera_start_bound *. !phys_width
+      then movex -. camera_max_force *. elapsed_time *. ( ~-. x -. movex +. camera_start_bound *. !phys_width)
+    else if x +. movex > (1. -. camera_start_bound) *. !phys_width
+      then movex -. camera_max_force *. elapsed_time *. ( ~-. x -. movex +. (1. -. camera_start_bound) *. !phys_width)
+    else movex),
+    (if y +. movey < camera_start_bound *. !phys_height
+      then movey -. camera_max_force *. elapsed_time *. ( ~-. y -. movey +. camera_start_bound *. !phys_height)
+    else if y +. movey > (1. -. camera_start_bound) *. !phys_height
+      then movey -. camera_max_force *. elapsed_time *. ( ~-. y -. movey +. (1. -. camera_start_bound) *. !phys_height)
+    else movey)) in
 
     if not !pause then ignore (deplac_stars etat.ref_stars move_camera);
     deplac_objet_abso etat.ref_ship move_camera;
@@ -1286,6 +1298,7 @@ let random_teleport ref_etat =
   if etat.cooldown_tp <= 0. then (
     if !flashes then add_color := hdr_add !add_color (intensify {r=0.;v=4.;b=40.} flashes_teleport);
     game_exposure := game_exposure_target_tp;
+    game_speed := ratio_time_tp *. !game_speed;
     let ship = !(etat.ref_ship) in
     ship.position <- (Random.float !phys_width, Random.float !phys_height);
     ship.velocity <- (0.,0.);

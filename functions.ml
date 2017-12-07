@@ -10,7 +10,7 @@ let randfloat min max = min +. Random.float (max -. min)
 let carre v = v *. v
 
 (*Fonction de décroissance exponentielle de n au bout de t secondes en float. Basée sur le temps ingame*)
-let exp_decay n half_life = n *. 2. ** (!Parameters.game_speed *. (!time_last_frame -. !time_current_frame) /. half_life)
+let exp_decay n half_life = n *. 2. ** (!game_speed *. (!time_last_frame -. !time_current_frame) /. half_life)
 
 (*Fonction de décroissance exponentielle de n au bout de t secondes en float. Basée sur le temps réel, pas sur le temps de jeu*)
 let abso_exp_decay n half_life = n *. 2. ** ((!time_last_frame -. !time_current_frame) /. half_life)
@@ -84,5 +84,3 @@ On considère une surface de 3x3 la surface de jeu.*)
 let modulo_3reso (x, y) =
   ((modulo_float (x +. !phys_width ) (!phys_width  *. 3.)) -. !phys_width,
    (modulo_float (y +. !phys_height) (!phys_height *. 3.)) -. !phys_height)
-
-
