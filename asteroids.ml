@@ -425,7 +425,7 @@ let close_enough_bullet ref_objet =
   if !infinitespace then (
     hypothenuse (x,y) < max_dist
   ) else (
-    (x < 1.01 *. !phys_width)
+    (x < 0.01 *. !phys_width)
     && (x > 0. -. (0.01  *. !phys_width))
     && (y < 1.01 *. !phys_height)
     && (y > 0. -. (0.01 *. !phys_height)))
@@ -449,9 +449,11 @@ let rec center_of_attention ref_objets pos =
 let despawn ref_etat =
   let etat = !ref_etat in
   (*On met les objets dans la liste de chunks, qui ne sont que décoratif et pour lesquels on ne calculera pas les collisions*)
+  if !chunks then (
     etat.ref_chunks <- (List.append (List.map decay_chunk etat.ref_chunks) (List.append
       (List.append (List.filter too_small etat.ref_objets) (List.filter too_small etat.ref_objets_unspawned))
-      (List.append (List.filter too_small etat.ref_fragments) (List.filter too_small etat.ref_fragments_unspawned))));
+      (List.append (List.filter too_small etat.ref_fragments) (List.filter too_small etat.ref_fragments_unspawned))))
+);
 
     (*Plus besoin de checker les objets unspawned à supprimer, ils ont maintenant une légère tendance à accélérer vers le centre de l'écran.*)
 
@@ -1144,7 +1146,7 @@ let etat_suivant ref_etat =
     v = randfloat rand_min_lum rand_max_lum ;
     b = randfloat rand_min_lum rand_max_lum } in
       mul_base := saturate new_col filter_saturation;
-      space_color_goal := saturate (intensify new_col 10.) space_saturation;
+      space_color_goal := saturate (intensify new_col 5.) space_saturation;
       star_color_goal := saturate (intensify new_col 100.) star_saturation
     );
 

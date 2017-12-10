@@ -75,13 +75,13 @@ let visuals_ship = {
   color = {r=1000.;v=100.;b=25.};
   radius = ship_radius *. 0.9;
   shapes =
-    [({r=200.;v=20.;b=20.},
+    [({r=200.;v=50.;b=50.},
       [(0.,3.*.ship_radius);
       (3. *. pi /. 4.,2.*.ship_radius);
       (pi,ship_radius);
       (~-.3. *. pi /. 4.,2.*.ship_radius)]);
 
-    ({r=250.;v=25.;b=25.},
+    ({r=300.;v=30.;b=30.},
       [(0.,3.*.ship_radius);
       (pi,ship_radius);
       (~-.3. *. pi /. 4.,2.*.ship_radius)]);
@@ -191,9 +191,7 @@ let spawn_projectile position velocity = {
 (*Permet de créer n projectiles*)
 let rec spawn_n_projectiles ship n =
   if n = 0 then [] else (
-  let vel = if projectile_herit_speed
-    then addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. !projectile_deviation +. ship.orientation) (!projectile_min_speed +. Random.float (!projectile_max_speed -. !projectile_min_speed)))
-    else (polar_to_affine (((Random.float 1.) -. 0.5) *. !projectile_deviation +. ship.orientation) (!projectile_min_speed +. Random.float (!projectile_max_speed -. !projectile_min_speed)))
+  let vel = addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. !projectile_deviation +. ship.orientation) (!projectile_min_speed +. Random.float (!projectile_max_speed -. !projectile_min_speed)))
   and pos = addtuple ship.position (polar_to_affine ship.orientation ship.hitbox.ext_radius) in (*On fait spawner les projectiles au bout du vaisseau*)
   ref (spawn_projectile pos vel) :: spawn_n_projectiles ship (n-1))
 

@@ -1,3 +1,14 @@
+v1.8 - ???
+  Powerups ?
+  Guns, vies, propulsion, vie totale, autoregen
+  Trou noir ?
+  Nébuleuses "volumétriques" ?
+  Étincelles ?
+  Vraie explosion après la mort ?
+  (Et au passage faire les dégats en fonction d'elapsed time)
+  (Et tant qu'on y est, faire des dégats PAR explosion. Masse serait bien pour régler ça.)
+  Astéroides apparaissant progressivement et pas en bloc
+
 v1.7 - MORE FUN update
 Features :
   -Everything is bigger and faster !
