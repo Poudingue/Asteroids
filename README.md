@@ -20,30 +20,15 @@ Run it with ./asteroids
 
 ## Changelog
 
-v1.7 - MORE FUN update
+v1.8 beta - MAYHEM update - WIP
 
 Features :
-- Everything is bigger and faster !
-- Light flashes for events (Shooting, teleporting and explosions)
-- Color correction, star colors and space color change from one stage to the next
-- More forgiving physics damages (allows easy asteroid-pushing :D)
-- The default gamemode is now infinitespace
-- The default weapon is now a powerfull shotgun
-- Overexposed colors become whiter. A very intense red will look orange, or yellow, and a very intense blue will look cyan
-- Lots of tweaks, too much to enumerate
+- Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculatioin of collisions
 
 Fixed :
-- Infinitespace now works properly, with objects that are too far coming back the other side
-- Smart camera now follows the action as intended :
-  - Properly focus on objects depending on mass an squared distance to the ship
-  - The ship can't go outside of screen anymore
-- Better performance thanks to a higher asteroid minimum radius and default infinitespace
-- No more intricated asteroids and physics bugs.
+- No more massive asteroid spawn, fixed interval between two asteroid spawning
 
 Bugs :
-- At the beginning of stages, the sudden spawn of countless asteroids create a massive performance hit.
-  - Side effect : It creates an insane amount of chaos for more advanced stages
-  - Suggested fix : Make the asteroids of the stage appear progressively
 - Momentum of objects still not taken into account for physics
 
 For all changelogs, see changelog.txt

@@ -243,6 +243,7 @@ let spawn_explosion ref_projectile =
 let spawn_explosion_object ref_objet =
   let rad = explosion_ratio_radius *. !ref_objet.hitbox.int_radius in (*On récupère le rayon de l'objet*)
   if !flashes then add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color flashes_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
+  if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_explosions;
   ref {
   objet = Explosion;
   visuals = {

@@ -69,8 +69,8 @@ let last_count = ref 0
 let current_count = ref 0
 
 (*Dimensions fenêtre graphique.*)
-let width = 2500
-let height = 1400
+let width = 1360
+let height = 760
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
 let infinitespace = ref true
 let max_dist = 6000.

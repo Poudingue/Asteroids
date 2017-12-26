@@ -1,3 +1,4 @@
+
 (*Parameters of the whole game*)
 
 open Graphics
@@ -23,8 +24,8 @@ let pause = ref false
 let restart = ref false
 let quit = ref false
 let game_speed_target_pause = 0.  (*Vitesse du jeu en pause*)
-let game_speed_target_death = 0.8 (*Vitesse du jeu après mort*)
-let game_speed_target_boucle = 1.0 (*Vitesse du jeu par défaut*)
+let game_speed_target_death = 0.6 (*Vitesse du jeu après mort*)
+let game_speed_target_boucle = 1. (*Vitesse du jeu par défaut*)
 let game_speed_target = ref 1.
 (*Le game_speed est la vitesse réelle à laquelle le jeu tourne à l'heure actuelle.*)
 (*Cela permet notamment de faire des effets de ralenti ou d'accéléré*)
@@ -69,8 +70,8 @@ let last_count = ref 0
 let current_count = ref 0
 
 (*Dimensions fenêtre graphique.*)
-let width = 2500
-let height = 1400
+let width = 1360
+let height = 760
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
 let infinitespace = ref true
 let max_dist = 6000.
@@ -216,18 +217,18 @@ let ship_impulse_pos = ref true
 let ship_impulse_rotat = ref true
 
 (*Ratio pour conversion des dégats physiques depuis le changement de vélocité au carré*)
-let ratio_phys_deg = ref 0.002
+let ratio_phys_deg = ref 0.001
 let advanced_hitbox = ref true
 
 (*Let objets physiques en contact se repoussent un peu plus que normal pour éviter d'être imbriqués*)
-let min_repulsion = 5.
+let min_repulsion = 10.
 let min_bounce = 50.
 
 (*Paramètres des astéroïdes*)
 let asteroid_spawn_delay = 1.01 (*Temps s'écoulant entre l'apparition de deux astéroïdes*)
 let asteroid_max_spawn_radius = 800. (*Taille max d'astéroïde au spawn.*)
-let asteroid_min_spawn_radius = 600. (*Taille min de spawn*)
-let asteroid_min_size = 50. (*En dessous de la taille minimale, un asteroide se transforme en chunk*)
+let asteroid_min_spawn_radius = 500. (*Taille min de spawn*)
+let asteroid_min_size = 200. (*En dessous de la taille minimale, un asteroide se transforme en too_small*)
 let asteroid_max_moment = 2. (*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
 let asteroid_max_velocity = 2000. (*Velocité max au spawn*)
 let asteroid_min_velocity = 1500. (*Velocité min au spawn*)
@@ -241,9 +242,9 @@ let asteroid_dam_res = 0. (*La résistance aux dégats d'explosions*)
 let asteroid_phys_ratio = 1. (*Sensibilité aux chocs physiques*)
 let asteroid_phys_res = 100. (*Résistance aux chocs physiques*)
 (*Paramètres pour les couleurs d'astéroïdes à la naissance*)
-let asteroid_min_lum = 20.
-let asteroid_max_lum = 150.
-let asteroid_min_satur = 0.3
+let asteroid_min_lum = 40.
+let asteroid_max_lum = 120.
+let asteroid_min_satur = 0.4
 let asteroid_max_satur = 0.5
 (*Paramètres de la hitbox et des visuels polygonaux*)
 let asteroid_polygon_min_sides = 7(*Nombre minimum de côtés qu'un astéroïde peut avoir*)
@@ -253,6 +254,9 @@ let asteroid_polygon_max = 1.3 (*En ratio du rayon*)
 (*Contrôle du nombre d'astéroïde apparaissant à chaque vague*)
 let asteroid_min_nb = 2
 let asteroid_stage_nb = 1
+let time_spawn_asteroid = 4. (*secondes*)
+let current_stage_asteroids = ref 3
+let time_since_last_spawn = ref 3.5
 (*Paramètres pour rapprocher l'air de rien les objets trop lointains (plus utilisé)*)
 let half_close = 10. (*Demi-temps de rapprochement d'un objet par rapport au centre de l'écran*)
 let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le centre de l'écran*)
@@ -262,22 +266,26 @@ let fragment_max_velocity = 2000. (*Velocité max au spawn*)
 let fragment_min_velocity = 1500. (*Velocité min au spawn*)
 let fragment_max_size = 0.6 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_size = 0.3 (*En ratio de la taille de l'astéroïde parent*)
-let fragment_min_exposure = 0.6 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
-let fragment_max_exposure = 1.4 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
+let fragment_min_exposure = 0.666 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
+let fragment_max_exposure = 1.5 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
 let fragment_number = ref 2
+let chunk_max_size = 50.
 let chunks = ref true
-let chunk_radius_decay = 10. (*Pour la décroissance des particules n'ayant pas de collisions*)
+let chunk_radius_decay = 25. (*Pour la décroissance des particules n'ayant pas de collisions*)
 
 (*Paramètres du vaisseau*)
+(*Pour l'autoregen*)
+let autoregen = true
+let autoregen_health = 5. (*Regain de vie par seconde*)
 (*valeurs du vaisseau*)
 let ship_max_health = 100. (*health au spawn. Permet de l'appliquer au modèle physique.*)
 let ship_max_lives = 3 (*Nombre de fois que le vaisseau peut réapparaître*)
-let ship_density = 50. (*Pour calcul de la masse du vaisseau, qui a un impact sur la physique*)
+let ship_density = 100. (*Pour calcul de la masse du vaisseau, qui a un impact sur la physique*)
 let ship_radius = 20. (*Pour la hitbox et le rendu*)
 (*Réduction des dégats et dégats physiques*)
 let ship_dam_ratio = 0.8
 let ship_dam_res = 10.
-let ship_phys_ratio = 0.005
+let ship_phys_ratio = 0.01
 let ship_phys_res = 10.
 let ship_death_max_momentum = 2.
 (*Contrôles de déplacement*)
@@ -293,16 +301,13 @@ let ship_max_rotat = pi /. 6.(*En radians*)
 let ship_half_stop_rotat = 0.2(*En temps nécessaire pour perdre la moitié du moment angulaire*)
 (*Temps min entre deux téléportations aléatoires*)
 let cooldown_tp = 10.
-(*Pour l'autoregen*)
-let autoregen = true
-let autoregen_health = 2. (*Regain de vie par seconde*)
 
 (*Valeurs du projectile*)
 let projectile_recoil = ref 100. (*Recul appliqué au vaisseau*)
 let projectile_cooldown = ref 0.3 (*Temps minimum entre deux projectiles*)
 let projectile_max_speed = ref 15000.(*Vitesse relative au lanceur lors du lancement*)
 let projectile_min_speed = ref 10000.
-let projectile_herit_speed = false
+let projectile_herit_speed = true
 let projectile_deviation = ref 0.3(*Déviation possible de la trajectoire des projectiles*)
 let projectile_radius = ref 15.
 let projectile_radius_hitbox = ref 50. (*On fait une hitbox plus grande pour être généreux sur les collisions*)
@@ -400,7 +405,7 @@ let camera_prediction = 1.5 (*En secondes de déplacement du vaisseau dans le fu
 let camera_half_depl = 1. (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
 let camera_ratio_objects = 3. (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
 let camera_ratio_vision = 0.3 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
-let camera_start_bound = 0.4 (*En ratio de la taille de l'écran : distance du bord à laquelle la caméra commence à se recentrer*)
+let camera_start_bound = 0.5 (*En ratio de la taille de l'écran : distance du bord à laquelle la caméra commence à se recentrer*)
 let camera_max_force = 1. (*En ratio de la taille de l'écran : vitesse appliquée à la caméra pour la recentrer si on ATTEINT le bord de l'écran*)
 
 (*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
@@ -438,11 +443,12 @@ let current_jitter_double = ref (0.,0.)
 
 (*L'exposition variable permet des variations de luminosité en fonction des évènements*)
 let variable_exposure = true
-let exposure_ratio_damage = 0.98
+let exposure_ratio_damage = 0.995
 let exposure_tir = 0.98
+let exposure_ratio_explosions = 0.99
 let exposure_half_life = 1.
 let game_exposure_target_death = 0.5
-let game_exposure_target_boucle = 2.5
+let game_exposure_target_boucle = 2.
 let game_exposure_target_tp = 0.5
 let game_exposure_target = ref 2.
 let game_exposure = ref 0.
@@ -453,6 +459,6 @@ let flashes_damage = 0.
 let flashes_explosion = 0.05
 let flashes_saturate = 8.
 let flashes_normal_mass = 100000.
-let flashes_tir = 0.5
+let flashes_tir =1.
 let flashes_teleport = 1000.
 let flashes_half_life = 0.02
