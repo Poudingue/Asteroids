@@ -201,13 +201,15 @@ let rec spawn_n_projectiles ship n =
 (*Spawne une explosion d'impact de projectile*)
 let spawn_explosion ref_projectile =
   let rad = explosion_min_radius +. (Random.float (explosion_max_radius -. explosion_min_radius)) in
+  let rand_lum = (randfloat explosion_min_exposure explosion_max_exposure) in
   ref {
   objet = Explosion;
   visuals = {
-    color = {
-      r = 1500.*. (randfloat explosion_min_exposure explosion_max_exposure);
-      v = 500. *. (randfloat explosion_min_exposure explosion_max_exposure);
-      b = 250. *. (randfloat explosion_min_exposure explosion_max_exposure)};
+    color = intensify {
+      r = 2000.;
+      v = 500. ;
+      b = 200.}
+    rand_lum;
     radius = rad;
     shapes = [];
   };

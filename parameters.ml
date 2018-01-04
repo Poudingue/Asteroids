@@ -70,8 +70,8 @@ let last_count = ref 0
 let current_count = ref 0
 
 (*Dimensions fenêtre graphique.*)
-let width = 1360
-let height = 760
+let width = 2500
+let height = 1400
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
 let infinitespace = ref true
 let max_dist = 6000.
@@ -119,7 +119,7 @@ let explosion_max_exposure = 2.
 let explosion_damages = 150.
 (*Pour les explosions héritant d'un objet*)
 let explosion_ratio_radius = 1.5
-let explosion_saturate = 10.
+let explosion_saturate = 15.
 let explosion_min_exposure_heritate = 6.(*Détermine la luminosité max et min des explosions héritant d'objets au spawn*)
 let explosion_max_exposure_heritate = 8.
 
@@ -222,10 +222,9 @@ let advanced_hitbox = ref true
 
 (*Let objets physiques en contact se repoussent un peu plus que normal pour éviter d'être imbriqués*)
 let min_repulsion = 10.
-let min_bounce = 50.
+let min_bounce = 10.
 
 (*Paramètres des astéroïdes*)
-let asteroid_spawn_delay = 1.01 (*Temps s'écoulant entre l'apparition de deux astéroïdes*)
 let asteroid_max_spawn_radius = 800. (*Taille max d'astéroïde au spawn.*)
 let asteroid_min_spawn_radius = 500. (*Taille min de spawn*)
 let asteroid_min_size = 200. (*En dessous de la taille minimale, un asteroide se transforme en too_small*)
@@ -265,7 +264,7 @@ let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le
 let fragment_max_velocity = 2000. (*Velocité max au spawn*)
 let fragment_min_velocity = 1500. (*Velocité min au spawn*)
 let fragment_max_size = 0.6 (*En ratio de la taille de l'astéroïde parent*)
-let fragment_min_size = 0.3 (*En ratio de la taille de l'astéroïde parent*)
+let fragment_min_size = 0.4 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.666 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
 let fragment_max_exposure = 1.5 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
 let fragment_number = ref 2
@@ -346,16 +345,16 @@ let machine_radius_hitbox = 25.
 let machine_number = 1
 
 (*Valeurs des explosions*)
-let explosion_max_radius = 100.
-let explosion_min_radius = 80.
-let explosion_min_exposure = 1.(*Détermine la luminosité max et min des explosions au spawn*)
-let explosion_max_exposure = 2.
+let explosion_max_radius = 250.
+let explosion_min_radius = 100.
+let explosion_min_exposure = 0.2(*Détermine la luminosité max et min des explosions au spawn*)
+let explosion_max_exposure = 1.5
 let explosion_damages = 150.
 (*Pour les explosions héritant d'un objet*)
-let explosion_ratio_radius = 1.5
+let explosion_ratio_radius = 2.
 let explosion_saturate = 10.
-let explosion_min_exposure_heritate = 6.(*Détermine la luminosité max et min des explosions héritant d'objets au spawn*)
-let explosion_max_exposure_heritate = 8.
+let explosion_min_exposure_heritate = 2.(*Détermine la luminosité max et min des explosions héritant d'objets au spawn*)
+let explosion_max_exposure_heritate = 6.
 
 (*Valeurs des muzzleflashes*)
 let muzzle_ratio_radius = 3.
@@ -370,9 +369,9 @@ let fire_ratio_radius = 1.
 (*Valeurs de la fumée*)
 let smoke = ref true
 let smoke_half_col = 0.2 (*Vitesse de la décroissance de la couleur*)
-let smoke_half_radius = 1. (*Vitesse de la décroissance du rayon*)
-let smoke_radius_decay = 10. (*Diminution du rayon des particules de fumée*)
-let smoke_max_speed = 40.(*Vitesse random dans une direction random de la fumée*)
+let smoke_half_radius = 1.5 (*Vitesse de la décroissance du rayon*)
+let smoke_radius_decay = 5. (*Diminution du rayon des particules de fumée*)
+let smoke_max_speed = 400.(*Vitesse random dans une direction random de la fumée*)
 
 (*Valeurs des étincelles TODO*)
 
@@ -415,7 +414,7 @@ let screenshake_smoothness = 0.8 (*0 = aucun changement, 0.5 =  1 = lissage infi
 let screenshake_tir_ratio = 200.
 let screenshake_dam_ratio = 0.001
 let screenshake_phys_ratio = 0.001
-let screenshake_phys_mass = 20000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
+let screenshake_phys_mass = 100000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
 let screenshake_half_life = 0.1
 let game_screenshake = ref 0.
 let game_screenshake_pos = ref (0.,0.)
@@ -446,7 +445,7 @@ let variable_exposure = true
 let exposure_ratio_damage = 0.995
 let exposure_tir = 0.98
 let exposure_ratio_explosions = 0.99
-let exposure_half_life = 1.
+let exposure_half_life = 0.5
 let game_exposure_target_death = 0.5
 let game_exposure_target_boucle = 2.
 let game_exposure_target_tp = 0.5
@@ -456,9 +455,9 @@ let game_exposure = ref 0.
 (*Flashes lumineux lors d'évènements*)
 let flashes = ref true
 let flashes_damage = 0.
-let flashes_explosion = 0.05
-let flashes_saturate = 8.
+let flashes_explosion = 0.02
+let flashes_saturate = 10.
 let flashes_normal_mass = 100000.
 let flashes_tir =1.
 let flashes_teleport = 1000.
-let flashes_half_life = 0.02
+let flashes_half_life = 0.01
