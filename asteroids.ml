@@ -90,10 +90,9 @@ let rec n_stars n =
 let init_etat () =  game_screenshake:=0. ;{
   buttons =
     [ button_quit ; button_resume ; button_new_game;
-     button_scanlines ; button_retro ; button_oldschool;
-     button_hitbox ; button_dynamic_camera ; button_infinitespace ;
-     button_smoke ; button_screenshake ;
-    button_framerate ; button_mousecontrol ; button_flashes ; button_color];
+     button_scanlines ; button_retro ;
+     button_hitbox ; button_smoke ; button_screenshake ;
+    button_framerate ; button_flashes ; button_color];
   lifes = ship_max_lives;
   score = 0;
   stage = 0;
@@ -171,7 +170,7 @@ let render_visuals_modulo objet =
   render_visuals objet (    0.         , !phys_height);
   render_visuals objet (    !phys_width, !phys_height)
 
-let render_objet ref_objet = if !infinitespace then (render_visuals !ref_objet (0.,0.)) else (render_visuals_modulo !ref_objet);;
+let render_objet ref_objet = render_visuals !ref_objet (0.,0.)
 let render_unspawned ref_objet = render_visuals !ref_objet (0.,0.)
 
 (*Permet de rendre un polygone ayant des points déterminés en pourcentage de largeur et hauteur
@@ -270,7 +269,7 @@ let render_spark ref_spark =
 let deplac_objet_abso ref_objet velocity =
 let objet = !ref_objet in
 objet.last_position <- objet.position;
-if !dynamic_camera then objet.position <- proj objet.position velocity 1.;(*TODO sans doute moins sale de modifier direct la position*)
+objet.position <- proj objet.position velocity 1.;
 ref_objet := objet;;
 
 (*Même chose pour plusieurs objets*)
@@ -283,10 +282,10 @@ deplac_objets_abso (List.tl ref_objets) velocity)
 let deplac_star ref_star velocity =
   let star = !ref_star in
   star.last_pos <- star.pos;
-  if !dynamic_camera then (
   let (next_x, next_y) = addtuple star.pos (multuple velocity star.proximity) in
   star.pos <- modulo_reso (next_x, next_y);
-  if (next_x > !phys_width || next_x < 0. || next_y > !phys_height || next_y < 0.) then star.last_pos <- star.pos); (*On évite le motion blur incorrect causé par une téléportation d'un bord à l'autre de l'écran.*)
+  if (next_x > !phys_width || next_x < 0. || next_y > !phys_height || next_y < 0.) then star.last_pos <- star.pos;
+(*On évite le motion blur incorrect causé par une téléportation d'un bord à l'autre de l'écran.*)
   ref_star := star
 
 (*Déplacement d'un ensemble d'étoiles*)
@@ -378,9 +377,7 @@ let decay_chunk ref_chunk =
 
 let damage ref_objet damage =
   let objet = !ref_objet in
-  if (!oldschool)
-    then (objet.health <- ~-.0.1)
-    else (objet.health <- objet.health -. (max 0. (objet.dam_ratio *. damage -. objet.dam_res)));
+  objet.health <- objet.health -. (max 0. (objet.dam_ratio *. damage -. objet.dam_res));
   game_screenshake := !game_screenshake +. damage *. screenshake_dam_ratio;
   if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_damage;
   if !flashes then add_color := hdr_add !add_color (intensify {r=1.;v=0.7;b=0.5} (damage *. flashes_damage));
@@ -388,9 +385,7 @@ let damage ref_objet damage =
 
 let phys_damage ref_objet damage =
   let objet = !ref_objet in
-  if (!oldschool)
-    then (objet.health <- ~-.0.1)
-    else (objet.health <- objet.health -. (max 0. (objet.phys_ratio *. damage -. objet.phys_res)));
+  objet.health <- objet.health -. (max 0. (objet.phys_ratio *. damage -. objet.phys_res));
   game_screenshake := !game_screenshake +. damage *. screenshake_phys_ratio *. objet.mass /. screenshake_phys_mass;
   ref_objet := objet
 
@@ -456,25 +451,13 @@ let checkspawn_etat ref_etat =
 (*Booléen indiquant qu'un objet est suffisamment proche pour être encore pris en compte dans l'espace de jeu*)
 let close_enough ref_objet =
   let (x, y) = !ref_objet.position in
-  if !infinitespace then (
     hypothenuse (soustuple (x,y) (!phys_width /. 2., !phys_height /. 2.)) < max_dist
-  ) else (
-       (x < 2. *. !phys_width)
-    && (x > 0. -. !phys_width)
-    && (y < 2. *. !phys_height)
-    && (y > 0. -. !phys_height))
 
 let too_far ref_objet = not (close_enough ref_objet)
 
 let close_enough_bullet ref_objet =
   let (x, y) = !ref_objet.position in
-  if !infinitespace then (
     hypothenuse (x,y) < max_dist
-  ) else (
-    (x < 0.01 *. !phys_width)
-    && (x > 0. -. (0.01  *. !phys_width))
-    && (y < 1.01 *. !phys_height)
-    && (y > 0. -. (0.01 *. !phys_height)))
 
 let positive_radius ref_objet = !ref_objet.visuals.radius > 0.
 
@@ -535,7 +518,6 @@ let despawn ref_etat =
     etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
     (*TODO permettre un missile ne despawnant pas après mort, mais provoquant plusieurs explosions sur son passage*)
 
-    if not !infinitespace then etat.ref_projectiles <- (List.filter close_enough_bullet etat.ref_projectiles) else etat.ref_projectiles <- (List.filter close_enough etat.ref_projectiles);
 
     etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
     (*etat.ref_smoke <- (List.filter checkspawn_objet etat.ref_smoke);*)
@@ -698,38 +680,7 @@ let deplac_obj_modulo ref_objet (x,y) = (*x et y sont des entiers, en quantité 
 
 (*Fonction permettant aux objets simultanément à plusieurs endroits de l'écran de réagir correctement au niveau physique*)
 let rec calculate_collisions_modulo ref_objet ref_objets precis =
-if List.length ref_objets > 0 then (
-  (*En mode infinitespace, on ignore la partie modulo du calcul*)
-  if not !infinitespace then (
-    (*duplicata haut de l'objet*)
-    deplac_obj_modulo ref_objet (0, 1);
-    calculate_collisions_objet ref_objet ref_objets precis;
-    (*Duplicata haut droite de l'objet*)
-    deplac_obj_modulo ref_objet (1, 0);
-    calculate_collisions_objet ref_objet ref_objets precis;
-    (*Duplicata droit de l'objet*)
-    deplac_obj_modulo ref_objet (0, ~-1);
-    calculate_collisions_objet ref_objet ref_objets precis;
-    (*Duplicata droit bas*)
-    deplac_obj_modulo ref_objet (0, ~-1);
-    calculate_collisions_objet ref_objet ref_objets precis;
-    (*Duplicata bas*)
-    deplac_obj_modulo ref_objet (~-1, 0);
-    calculate_collisions_objet ref_objet ref_objets precis;
-  (*Duplicata bas gauche*)
-    deplac_obj_modulo ref_objet (~-1, 0);
-    calculate_collisions_objet ref_objet ref_objets precis;
-    (*Duplicata gauche*)
-    deplac_obj_modulo ref_objet (0, 1);
-    calculate_collisions_objet ref_objet ref_objets precis;
-    (*Duplicata haut gauche*)
-    deplac_obj_modulo ref_objet (0, 1);
-    calculate_collisions_objet ref_objet ref_objets precis;
-    (*On remet l'objet à son emplacement habituel et on calcule sa physique*)
-    deplac_obj_modulo ref_objet (1, ~-1)));
-
-  (*On calcule aussi la collision à son lieu original)*)
-  calculate_collisions_objet ref_objet ref_objets precis
+if List.length ref_objets > 0 then calculate_collisions_objet ref_objet ref_objets precis;;
 
 (*Même chose, pour une liste de ref objets*)
 let rec calculate_collisions_modulos ref_objets precis=
@@ -739,7 +690,7 @@ calculate_collisions_modulos (List.tl ref_objets) precis)
 else ()
 
 (*Même chose, mais collision entre deux listes*)
-let rec calculate_collisions_modulo_listes ref_objets1 ref_objets2 precis=
+let rec calculate_collisions_modulo_listes ref_objets1 ref_objets2 precis =
 if ref_objets1 = [] || ref_objets2 = [] then () else (
 calculate_collisions_modulo (List.hd ref_objets1) ref_objets2 precis;
 calculate_collisions_modulo_listes (List.tl ref_objets1) ref_objets2 precis)
@@ -1047,8 +998,7 @@ let affiche_etat ref_etat =
   if not !retro then (set_line_width 2; List.iter render_star_trail etat.ref_stars);(*Avec ou sans motion blur, on rend les étoiles comme il faut*)
   set_line_width 0;
 
-  if not !oldschool then (
-  List.iter render_objet etat.ref_smoke);
+  List.iter render_objet etat.ref_smoke;
   List.iter render_projectile etat.ref_projectiles;
   render_objet etat.ref_ship;
   List.iter render_chunk etat.ref_chunks;
@@ -1083,23 +1033,9 @@ let etat_suivant ref_etat =
     game_speed_target := game_speed_target_pause;
     game_speed := game_speed_target_pause
   );
-  if !oldschool
-    then (
-      retro := true;
-      projectile_number := 1;
-      fragment_number := 2;
-      stars_nb := 0;
-      screenshake := false;
-      dynamic_camera := false;
-      infinitespace := false;
-      smoke := false;
-      motion_blur := false;
-      mousecontrol := false)
-    else (
       stars_nb := stars_nb_default;
       projectile_number := projectile_number_default;
-      fragment_number := 5);
-  if !infinitespace then dynamic_camera := true;
+      fragment_number := 5;
 
   if !stars_nb != !stars_nb_previous then (etat.ref_stars <- n_stars !stars_nb; stars_nb_previous := !stars_nb);
 
@@ -1259,12 +1195,10 @@ let etat_suivant ref_etat =
   (*On fait apparaitre les explosions correspondant aux projectiles détruits*)
   etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
 
-  (*On fait apparaitre les explosions correspondant aux objets détruits,
-  sauf en mode oldschool*)
-  if not ! oldschool then (
+  (*On fait apparaitre les explosions correspondant aux objets détruits*)
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen));
-  etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen2)));
+  etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen2));
   (*On ne fait pas exploser les fragments, car ils sont tous superposés, et en quelques frames ils meurent tous.
   On fait par contre entrer les explosions dans les effets de fumée, pour l'effet visuel.*)
   if !smoke then(
@@ -1484,7 +1418,7 @@ ce qui est une approximation généralement correcte*)
     (*On ajoute les projectiles *)
     etat.ref_projectiles <- List.append (spawn_n_projectiles ship !projectile_number) etat.ref_projectiles;
     (*Ajout du muzzleflash correspondant aux tirs*)
-    if !smoke && not !oldschool then etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_muzzle (spawn_n_projectiles ship !projectile_number));
+    if !smoke then etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_muzzle (spawn_n_projectiles ship !projectile_number));
     etat.cooldown <- etat.cooldown +. !projectile_cooldown;
     ship.velocity <- addtuple ship.velocity (polar_to_affine (ship.orientation +. pi) !projectile_recoil)
   done;
@@ -1527,13 +1461,11 @@ let controle_souris ref_etat =
 let rec mort ref_etat =
   game_speed_target := game_speed_target_death;
   game_exposure_target := game_exposure_target_death;
-  if not !oldschool then (
     acceleration ref_etat;
-    !(!ref_etat.ref_ship).mass <- 100000.
-  );
+    !(!ref_etat.ref_ship).mass <- 100000.;
   etat_suivant ref_etat;
   if (Unix.gettimeofday () < !time_of_death +. time_stay_dead) then (
-    if !mousecontrol then controle_souris ref_etat;
+    controle_souris ref_etat;
     if key_pressed  ()then (
       let status = wait_next_event[Key_pressed] in
         match status.key  with (* ...en fonction de la touche frappee *)
@@ -1559,7 +1491,7 @@ let rec boucle_interaction ref_etat =
     (!ref_etat).lifes <- (!ref_etat).lifes - 1;
     mort ref_etat;
   );
-  if !mousecontrol then controle_souris ref_etat;
+  controle_souris ref_etat;
   if key_pressed () && not !pause then
   let status = wait_next_event[Key_pressed] in
     match status.key  with (* ...en fonction de la touche frappee *)

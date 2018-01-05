@@ -94,14 +94,6 @@ let applique_slider ref_slider =
     boolean = quit;
     lastmousestate = false;}
 
-  let button_oldschool={
-    pos1 = ((4./.16.) *. !phys_width,(12./.24.) *. !phys_height);
-    pos2 = ((6./.16.) *. !phys_width,(14./.24.) *. !phys_height);
-    text = "oldschool mode";
-    text_over = "Play like in the old days.";
-    boolean = oldschool;
-    lastmousestate = false;}
-
   let button_retro={
     pos1 = ((7./.16.) *. !phys_width,(12./.24.) *. !phys_height);
     pos2 = ((9./.16.) *. !phys_width,(14./.24.) *. !phys_height);
@@ -116,24 +108,6 @@ let applique_slider ref_slider =
     text = "scanlines";
     text_over = "Imitates the look of old CRT monitors.\nLowers luminosity.";
     boolean = scanlines;
-    lastmousestate = false;}
-
-
-
-  let button_infinitespace={
-    pos1 = ((4./.16.) *. !phys_width,(9./.24.) *. !phys_height);
-    pos2 = ((6./.16.) *. !phys_width,(11./.24.) *. !phys_height);
-    text = "infinitespace";
-    text_over = "To infinity and beyond !";
-    boolean = infinitespace;
-    lastmousestate = false;}
-
-  let button_dynamic_camera={
-    pos1 = ((7./.16.) *. !phys_width,(9./.24.) *. !phys_height);
-    pos2 = ((9./.16.) *. !phys_width,(11./.24.) *. !phys_height);
-    text = "dynamic camera";
-    text_over = "Intelligent camera";
-    boolean = dynamic_camera;
     lastmousestate = false;}
 
   let button_hitbox={
@@ -174,14 +148,6 @@ let applique_slider ref_slider =
     text = "smoke particles";
     text_over = "Allows smoke. Disable for better performance.";
     boolean = smoke;
-    lastmousestate = false;}
-
-  let button_mousecontrol={
-    pos1 = ((4./.16.) *. !phys_width,(3./.24.) *. !phys_height);
-    pos2 = ((6./.16.) *. !phys_width,(5./.24.) *. !phys_height);
-    text = "mouse control";
-    text_over = "Mouse to aim. Click to accelerate. Hold spacebar to shoot.";
-    boolean = mousecontrol;
     lastmousestate = false;}
 
   let button_framerate={

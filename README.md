@@ -23,8 +23,9 @@ Run it with ./asteroids
 v1.8 beta - MAYHEM update - WIP
 
 Features :
-- Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculatioin of collisions
-- Better explosions, better fire
+- Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculation of collisions
+- Better explosions, better fire, better screenshake, better time dilation, better flashes
+- Only infinitespace with mouse control available now
 
 Fixed :
 - No more massive asteroid spawn, fixed interval between two asteroid spawning
@@ -32,5 +33,6 @@ Fixed :
 
 Bugs :
 - Momentum of objects still not taken into account for physics
+- Some objects seem to spawn in the middle of the screen
 
 For all changelogs, see changelog.txt

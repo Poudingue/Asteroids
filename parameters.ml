@@ -35,7 +35,7 @@ let half_speed_change = 0.5
 
 (*Ratios de changement de vitesse en fonction des évènements*)
 let ratio_time_explosion = 0.999
-let ratio_time_destr_asteroid = 0.99
+let ratio_time_destr_asteroid = 0.98
 let ratio_time_tp = 0.
 
 (*Timer pour la mort*)
@@ -73,7 +73,6 @@ let current_count = ref 0
 let width = 2500
 let height = 1400
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
-let infinitespace = ref true
 let max_dist = 6000.
 (*Dimensions de l'espace physique dans lequel les objets évoluent.
 On s'assure que la surface de jeu soit la même quelle que soit la résolution.
@@ -205,9 +204,6 @@ let shutter_speed = 1.
 (******************************************************************************)
 (*Paramètres de jeu*)
 
-(*Permet le contrôle du vaisseau à la souris.
-Viser avec la souris, clic pour accélérer, toujours barre d'espace pour tirer*)
-let mousecontrol = ref true
 (*Les contrôles directs ne contrôlent pas la vitesse et le moment mais directement la position et la rotation.
 Les valeurs par défaut sont celles demandées dans le tp*)
 (*TODO implémenter correctement toutes les méthodes de contrôle*)
@@ -309,7 +305,7 @@ let projectile_min_speed = ref 10000.
 let projectile_herit_speed = true
 let projectile_deviation = ref 0.3(*Déviation possible de la trajectoire des projectiles*)
 let projectile_radius = ref 15.
-let projectile_radius_hitbox = ref 50. (*On fait une hitbox plus grande pour être généreux sur les collisions*)
+let projectile_radius_hitbox = ref 30. (*On fait une hitbox plus grande pour être généreux sur les collisions*)
 let projectile_health = 0.(*On considère la mort quand la santé descend sous zéro. On a ici la certitude que le projectile se détruira*)
 let projectile_number = ref 50
 let projectile_number_default = 10
@@ -364,7 +360,7 @@ let muzzle_ratio_speed = 0.05
 let fire_max_random = 100.
 let fire_min_speed = 500.
 let fire_max_speed = 1000.
-let fire_ratio_radius = 1.5
+let fire_ratio_radius = 1.4
 
 (*Valeurs de la fumée*)
 let smoke = ref true
@@ -378,9 +374,9 @@ let smoke_max_speed = 400.(*Vitesse random dans une direction random de la fumé
 (*Valeurs des étoiles*)
 let star_min_prox = 0.3 (*Prox min des étoiles. 0 = étoile à l'infini, paraît immobile quel que soit le mouvement.*)
 let star_max_prox = 0.9 (*Prox max. 1 = même profondeur que le vaisseau *)
-let star_prox_lum = 10.(*Pour ajouter de la luminosité aux étoiles plus proches*)
+let star_prox_lum = 5.(*Pour ajouter de la luminosité aux étoiles plus proches*)
 let star_min_lum = 0.
-let star_max_lum = 5.
+let star_max_lum = 4.
 let star_rand_lum = 2. (*Effet de scintillement des étoiles*)
 let stars_nb_default = 100
 let stars_nb = ref 200
@@ -399,7 +395,6 @@ let scanlines_offset = ref 0
 
 (*La camera predictive oriente la camera vers l'endroit où le vaisseau va,
 pour le garder tant que possible au centre de l'écran*)
-let dynamic_camera = ref true
 let camera_prediction = 1.5 (*En secondes de déplacement du vaisseau dans le futur.*)
 let camera_half_depl = 1. (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
 let camera_ratio_objects = 3. (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
@@ -410,10 +405,10 @@ let camera_max_force = 1. (*En ratio de la taille de l'écran : vitesse appliqu�
 (*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
 let screenshake = ref true
 let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse et réaliste physiquement. Sorte de passe-bas sur les mouvements*)
-let screenshake_smoothness = 0.8 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
+let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
 let screenshake_tir_ratio = 200.
-let screenshake_dam_ratio = 0.001
-let screenshake_phys_ratio = 0.001
+let screenshake_dam_ratio = 0.01
+let screenshake_phys_ratio = 0.01
 let screenshake_phys_mass = 100000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
 let screenshake_half_life = 0.1
 let game_screenshake = ref 0.
@@ -431,7 +426,7 @@ let shake_score_half_life = 0.2
 C'est une forme de dithering spatial
 afin de compenser la perte de précision due à la rastérisation
 lors du placement des objets et du tracé des contours.*)
-let dither_aa = true
+let dither_aa = false
 (*La puissance du jitter détermine à quel point le rendu peut se décaler.*)
 (*Déterminer à 1 ou moins pour éviter un effet de flou et de fatigue visuelle*)
 let dither_power = 0.5 (*En ratio de la taille d'un pixel*)
@@ -459,5 +454,5 @@ let flashes_explosion = 0.02
 let flashes_saturate = 10.
 let flashes_normal_mass = 100000.
 let flashes_tir =1.
-let flashes_teleport = 1000.
+let flashes_teleport = 100.
 let flashes_half_life = 0.01
