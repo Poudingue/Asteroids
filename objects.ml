@@ -383,7 +383,7 @@ let spawn_fire ref_ship = ref {
   phys_ratio = 0.;
 
   last_position = !ref_ship.position;
-  position = !ref_ship.position;
+  position = addtuple !ref_ship.position (polar_to_affine (!ref_ship.orientation +. pi) !ref_ship.hitbox.int_radius);
   velocity = addtuple !ref_ship.velocity (addtuple (polar_to_affine (!ref_ship.orientation +. pi) (fire_min_speed +. (Random.float (fire_max_speed -. fire_min_speed)))) (polar_to_affine (Random.float 2. *. pi) (Random.float fire_max_random)));
   half_stop = 0.;
   orientation = 0.;

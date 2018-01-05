@@ -24,9 +24,11 @@ v1.8 beta - MAYHEM update - WIP
 
 Features :
 - Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculatioin of collisions
+- Better explosions, better fire
 
 Fixed :
 - No more massive asteroid spawn, fixed interval between two asteroid spawning
+- No more ad vitam eternam respawn without lives
 
 Bugs :
 - Momentum of objects still not taken into account for physics

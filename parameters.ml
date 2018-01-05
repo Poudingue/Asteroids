@@ -185,7 +185,7 @@ let phys_height = ref (float_of_int height /. !ratio_rendu)
 let rand_min_lum = 0.5
 let rand_max_lum = 1.5
 let space_saturation = 2.
-let star_saturation = 20.
+let star_saturation = 8.
 let dyn_color = ref true
 
 (*Couleurs des boutons*)
@@ -221,8 +221,8 @@ let ratio_phys_deg = ref 0.001
 let advanced_hitbox = ref true
 
 (*Let objets physiques en contact se repoussent un peu plus que normal pour éviter d'être imbriqués*)
-let min_repulsion = 10.
-let min_bounce = 10.
+let min_repulsion = 5.
+let min_bounce = 0.
 
 (*Paramètres des astéroïdes*)
 let asteroid_max_spawn_radius = 800. (*Taille max d'astéroïde au spawn.*)
@@ -253,18 +253,18 @@ let asteroid_polygon_max = 1.3 (*En ratio du rayon*)
 (*Contrôle du nombre d'astéroïde apparaissant à chaque vague*)
 let asteroid_min_nb = 2
 let asteroid_stage_nb = 1
-let time_spawn_asteroid = 4. (*secondes*)
+let time_spawn_asteroid = 5. (*secondes*)
 let current_stage_asteroids = ref 3
-let time_since_last_spawn = ref 3.5
+let time_since_last_spawn = ref 4.5
 (*Paramètres pour rapprocher l'air de rien les objets trop lointains (plus utilisé)*)
 let half_close = 10. (*Demi-temps de rapprochement d'un objet par rapport au centre de l'écran*)
 let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le centre de l'écran*)
 
 (*Caractéristiques des fragments. Principalement hérité des parents.*)
-let fragment_max_velocity = 2000. (*Velocité max au spawn*)
-let fragment_min_velocity = 1500. (*Velocité min au spawn*)
-let fragment_max_size = 0.6 (*En ratio de la taille de l'astéroïde parent*)
-let fragment_min_size = 0.4 (*En ratio de la taille de l'astéroïde parent*)
+let fragment_max_velocity = 3000. (*Velocité max au spawn*)
+let fragment_min_velocity = 2000. (*Velocité min au spawn*)
+let fragment_max_size = 0.65 (*En ratio de la taille de l'astéroïde parent*)
+let fragment_min_size = 0.35 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.666 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
 let fragment_max_exposure = 1.5 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
 let fragment_number = ref 2
@@ -280,7 +280,7 @@ let autoregen_health = 5. (*Regain de vie par seconde*)
 let ship_max_health = 100. (*health au spawn. Permet de l'appliquer au modèle physique.*)
 let ship_max_lives = 3 (*Nombre de fois que le vaisseau peut réapparaître*)
 let ship_density = 100. (*Pour calcul de la masse du vaisseau, qui a un impact sur la physique*)
-let ship_radius = 20. (*Pour la hitbox et le rendu*)
+let ship_radius = 25. (*Pour la hitbox et le rendu*)
 (*Réduction des dégats et dégats physiques*)
 let ship_dam_ratio = 0.8
 let ship_dam_res = 10.
@@ -345,9 +345,9 @@ let machine_radius_hitbox = 25.
 let machine_number = 1
 
 (*Valeurs des explosions*)
-let explosion_max_radius = 250.
+let explosion_max_radius = 150.
 let explosion_min_radius = 100.
-let explosion_min_exposure = 0.2(*Détermine la luminosité max et min des explosions au spawn*)
+let explosion_min_exposure = 0.4(*Détermine la luminosité max et min des explosions au spawn*)
 let explosion_max_exposure = 1.5
 let explosion_damages = 150.
 (*Pour les explosions héritant d'un objet*)
@@ -361,10 +361,10 @@ let muzzle_ratio_radius = 3.
 let muzzle_ratio_speed = 0.05
 
 (*Valeurs du feu à l'arrière du vaisseau*)
-let fire_max_random = 20.
-let fire_min_speed = 250.
-let fire_max_speed = 500.
-let fire_ratio_radius = 1.
+let fire_max_random = 100.
+let fire_min_speed = 500.
+let fire_max_speed = 1000.
+let fire_ratio_radius = 1.5
 
 (*Valeurs de la fumée*)
 let smoke = ref true
@@ -376,13 +376,13 @@ let smoke_max_speed = 400.(*Vitesse random dans une direction random de la fumé
 (*Valeurs des étincelles TODO*)
 
 (*Valeurs des étoiles*)
-let star_min_prox = 0.4 (*Prox min des étoiles. 0 = étoile à l'infini, paraît immobile quel que soit le mouvement.*)
-let star_max_prox = 0.8 (*Prox max. 1 = même profondeur que le vaisseau *)
+let star_min_prox = 0.3 (*Prox min des étoiles. 0 = étoile à l'infini, paraît immobile quel que soit le mouvement.*)
+let star_max_prox = 0.9 (*Prox max. 1 = même profondeur que le vaisseau *)
 let star_prox_lum = 10.(*Pour ajouter de la luminosité aux étoiles plus proches*)
-let star_min_lum = 0.1
-let star_max_lum = 1.
-let star_rand_lum = 1. (*Effet de scintillement des étoiles*)
-let stars_nb_default = 500
+let star_min_lum = 0.
+let star_max_lum = 5.
+let star_rand_lum = 2. (*Effet de scintillement des étoiles*)
+let stars_nb_default = 100
 let stars_nb = ref 200
 let stars_nb_previous = ref 200
 

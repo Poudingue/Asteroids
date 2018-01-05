@@ -538,7 +538,7 @@ let despawn ref_etat =
     if not !infinitespace then etat.ref_projectiles <- (List.filter close_enough_bullet etat.ref_projectiles) else etat.ref_projectiles <- (List.filter close_enough etat.ref_projectiles);
 
     etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
-    etat.ref_smoke <- (List.filter checkspawn_objet etat.ref_smoke);
+    (*etat.ref_smoke <- (List.filter checkspawn_objet etat.ref_smoke);*)
     etat.ref_chunks <- (List.filter positive_radius etat.ref_chunks);
     etat.ref_chunks <- (List.filter checkspawn_objet etat.ref_chunks);
   ref_etat := etat
@@ -1543,7 +1543,7 @@ let rec mort ref_etat =
         | _ -> mort ref_etat)
     else mort ref_etat)
   else (
-  if (!ref_etat).lifes = 0 then (ref_etat := init_etat ();pause := true) else (
+  if (!ref_etat).lifes <= 0 then (ref_etat := init_etat ();pause := true) else (
   !ref_etat.ref_ship <- ref (spawn_ship ());
   game_speed_target := game_speed_target_boucle;
   game_exposure_target := game_exposure_target_boucle))
