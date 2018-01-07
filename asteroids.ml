@@ -35,6 +35,7 @@ plutôt que de vérifier le type d'objet à la volée*)
   mutable ref_objets_oos_small3 : objet_physique ref list;
   mutable ref_objets_oos_small4 : objet_physique ref list;
   mutable ref_chunks : objet_physique ref list;
+  mutable ref_chunks_explo : objet_physique ref list;
   mutable ref_projectiles : objet_physique ref list;
   mutable ref_explosions : objet_physique ref list;
   mutable ref_smoke : objet_physique ref list;
@@ -111,6 +112,7 @@ let init_etat () =  game_screenshake:=0. ;{
   ref_objets_oos_small3 = [];
   ref_objets_oos_small4 = [];
   ref_chunks = [];
+  ref_chunks_explo = [];
   ref_projectiles = [];
   ref_explosions = [];
   ref_smoke = [];
@@ -365,14 +367,19 @@ let moment_objets ref_objets = List.iter moment_objet ref_objets (*TODO supprime
 
 let decay_smoke ref_smoke =
   let smoke = !ref_smoke in
-  smoke.visuals.radius <- (exp_decay smoke.visuals.radius smoke_half_radius) -. (!game_speed *. smoke_radius_decay *. (!time_current_frame -. !time_last_frame));
+  smoke.visuals.radius <- (exp_decay smoke.visuals.radius smoke_half_radius) -. smoke_radius_decay *. (!game_speed *. (!time_current_frame -. !time_last_frame));
   (*Si l'exposition est déjà minimale, ne pas encombrer par un calcul de décroissance expo supplémentaire*)
-  if smoke.hdr_exposure > 0.005 then  smoke.hdr_exposure <- (exp_decay smoke.hdr_exposure smoke_half_col);
+  if smoke.hdr_exposure > 0.001 then  smoke.hdr_exposure <- (exp_decay smoke.hdr_exposure smoke_half_col);
   ref smoke
 
 let decay_chunk ref_chunk =
   let chunk = !ref_chunk in
   chunk.visuals.radius <- chunk.visuals.radius -. (!game_speed *. chunk_radius_decay *. (!time_current_frame -. !time_last_frame));
+  ref chunk
+
+let decay_chunk_explo ref_chunk =
+  let chunk = !ref_chunk in
+  chunk.visuals.radius <- chunk.visuals.radius -. (!game_speed *. chunk_explo_radius_decay *. (!time_current_frame -. !time_last_frame));
   ref chunk
 
 let damage ref_objet damage =
@@ -393,7 +400,7 @@ let phys_damage ref_objet damage =
 let is_alive ref_objet = !ref_objet.health >= 0.
 let is_dead ref_objet = !ref_objet.health <0.
 
-(*Vérifie si un objet dépasse dans l'écran*)
+(*Vérifie si un objet dépasse potentiellement dans l'écran*)
 let checkspawn_objet ref_objet_unspawned =
   let objet = !ref_objet_unspawned in
   let (x, y) = objet.position in
@@ -404,8 +411,7 @@ let checknotspawn_objet ref_objet_unspawned = not (checkspawn_objet ref_objet_un
 
 (*Fait spawner tous les objets en ayant le droit*)
 let checkspawn_etat ref_etat =
-  if !ref_etat.ref_objets_outofscreen = [] then ()
-  else begin
+  begin
     let etat = !ref_etat in
     etat.ref_objets <- (List.append etat.ref_objets (List.filter checkspawn_objet (List.append etat.ref_objets_outofscreen etat.ref_objets_outofscreen2)));
     etat.ref_objets_outofscreen <- List.filter checknotspawn_objet etat.ref_objets_outofscreen;
@@ -484,6 +490,8 @@ let despawn ref_etat =
       (List.map decay_chunk etat.ref_chunks)
       (List.append (List.filter ischunk etat.ref_objets_toosmall) (List.filter ischunk etat.ref_objets_toosmall2)));
 
+    etat.ref_chunks_explo <- (List.map decay_chunk_explo etat.ref_chunks_explo);
+
     etat.ref_objets <- (List.filter is_alive etat.ref_objets);
     etat.ref_objets <- (List.filter big_enough etat.ref_objets);
 
@@ -520,20 +528,12 @@ let despawn ref_etat =
 
 
     etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
-    (*etat.ref_smoke <- (List.filter checkspawn_objet etat.ref_smoke);*)
+    etat.ref_smoke <- (List.filter checkspawn_objet etat.ref_smoke);
     etat.ref_chunks <- (List.filter positive_radius etat.ref_chunks);
+    etat.ref_chunks_explo <- (List.filter positive_radius etat.ref_chunks_explo);
     etat.ref_chunks <- (List.filter checkspawn_objet etat.ref_chunks);
   ref_etat := etat
 
-
-(*Recentrer les objets débordant de l'écran d'un côté de l'écran ou de l'autre*)
-let recenter_objet ref_objet =
-  let objet = !ref_objet in
-  let (next_x, next_y) = modulo_reso objet.position in
-  objet.position <- (next_x, next_y);
-  if (next_x > !phys_width || next_x < 0. || next_y > !phys_height || next_y < 0.)
-    then objet.last_position <- objet.position;(*On évite d'avoir du flou incorrect d'un côté à l'autre de l'écran*)
-ref_objet := objet
 
 (*Fonction permettant de rapprocher les objets lointains*)
 let closer_objet ref_objet =
@@ -545,7 +545,7 @@ let closer_objet ref_objet =
 
 
 (*On recentre les objets qui sont hors de l'écran, mais selon un écran 3 fois plus large et haut*)
-let recenter_objet_unspawned ref_objet =
+let recenter_objet ref_objet =
   let objet = !ref_objet in
   objet.position <- modulo_3reso objet.position;
 ref_objet := objet
@@ -855,6 +855,12 @@ let affiche_hud ref_etat =
       (0.02 *. !phys_width) (0.05 *. !phys_height) (0.01 *. !phys_width)
       0.;
 
+    let time_until_explo = !time_of_death +. time_stay_dead_max -. (Unix.gettimeofday()) in
+    if (ship.health<=0. && time_until_explo > 0. && time_until_explo -. (float_of_int (int_of_float time_until_explo)) > 0.5) then
+    render_string (string_of_int(int_of_float(time_until_explo +. 1.)))
+      (0.42 *. !phys_width, 0.3 *. !phys_height)
+      (0.16 *. !phys_width) (0.4 *. !phys_height) (0.01 *. !phys_width)
+      0.;
 
     set_color white;
     (*Affichage du framerate en bas à gauche.*)
@@ -907,6 +913,12 @@ let affiche_hud ref_etat =
     + List.length etat.ref_objets_oos_small2
     + List.length etat.ref_objets_oos_small3
     + List.length etat.ref_objets_oos_small4));
+
+    moveto 20 140;
+    draw_string ("Chunks_explo : " ^ string_of_int (List.length etat.ref_chunks_explo));
+
+    moveto 20 120;
+    draw_string ("Explosions : " ^ string_of_int (List.length etat.ref_explosions));
 
     moveto 20 60;
     draw_string ("Chunks : " ^ string_of_int (List.length etat.ref_chunks));
@@ -981,6 +993,7 @@ let affiche_etat ref_etat =
     deplac_objets_abso etat.ref_objets_outofscreen2 move_camera;
     deplac_objets_abso etat.ref_fragments move_camera;
     deplac_objets_abso etat.ref_chunks move_camera;
+    deplac_objets_abso etat.ref_chunks_explo move_camera;
     deplac_objets_abso etat.ref_objets_toosmall move_camera;
     deplac_objets_abso etat.ref_objets_toosmall2 move_camera;
     deplac_objets_abso etat.ref_objets_oos_small1 move_camera;
@@ -1082,6 +1095,7 @@ let etat_suivant ref_etat =
   inertie_objets etat.ref_objets_outofscreen2;
   inertie_objets etat.ref_fragments;
   inertie_objets etat.ref_chunks;
+  inertie_objets etat.ref_chunks_explo;
   inertie_objets etat.ref_objets_toosmall;
   inertie_objets etat.ref_objets_toosmall2;
   inertie_objets etat.ref_objets_oos_small1;
@@ -1195,10 +1209,13 @@ let etat_suivant ref_etat =
   (*On fait apparaitre les explosions correspondant aux projectiles détruits*)
   etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
 
+
   (*On fait apparaitre les explosions correspondant aux objets détruits*)
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen));
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen2));
+
+  etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
   (*On ne fait pas exploser les fragments, car ils sont tous superposés, et en quelques frames ils meurent tous.
   On fait par contre entrer les explosions dans les effets de fumée, pour l'effet visuel.*)
   if !smoke then(
@@ -1234,6 +1251,10 @@ let etat_suivant ref_etat =
   + List.length (List.filter is_dead etat.ref_fragments)
   + List.length (List.filter is_dead etat.ref_objets_toosmall)
   + List.length (List.filter is_dead etat.ref_objets_toosmall2)
+  + List.length (List.filter is_dead etat.ref_objets_oos_small1)
+  + List.length (List.filter is_dead etat.ref_objets_oos_small2)
+  + List.length (List.filter is_dead etat.ref_objets_oos_small3)
+  + List.length (List.filter is_dead etat.ref_objets_oos_small4)
   in
   game_speed := !game_speed *. ratio_time_destr_asteroid ** (float_of_int nb_destroyed);
   etat.score <- etat.score + nb_destroyed; (*TODO meilleure version du score avec multiplicateurs*)
@@ -1279,20 +1300,16 @@ let etat_suivant ref_etat =
   );
   time_since_last_spawn := !time_since_last_spawn +. (!time_current_frame -. !time_last_frame) *. !game_speed;
 
-  (*Recentrage des objets sortis de l'écran.
-  Ne pas appeler en infinitespace*)
-
-  List.iter recenter_objet_unspawned etat.ref_chunks;
-  List.iter recenter_objet_unspawned etat.ref_objets;
-  List.iter recenter_objet_unspawned etat.ref_objets_outofscreen;
-  List.iter recenter_objet_unspawned etat.ref_objets_outofscreen2;
-  List.iter recenter_objet_unspawned etat.ref_fragments;
-  List.iter recenter_objet_unspawned etat.ref_objets_toosmall;
-  List.iter recenter_objet_unspawned etat.ref_objets_toosmall2;
-  List.iter recenter_objet_unspawned etat.ref_objets_oos_small1;
-  List.iter recenter_objet_unspawned etat.ref_objets_oos_small2;
-  List.iter recenter_objet_unspawned etat.ref_objets_oos_small3;
-  List.iter recenter_objet_unspawned etat.ref_objets_oos_small4;
+  List.iter recenter_objet etat.ref_objets;
+  List.iter recenter_objet etat.ref_objets_outofscreen;
+  List.iter recenter_objet etat.ref_objets_outofscreen2;
+  List.iter recenter_objet etat.ref_fragments;
+  List.iter recenter_objet etat.ref_objets_toosmall;
+  List.iter recenter_objet etat.ref_objets_toosmall2;
+  List.iter recenter_objet etat.ref_objets_oos_small1;
+  List.iter recenter_objet etat.ref_objets_oos_small2;
+  List.iter recenter_objet etat.ref_objets_oos_small3;
+  List.iter recenter_objet etat.ref_objets_oos_small4;
 
   (*On ne recentre pas les projectiles car ils doivent despawner une fois sortis de l'espace de jeu*)
 
@@ -1435,6 +1452,7 @@ let random_teleport ref_etat =
     let ship = !(etat.ref_ship) in
     ship.position <- (Random.float !phys_width, Random.float !phys_height);
     ship.velocity <- (0.,0.);
+    etat.ref_chunks_explo <- List.append (spawn_n_chunks ship nb_chunks_explo {r=0.;v=1000.;b=10000.}) !ref_etat.ref_chunks_explo;
     etat.ref_ship := ship;
     etat.ref_explosions <- (spawn_explosion_tp ship) :: etat.ref_explosions;
     etat.cooldown_tp <- etat.cooldown_tp +. cooldown_tp;
@@ -1461,10 +1479,9 @@ let controle_souris ref_etat =
 let rec mort ref_etat =
   game_speed_target := game_speed_target_death;
   game_exposure_target := game_exposure_target_death;
-    acceleration ref_etat;
-    !(!ref_etat.ref_ship).mass <- 100000.;
+  acceleration ref_etat;
   etat_suivant ref_etat;
-  if (Unix.gettimeofday () < !time_of_death +. time_stay_dead) then (
+  if (Unix.gettimeofday () < !time_of_death +. time_stay_dead_max) && not ((!(!ref_etat.ref_ship).health < ~-. 100.) && (Unix.gettimeofday () > !time_of_death +. time_stay_dead_min)) then (
     controle_souris ref_etat;
     if key_pressed  ()then (
       let status = wait_next_event[Key_pressed] in
@@ -1476,7 +1493,12 @@ let rec mort ref_etat =
     else mort ref_etat)
   else (
   if (!ref_etat).lifes <= 0 then (ref_etat := init_etat ();pause := true) else (
+  !ref_etat.ref_chunks_explo <- List.append (spawn_n_chunks !(!ref_etat.ref_ship) nb_chunks_explo {r=1500.;v=400.;b=200.}) !ref_etat.ref_chunks_explo;
+  game_screenshake := !game_screenshake +. screenshake_death;
+  if !flashes then add_color := hdr_add !add_color (intensify {r = 1000. ; v = 0. ; b = 0. } flashes_death);
   !ref_etat.ref_ship <- ref (spawn_ship ());
+  random_teleport ref_etat;
+  (!ref_etat).cooldown_tp <- 0.;
   game_speed_target := game_speed_target_boucle;
   game_exposure_target := game_exposure_target_boucle))
 
@@ -1489,6 +1511,10 @@ let rec boucle_interaction ref_etat =
   if !(!ref_etat.ref_ship).health<0. then (
     time_of_death := Unix.gettimeofday ();
     (!ref_etat).lifes <- (!ref_etat).lifes - 1;
+    !ref_etat.ref_chunks_explo <- List.append (spawn_n_chunks !(!ref_etat.ref_ship) nb_chunks_explo {r=1500.;v=400.;b=200.}) !ref_etat.ref_chunks_explo;
+    game_screenshake := !game_screenshake +. screenshake_death;
+    if !flashes then add_color := hdr_add !add_color (intensify {r = 1000. ; v = 0. ; b = 0. } flashes_death);
+    !(!ref_etat.ref_ship).health <- ~-. 0.1;
     mort ref_etat;
   );
   controle_souris ref_etat;

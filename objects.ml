@@ -198,6 +198,52 @@ let rec spawn_n_projectiles ship n =
   ref (spawn_projectile pos vel) :: spawn_n_projectiles ship (n-1))
 
 
+
+  let spawn_chunk_explo position velocity color= {
+      objet = Asteroid;
+
+      visuals = {
+        color = color;
+        radius = chunks_explo_radius;
+        shapes = [];
+      };
+
+      hitbox = {
+        int_radius = 0.;
+        ext_radius = 0.;
+        points = [];
+      };
+
+      mass = 100.;
+      health = projectile_health;
+      max_health = projectile_health;
+      (*Les projectiles sont conçus pour être détruits au contact*)
+      dam_res = 0.;
+      dam_ratio = 1.;
+      phys_res = 0.;
+      phys_ratio = 1.;
+
+      last_position = position;
+      position = position;
+      velocity = velocity;
+      half_stop = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
+
+      orientation = 0.;
+      moment = 0.;
+      half_stop_rotat = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
+
+      proper_time = 1.;
+      hdr_exposure = 4.;
+  }
+
+  (*Permet de créer n projectiles*)
+  let rec spawn_n_chunks ship n color =
+    if n = 0 then [] else (
+    let vel = addtuple ship.velocity (polar_to_affine (Random.float (2. *. pi)) (chunks_explo_min_speed +. Random.float (chunks_explo_max_speed -. chunks_explo_min_speed)))
+      and pos = ship.position in
+    ref (spawn_chunk_explo pos vel color) :: spawn_n_chunks ship (n-1) color)
+
+
 (*Spawne une explosion d'impact de projectile*)
 let spawn_explosion ref_projectile =
   let rad = explosion_min_radius +. (Random.float (explosion_max_radius -. explosion_min_radius)) in
@@ -280,6 +326,46 @@ let spawn_explosion_object ref_objet =
 (*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
 
   hdr_exposure = randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate ;
+}
+
+let spawn_explosion_chunk ref_objet =
+  let rad = explosion_ratio_radius *. !ref_objet.visuals.radius in (*On récupère le rayon de l'objet*)
+  if !flashes then add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color flashes_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
+  if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_explosions;
+  ref {
+  objet = Explosion;
+  visuals = {
+    color = !ref_objet.visuals.color;
+    radius = rad;
+    shapes = [];
+  };
+  hitbox = {
+    int_radius = rad;
+    ext_radius = rad;
+    points = [];
+  };
+  mass = 0.;
+  health = 0.;
+  max_health = 0.;
+
+  dam_res = 0.;
+  dam_ratio = 0.;
+  phys_res = 0.;
+  phys_ratio = 0.;
+
+  last_position = !ref_objet.position;
+  position = !ref_objet.position;
+  (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
+  velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
+  half_stop = 0.;
+  orientation = 0.;
+  moment = 0.;
+  half_stop_rotat = 0.;
+
+  proper_time = 1.;
+(*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
+
+  hdr_exposure = explosion_min_exposure +. (Random.float (explosion_max_exposure -. explosion_min_exposure));
 }
 
 (*Spawne une explosion venant d'une téléportation*)

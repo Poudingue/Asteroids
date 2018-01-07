@@ -24,23 +24,24 @@ let pause = ref false
 let restart = ref false
 let quit = ref false
 let game_speed_target_pause = 0.  (*Vitesse du jeu en pause*)
-let game_speed_target_death = 0.6 (*Vitesse du jeu après mort*)
+let game_speed_target_death = 0.8 (*Vitesse du jeu après mort*)
 let game_speed_target_boucle = 1. (*Vitesse du jeu par défaut*)
 let game_speed_target = ref 1.
 (*Le game_speed est la vitesse réelle à laquelle le jeu tourne à l'heure actuelle.*)
 (*Cela permet notamment de faire des effets de ralenti ou d'accéléré*)
 let game_speed = ref 1.
 (*Le half_speed_change détermine à quelle «vitesse» le game speed se rapproche de game_speed_target (En demi-vie) *)
-let half_speed_change = 0.5
+let half_speed_change = 0.3
 
 (*Ratios de changement de vitesse en fonction des évènements*)
 let ratio_time_explosion = 0.999
-let ratio_time_destr_asteroid = 0.98
-let ratio_time_tp = 0.
+let ratio_time_destr_asteroid = 0.95
+let ratio_time_tp = 0.8
 
 (*Timer pour la mort*)
 let time_of_death = ref 0.
-let time_stay_dead = 5.
+let time_stay_dead_min = 1.
+let time_stay_dead_max = 5.
 
 (*La limitation de framerate est activable,
 mais il semblerait que le gettimeofday et l'attente de Unix.select
@@ -80,64 +81,7 @@ On conserve au passage le ratio de la résolution pour les dimensions de jeu
 On a une surface de jeu de 1 000 000 par défaut*)
 let projectile_number_default = 10
 
-(*Shotgun*)
-let shotgun_recoil = 100.
-let shotgun_cooldown = 0.3
-let shotgun_max_speed = 15000.
-let shotgun_min_speed = 10000.
-let shotgun_deviation = 0.3
-let shotgun_radius = 15.
-let shotgun_radius_hitbox = 50.
-let shotgun_number = 50
 
-(*Sniper*)
-let sniper_recoil = 10000.
-let sniper_cooldown = 1.
-let sniper_max_speed = 20000.
-let sniper_min_speed = 15000.
-let sniper_deviation = 0.
-let sniper_radius = 25.
-let sniper_radius_hitbox = 75.
-let sniper_number = 1
-
-(*Machinegun*)
-let machine_recoil = 10.
-let machine_cooldown = 0.01
-let machine_max_speed = 10000.
-let machine_min_speed =  8000.
-let machine_deviation = 0.2
-let machine_radius = 10.
-let machine_radius_hitbox = 25.
-let machine_number = 1
-
-(*Valeurs des explosions*)
-let explosion_max_radius = 100.
-let explosion_min_radius = 80.
-let explosion_min_exposure = 1.(*Détermine la luminosité max et min des explosions au spawn*)
-let explosion_max_exposure = 2.
-let explosion_damages = 150.
-(*Pour les explosions héritant d'un objet*)
-let explosion_ratio_radius = 1.5
-let explosion_saturate = 15.
-let explosion_min_exposure_heritate = 6.(*Détermine la luminosité max et min des explosions héritant d'objets au spawn*)
-let explosion_max_exposure_heritate = 8.
-
-(*Valeurs des muzzleflashes*)
-let muzzle_ratio_radius = 3.
-let muzzle_ratio_speed = 0.05
-
-(*Valeurs du feu à l'arrière du vaisseau*)
-let fire_max_random = 20.
-let fire_min_speed = 250.
-let fire_max_speed = 500.
-let fire_ratio_radius = 1.
-
-(*Valeurs de la fumée*)
-let smoke = ref true
-let smoke_half_col = 0.2 (*Vitesse de la décroissance de la couleur*)
-let smoke_half_radius = 1. (*Vitesse de la décroissance du rayon*)
-let smoke_radius_decay = 10. (*Diminution du rayon des particules de fumée*)
-let smoke_max_speed = 40.(*Vitesse random dans une direction random de la fumée*)
 
 (*Valeurs des étincelles TODO*)
 
@@ -223,7 +167,7 @@ let min_bounce = 0.
 (*Paramètres des astéroïdes*)
 let asteroid_max_spawn_radius = 800. (*Taille max d'astéroïde au spawn.*)
 let asteroid_min_spawn_radius = 500. (*Taille min de spawn*)
-let asteroid_min_size = 200. (*En dessous de la taille minimale, un asteroide se transforme en too_small*)
+let asteroid_min_size = 250. (*En dessous de la taille minimale, un asteroide se transforme en too_small*)
 let asteroid_max_moment = 2. (*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
 let asteroid_max_velocity = 2000. (*Velocité max au spawn*)
 let asteroid_min_velocity = 1500. (*Velocité min au spawn*)
@@ -259,14 +203,21 @@ let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le
 (*Caractéristiques des fragments. Principalement hérité des parents.*)
 let fragment_max_velocity = 3000. (*Velocité max au spawn*)
 let fragment_min_velocity = 2000. (*Velocité min au spawn*)
-let fragment_max_size = 0.65 (*En ratio de la taille de l'astéroïde parent*)
-let fragment_min_size = 0.35 (*En ratio de la taille de l'astéroïde parent*)
+let fragment_max_size = 0.6 (*En ratio de la taille de l'astéroïde parent*)
+let fragment_min_size = 0.4 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.666 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
 let fragment_max_exposure = 1.5 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
 let fragment_number = ref 2
 let chunk_max_size = 50.
 let chunks = ref true
 let chunk_radius_decay = 25. (*Pour la décroissance des particules n'ayant pas de collisions*)
+
+
+let nb_chunks_explo = 7
+let chunks_explo_radius = 150.
+let chunks_explo_min_speed = 10000.
+let chunks_explo_max_speed = 20000.
+let chunk_explo_radius_decay = 300. (*Pour la décroissance des particules n'ayant pas de collisions*)
 
 (*Paramètres du vaisseau*)
 (*Pour l'autoregen*)
@@ -341,8 +292,8 @@ let machine_radius_hitbox = 25.
 let machine_number = 1
 
 (*Valeurs des explosions*)
-let explosion_max_radius = 150.
-let explosion_min_radius = 100.
+let explosion_max_radius = 200.
+let explosion_min_radius = 150.
 let explosion_min_exposure = 0.4(*Détermine la luminosité max et min des explosions au spawn*)
 let explosion_max_exposure = 1.5
 let explosion_damages = 150.
@@ -365,8 +316,8 @@ let fire_ratio_radius = 1.4
 (*Valeurs de la fumée*)
 let smoke = ref true
 let smoke_half_col = 0.2 (*Vitesse de la décroissance de la couleur*)
-let smoke_half_radius = 1.5 (*Vitesse de la décroissance du rayon*)
-let smoke_radius_decay = 5. (*Diminution du rayon des particules de fumée*)
+let smoke_half_radius = 1. (*Vitesse de la décroissance du rayon*)
+let smoke_radius_decay = 10. (*Diminution du rayon des particules de fumée*)
 let smoke_max_speed = 400.(*Vitesse random dans une direction random de la fumée*)
 
 (*Valeurs des étincelles TODO*)
@@ -407,6 +358,7 @@ let screenshake = ref true
 let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse et réaliste physiquement. Sorte de passe-bas sur les mouvements*)
 let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
 let screenshake_tir_ratio = 200.
+let screenshake_death = 5000.
 let screenshake_dam_ratio = 0.01
 let screenshake_phys_ratio = 0.01
 let screenshake_phys_mass = 100000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
@@ -441,7 +393,7 @@ let exposure_ratio_damage = 0.995
 let exposure_tir = 0.98
 let exposure_ratio_explosions = 0.99
 let exposure_half_life = 0.5
-let game_exposure_target_death = 0.5
+let game_exposure_target_death = 0.8
 let game_exposure_target_boucle = 2.
 let game_exposure_target_tp = 0.5
 let game_exposure_target = ref 2.
@@ -455,4 +407,5 @@ let flashes_saturate = 10.
 let flashes_normal_mass = 100000.
 let flashes_tir =1.
 let flashes_teleport = 100.
+let flashes_death = 200.
 let flashes_half_life = 0.01

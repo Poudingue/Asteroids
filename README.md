@@ -24,6 +24,8 @@ v1.8 beta - MAYHEM update - WIP
 
 Features :
 - Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculation of collisions
+- Very satisfying and devastating death
+- Same for teleportation
 - Better explosions, better fire, better screenshake, better time dilation, better flashes
 - Only infinitespace with mouse control available now
 
@@ -33,6 +35,6 @@ Fixed :
 
 Bugs :
 - Momentum of objects still not taken into account for physics
-- Some objects seem to spawn in the middle of the screen
+- A big performance issue, appeared when i added explosive chunks. Not sure if linked
 
 For all changelogs, see changelog.txt
