@@ -10,13 +10,15 @@ I work on it on my spare time, and make the source code available to everyone, f
 
 ## Compilation and Launch
 
-You can compile this game using the command line :
 (You will need ocamlc)
+You can compile this game using the command line :
 
 ocamlc -o asteroids unix.cma graphics.cma parameters.ml functions.ml colors.ml objects.ml buttons.ml asteroids.ml
-(On windows write asteroids.exe instead of asteroids)
+(for windows, its asteroids.exe instead of asteroids)
 
-Run it with ./asteroids
+Run it with ./asteroids (.exe for windows)
+
+(Works both on linux and windows via powershell. Not sure for mac tho)
 
 ## Changelog
 
@@ -35,6 +37,7 @@ Fixed :
 
 Bugs :
 - Momentum of objects still not taken into account for physics
-- A big performance issue, appeared when i added explosive chunks. Not sure if linked
+- A big performance issue, appeared when i added explosive chunks. Not sure if linked.
+(Partially fixed by allowing bigger asteroids in the list of toosmall)
 
 For all changelogs, see changelog.txt

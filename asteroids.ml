@@ -528,7 +528,6 @@ let despawn ref_etat =
 
 
     etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
-    etat.ref_smoke <- (List.filter checkspawn_objet etat.ref_smoke);
     etat.ref_chunks <- (List.filter positive_radius etat.ref_chunks);
     etat.ref_chunks_explo <- (List.filter positive_radius etat.ref_chunks_explo);
     etat.ref_chunks <- (List.filter checkspawn_objet etat.ref_chunks);
@@ -1216,6 +1215,7 @@ let etat_suivant ref_etat =
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen2));
 
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
+  (* etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_chunk etat.ref_chunks); *)
   (*On ne fait pas exploser les fragments, car ils sont tous superposés, et en quelques frames ils meurent tous.
   On fait par contre entrer les explosions dans les effets de fumée, pour l'effet visuel.*)
   if !smoke then(
@@ -1447,7 +1447,7 @@ let random_teleport ref_etat =
   let etat = !ref_etat in
   if etat.cooldown_tp <= 0. then (
     if !flashes then add_color := hdr_add !add_color (intensify {r=0.;v=4.;b=40.} flashes_teleport);
-    game_exposure := game_exposure_target_tp;
+    game_exposure := !game_exposure *. game_exposure_tp;
     game_speed := ratio_time_tp *. !game_speed;
     let ship = !(etat.ref_ship) in
     ship.position <- (Random.float !phys_width, Random.float !phys_height);
@@ -1494,11 +1494,14 @@ let rec mort ref_etat =
   else (
   if (!ref_etat).lifes <= 0 then (ref_etat := init_etat ();pause := true) else (
   !ref_etat.ref_chunks_explo <- List.append (spawn_n_chunks !(!ref_etat.ref_ship) nb_chunks_explo {r=1500.;v=400.;b=200.}) !ref_etat.ref_chunks_explo;
+  game_speed := ratio_time_death *. !game_speed;
   game_screenshake := !game_screenshake +. screenshake_death;
   if !flashes then add_color := hdr_add !add_color (intensify {r = 1000. ; v = 0. ; b = 0. } flashes_death);
   !ref_etat.ref_ship <- ref (spawn_ship ());
+  (* not sure
   random_teleport ref_etat;
   (!ref_etat).cooldown_tp <- 0.;
+  *)
   game_speed_target := game_speed_target_boucle;
   game_exposure_target := game_exposure_target_boucle))
 
@@ -1515,6 +1518,7 @@ let rec boucle_interaction ref_etat =
     game_screenshake := !game_screenshake +. screenshake_death;
     if !flashes then add_color := hdr_add !add_color (intensify {r = 1000. ; v = 0. ; b = 0. } flashes_death);
     !(!ref_etat.ref_ship).health <- ~-. 0.1;
+  game_speed := ratio_time_death *. !game_speed;
     mort ref_etat;
   );
   controle_souris ref_etat;

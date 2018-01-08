@@ -37,6 +37,7 @@ let half_speed_change = 0.3
 let ratio_time_explosion = 0.999
 let ratio_time_destr_asteroid = 0.95
 let ratio_time_tp = 0.8
+let ratio_time_death = 0.5
 
 (*Timer pour la mort*)
 let time_of_death = ref 0.
@@ -213,11 +214,12 @@ let chunks = ref true
 let chunk_radius_decay = 25. (*Pour la décroissance des particules n'ayant pas de collisions*)
 
 
-let nb_chunks_explo = 7
-let chunks_explo_radius = 150.
-let chunks_explo_min_speed = 10000.
-let chunks_explo_max_speed = 20000.
-let chunk_explo_radius_decay = 300. (*Pour la décroissance des particules n'ayant pas de collisions*)
+let nb_chunks_explo = 15
+let chunks_explo_min_radius =  100.
+let chunks_explo_max_radius =  200.
+let chunks_explo_min_speed =  5000.
+let chunks_explo_max_speed = 10000.
+let chunk_explo_radius_decay = 200.
 
 (*Paramètres du vaisseau*)
 (*Pour l'autoregen*)
@@ -315,9 +317,9 @@ let fire_ratio_radius = 1.4
 
 (*Valeurs de la fumée*)
 let smoke = ref true
-let smoke_half_col = 0.2 (*Vitesse de la décroissance de la couleur*)
-let smoke_half_radius = 1. (*Vitesse de la décroissance du rayon*)
-let smoke_radius_decay = 10. (*Diminution du rayon des particules de fumée*)
+let smoke_half_col = 0.25 (*Vitesse de la décroissance de la couleur*)
+let smoke_half_radius = 0.8 (*Vitesse de la décroissance du rayon*)
+let smoke_radius_decay = 5. (*Diminution du rayon des particules de fumée*)
 let smoke_max_speed = 400.(*Vitesse random dans une direction random de la fumée*)
 
 (*Valeurs des étincelles TODO*)
@@ -358,7 +360,7 @@ let screenshake = ref true
 let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse et réaliste physiquement. Sorte de passe-bas sur les mouvements*)
 let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
 let screenshake_tir_ratio = 200.
-let screenshake_death = 5000.
+let screenshake_death = 8000.
 let screenshake_dam_ratio = 0.01
 let screenshake_phys_ratio = 0.01
 let screenshake_phys_mass = 100000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
@@ -393,9 +395,9 @@ let exposure_ratio_damage = 0.995
 let exposure_tir = 0.98
 let exposure_ratio_explosions = 0.99
 let exposure_half_life = 0.5
-let game_exposure_target_death = 0.8
+let game_exposure_target_death = 1.5
 let game_exposure_target_boucle = 2.
-let game_exposure_target_tp = 0.5
+let game_exposure_tp = 0.25
 let game_exposure_target = ref 2.
 let game_exposure = ref 0.
 

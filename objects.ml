@@ -204,7 +204,7 @@ let rec spawn_n_projectiles ship n =
 
       visuals = {
         color = color;
-        radius = chunks_explo_radius;
+        radius = chunks_explo_min_radius +. Random.float (chunks_explo_max_radius -. chunks_explo_min_radius);
         shapes = [];
       };
 
