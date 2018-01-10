@@ -31,12 +31,12 @@ let game_speed_target = ref 1.
 (*Cela permet notamment de faire des effets de ralenti ou d'accéléré*)
 let game_speed = ref 1.
 (*Le half_speed_change détermine à quelle «vitesse» le game speed se rapproche de game_speed_target (En demi-vie) *)
-let half_speed_change = 0.3
+let half_speed_change = 0.1
 
 (*Ratios de changement de vitesse en fonction des évènements*)
-let ratio_time_explosion = 0.999
+let ratio_time_explosion = 0.995
 let ratio_time_destr_asteroid = 0.95
-let ratio_time_tp = 0.8
+let ratio_time_tp = 0.
 let ratio_time_death = 0.5
 
 (*Timer pour la mort*)
@@ -168,7 +168,7 @@ let min_bounce = 0.
 (*Paramètres des astéroïdes*)
 let asteroid_max_spawn_radius = 800. (*Taille max d'astéroïde au spawn.*)
 let asteroid_min_spawn_radius = 500. (*Taille min de spawn*)
-let asteroid_min_size = 250. (*En dessous de la taille minimale, un asteroide se transforme en too_small*)
+let asteroid_min_size = 200. (*En dessous de la taille minimale, un asteroide se transforme en too_small*)
 let asteroid_max_moment = 2. (*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
 let asteroid_max_velocity = 2000. (*Velocité max au spawn*)
 let asteroid_min_velocity = 1500. (*Velocité min au spawn*)
@@ -209,17 +209,19 @@ let fragment_min_size = 0.4 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.666 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
 let fragment_max_exposure = 1.5 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
 let fragment_number = ref 2
+let fragment_min_repulsion = 10.
+let fragment_min_bounce = 5.
 let chunk_max_size = 50.
 let chunks = ref true
 let chunk_radius_decay = 25. (*Pour la décroissance des particules n'ayant pas de collisions*)
 
 
 let nb_chunks_explo = 15
-let chunks_explo_min_radius =  100.
-let chunks_explo_max_radius =  200.
-let chunks_explo_min_speed =  5000.
-let chunks_explo_max_speed = 10000.
-let chunk_explo_radius_decay = 200.
+let chunks_explo_min_radius = 100.
+let chunks_explo_max_radius = 200.
+let chunks_explo_min_speed = 4000.
+let chunks_explo_max_speed = 8000.
+let chunk_explo_radius_decay = 100.
 
 (*Paramètres du vaisseau*)
 (*Pour l'autoregen*)
@@ -251,7 +253,7 @@ let ship_half_stop_rotat = 0.2(*En temps nécessaire pour perdre la moitié du m
 let cooldown_tp = 10.
 
 (*Valeurs du projectile*)
-let projectile_recoil = ref 100. (*Recul appliqué au vaisseau*)
+let projectile_recoil = ref 500. (*Recul appliqué au vaisseau*)
 let projectile_cooldown = ref 0.3 (*Temps minimum entre deux projectiles*)
 let projectile_max_speed = ref 15000.(*Vitesse relative au lanceur lors du lancement*)
 let projectile_min_speed = ref 10000.
@@ -331,7 +333,7 @@ let star_prox_lum = 5.(*Pour ajouter de la luminosité aux étoiles plus proches
 let star_min_lum = 0.
 let star_max_lum = 4.
 let star_rand_lum = 2. (*Effet de scintillement des étoiles*)
-let stars_nb_default = 100
+let stars_nb_default = 500
 let stars_nb = ref 200
 let stars_nb_previous = ref 200
 
@@ -359,10 +361,10 @@ let camera_max_force = 1. (*En ratio de la taille de l'écran : vitesse appliqu�
 let screenshake = ref true
 let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse et réaliste physiquement. Sorte de passe-bas sur les mouvements*)
 let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
-let screenshake_tir_ratio = 200.
-let screenshake_death = 8000.
-let screenshake_dam_ratio = 0.01
-let screenshake_phys_ratio = 0.01
+let screenshake_tir_ratio = 400.
+let screenshake_death = 6000.
+let screenshake_dam_ratio = 0.005
+let screenshake_phys_ratio = 0.005
 let screenshake_phys_mass = 100000.(*Masse de screenshake «normal». Des objets plus légers en provoqueront moins, les objets plus lourds plus*)
 let screenshake_half_life = 0.1
 let game_screenshake = ref 0.

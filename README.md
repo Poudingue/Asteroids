@@ -33,11 +33,14 @@ Features :
 
 Fixed :
 - No more massive asteroid spawn, fixed interval between two asteroid spawning
-- No more ad vitam eternam respawn without lives
+- Stupid performance problem where i forgot to despawn projectiles that are too far
 
 Bugs :
 - Momentum of objects still not taken into account for physics
-- A big performance issue, appeared when i added explosive chunks. Not sure if linked.
-(Partially fixed by allowing bigger asteroids in the list of toosmall)
+
+Not cool :
+- Final death can't be viewed yet.
+- Respawn and instant die because of asteroid
+- Teleport and instant die because of asteroid
 
 For all changelogs, see changelog.txt

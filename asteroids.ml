@@ -524,7 +524,7 @@ let despawn ref_etat =
 
 
     etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
-    (*TODO permettre un missile ne despawnant pas après mort, mais provoquant plusieurs explosions sur son passage*)
+    etat.ref_projectiles <- (List.filter close_enough etat.ref_projectiles);
 
 
     etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
@@ -591,6 +591,8 @@ let rec collision_objet_liste ref_objet ref_objets precis =
   | [] -> false
   | _ -> collision !ref_objet !(List.hd ref_objets) precis || collision_objet_liste ref_objet (List.tl ref_objets) precis
 
+
+(*S'applique seulement aux fragments -> on repousse selon la normale*)
 (*Retourne les objets de la liste 1 étant en collision avec des objets de la liste 2*)
 let rec collision_objets_listes ref_objets1 ref_objets2 precis =
   if ref_objets1 = [] || ref_objets2 = [] then []
@@ -619,7 +621,7 @@ let consequences_collision ref_objet1 ref_objet2 =
   | Explosion -> damage ref_objet2 explosion_damages (*On applique les dégats de l'explosion*)
   | Projectile -> damage ref_objet1 0.1 (*On endommage le projectile pour qu'il meure*)
   | _ -> (*Si ce n'est ni une explosion ni un projectile, on calcule les effets de la collision physique*)
-    (let objet1 = !ref_objet1 in let objet2 = !ref_objet2 in
+    (let objet1 = !ref_objet1 and objet2 = !ref_objet2 in
     let total_mass = objet1.mass +. objet2.mass in
     let moy_velocity = moytuple objet1.velocity objet2.velocity (objet1.mass /. total_mass) in
     let (angle_obj1, dist1) = affine_to_polar (soustuple objet1.position objet2.position) in
@@ -633,14 +635,16 @@ let consequences_collision ref_objet1 ref_objet2 =
     objet2.velocity <- addtuple moy_velocity (polar_to_affine angle_obj2 (total_mass /. objet2.mass));
     objet1.velocity <- veloc_obj1;
 
+    if not !pause then (
+    let oldpos1 = objet1.position and oldpos2 = objet2.position in
+    let oldvel1 = objet1.velocity and oldvel2 = objet2.velocity in
     (*Pour éloigner les objets intriqués*)
-
-    objet1.position <- addtuple objet1.position (polar_to_affine angle_obj1 min_repulsion);
-    objet2.position <- addtuple objet2.position (polar_to_affine angle_obj2 min_repulsion);
+    objet1.position <- addtuple oldpos1 (polar_to_affine angle_obj1 min_repulsion);
+    objet2.position <- addtuple oldpos2 (polar_to_affine angle_obj2 min_repulsion);
 
     (*Pour éloigner les objets intriqués*)
-    objet1.velocity <- addtuple objet1.velocity (polar_to_affine angle_obj1 min_bounce);
-    objet2.velocity <- addtuple objet2.velocity (polar_to_affine angle_obj2 min_bounce);
+    objet1.velocity <- addtuple oldvel1 (polar_to_affine angle_obj1 min_bounce);
+    objet2.velocity <- addtuple oldvel2 (polar_to_affine angle_obj2 min_bounce));
 
     (*Changement de velocité subi par l'objet*)
     let g1 = hypothenuse (soustuple old_vel1 objet1.velocity) in
@@ -652,6 +656,31 @@ let consequences_collision ref_objet1 ref_objet2 =
     On applique un ratio pour réduire la valeur gigantesque générée*)
     phys_damage ref_objet1 (!ratio_phys_deg *. carre g1);
     phys_damage ref_objet2 (!ratio_phys_deg *. carre g2))
+
+
+let consequences_collision_frags ref_frag1 ref_frag2 =
+  let frag1 = !ref_frag1 and frag2 = !ref_frag2 in
+  let (angle_obj1, dist1) = affine_to_polar (soustuple frag1.position frag2.position) in
+  let (angle_obj2, dist2) = affine_to_polar (soustuple frag2.position frag1.position) in
+  let oldpos1 = frag1.position and oldpos2 = frag2.position in
+  let oldvel1 = frag1.velocity and oldvel2 = frag2.velocity in
+    frag1.position <- addtuple oldpos1 (polar_to_affine angle_obj1 fragment_min_repulsion);
+    frag2.position <- addtuple oldpos2 (polar_to_affine angle_obj2 fragment_min_repulsion);
+    frag1.velocity <- addtuple oldvel1 (polar_to_affine angle_obj1 fragment_min_bounce);
+    frag2.velocity <- addtuple oldvel2 (polar_to_affine angle_obj2 fragment_min_bounce);
+  ref_frag1 := frag1;
+  ref_frag2 := frag2;
+  ()
+
+let rec calculate_collisions_fragvfrags ref_frag ref_frags =
+  match ref_frags with
+  | [] -> ()
+  | hd::tl -> (consequences_collision_frags ref_frag hd)
+
+let rec calculate_collisions_frags ref_frags =
+  match ref_frags with
+  | [] -> ()
+  | hd::tl -> (calculate_collisions_fragvfrags hd tl; calculate_collisions_frags tl)
 
 (*Fonction vérifiant la collision entre un objet et les autres objets
 et appliquant les effets de collision*)
@@ -917,6 +946,9 @@ let affiche_hud ref_etat =
     draw_string ("Chunks_explo : " ^ string_of_int (List.length etat.ref_chunks_explo));
 
     moveto 20 120;
+    draw_string ("Projectiles : " ^ string_of_int (List.length etat.ref_projectiles));
+
+    moveto 20 100;
     draw_string ("Explosions : " ^ string_of_int (List.length etat.ref_explosions));
 
     moveto 20 60;
@@ -1132,76 +1164,79 @@ let etat_suivant ref_etat =
   friction_objet etat.ref_ship;
   friction_moment_objet etat.ref_ship;
 
-  (*Collisions entre le vaisseau et les objets*)
-  calculate_collisions_modulo etat.ref_ship etat.ref_objets true;
-  (*Collisions entre le vaisseau et les fragments*)
-  calculate_collisions_modulo etat.ref_ship etat.ref_fragments true;
 
-  calculate_collisions_objet etat.ref_ship etat.ref_objets_toosmall false;
-  calculate_collisions_objet etat.ref_ship etat.ref_objets_toosmall2 false;
-  (*Osef out of screen*)
+  if not !pause then (
+    (*Collisions entre le vaisseau et les objets*)
+    calculate_collisions_modulo etat.ref_ship etat.ref_objets true;
+    (*Collisions entre le vaisseau et les fragments*)
+    calculate_collisions_modulo etat.ref_ship etat.ref_fragments true;
 
-  (*Collisions entre projectiles et objets*)
-  calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets true;
-  (*Collisions entre projectiles et objets «non spawnés» - non modulo*)
-  (*calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_outofscreen false;(*osef la précision en dehors de l'écran*)
-  calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_outofscreen2 false;(*osef la précision en dehors de l'écran*)
-  *)
-  (*Collisions entre les projectiles et les fragments*)
+    calculate_collisions_objet etat.ref_ship etat.ref_objets_toosmall false;
+    calculate_collisions_objet etat.ref_ship etat.ref_objets_toosmall2 false;
+    (*Osef out of screen*)
 
-  calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_fragments false;
-(*Là c'est bon, la précision osef*)
-  calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets_toosmall false;
-  calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets_toosmall2 false;
-  (*Osef pour small out of screen*)
+    (*Collisions entre projectiles et objets*)
+    calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets true;
+    (*Collisions entre projectiles et objets «non spawnés» - non modulo*)
+    (*calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_outofscreen false;(*osef la précision en dehors de l'écran*)
+    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_outofscreen2 false;(*osef la précision en dehors de l'écran*)
+    *)
+    (*Collisions entre les projectiles et les fragments*)
+
+    calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_fragments false;
+  (*Là c'est bon, la précision osef*)
+    calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets_toosmall false;
+    calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets_toosmall2 false;
+    (*Osef pour small out of screen*)
 
 
-  (*Collisions entre explosions et objets*)
-  calculate_collisions_modulo_listes etat.ref_explosions etat.ref_objets true;
-  (*Collisions entre explosions et objets «non spawnés» - non modulo*)
-  calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_outofscreen false;
-  calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_outofscreen2 false;
-  (*Collisions entre explosions et les fragments*)
-  calculate_collisions_modulo_listes etat.ref_explosions etat.ref_fragments true;
+    (*Collisions entre explosions et objets*)
+    calculate_collisions_modulo_listes etat.ref_explosions etat.ref_objets true;
+    (*Collisions entre explosions et objets «non spawnés» - non modulo*)
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_outofscreen false;
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_outofscreen2 false;
+    (*Collisions entre explosions et les fragments*)
+    calculate_collisions_modulo_listes etat.ref_explosions etat.ref_fragments true;
 
-  calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_toosmall false;
-  calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_toosmall2 false;
-  (*Osef pour small out of screen*)
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_toosmall false;
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_toosmall2 false;
+    (*Osef pour small out of screen*)
 
-  (*Collisions entre objets*)
-  calculate_collisions_modulos etat.ref_objets true;
+    (*Collisions entre objets*)
+    calculate_collisions_modulos etat.ref_objets true;
 
-  (*Collisions entre objets et fragments*)
-  calculate_collisions_modulo_listes etat.ref_objets etat.ref_fragments true;
+    (*Collisions entre objets et fragments*)
+    calculate_collisions_modulo_listes etat.ref_objets etat.ref_fragments true;
 
-  if !even_frame
-    then (
-      calculate_collisions_listes_objets etat.ref_objets_toosmall etat.ref_objets false;
-(*      calculate_collisions_modulo_listes etat.ref_objets etat.ref_objets_outofscreen2 false;*)
-      calculate_collisions_modulos etat.ref_objets_outofscreen false;
-      if !evener_frame
+    if !even_frame
       then (
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small1 false;
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small3 false
-      )else(
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small3 false;
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small1 false
+        calculate_collisions_listes_objets etat.ref_objets_toosmall etat.ref_objets false;
+  (*      calculate_collisions_modulo_listes etat.ref_objets etat.ref_objets_outofscreen2 false;*)
+        calculate_collisions_modulos etat.ref_objets_outofscreen false;
+        if !evener_frame
+        then (
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small1 false;
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small3 false
+        )else(
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small3 false;
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small1 false
+        );
+      ) else (
+        calculate_collisions_listes_objets etat.ref_objets_toosmall2 etat.ref_objets false;
+        (* calculate_collisions_modulo_listes etat.ref_objets etat.ref_objets_outofscreen false; *)
+        calculate_collisions_modulos etat.ref_objets_outofscreen2 false;
+        if !evener_frame
+        then (
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small2 false;
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small4 false
+        )else(
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small4 false;
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small2 false
+        );
       );
-    ) else (
-      calculate_collisions_listes_objets etat.ref_objets_toosmall2 etat.ref_objets false;
-      (* calculate_collisions_modulo_listes etat.ref_objets etat.ref_objets_outofscreen false; *)
-      calculate_collisions_modulos etat.ref_objets_outofscreen2 false;
-      if !evener_frame
-      then (
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small2 false;
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small4 false
-      )else(
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small4 false;
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small2 false
-      );
-    );
 
-    calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_outofscreen2 false;
+      calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_outofscreen2 false;
+  );
 
   (*Les explosions sont ajoutées à la fumée, et la fumée précédente avec decay. Uniquement si smoke = true.*)
   if !smoke then etat.ref_smoke <- List.append (List.map decay_smoke etat.ref_smoke) etat.ref_explosions else etat.ref_smoke <- [];
@@ -1214,6 +1249,7 @@ let etat_suivant ref_etat =
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen));
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen2));
 
+  if not !pause then
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
   (* etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_chunk etat.ref_chunks); *)
   (*On ne fait pas exploser les fragments, car ils sont tous superposés, et en quelques frames ils meurent tous.
@@ -1222,7 +1258,8 @@ let etat_suivant ref_etat =
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_toosmall));
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_toosmall2));
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments)));
-  if (is_dead etat.ref_ship) then etat.ref_explosions <- (spawn_explosion etat.ref_ship) :: etat.ref_explosions;
+
+  if (is_dead etat.ref_ship) && not !pause then (etat.ref_explosions <- (spawn_explosion etat.ref_ship) :: etat.ref_explosions);
 
   (*On ralentit le temps selon le nombre d'explosions*)
   game_speed := !game_speed *. ratio_time_explosion ** (float_of_int (List.length etat.ref_explosions));
@@ -1279,6 +1316,9 @@ let etat_suivant ref_etat =
     (*On transfère les fragments qui ne sont pas en collision avec les autres dans les objets physiques.*)
     etat.ref_objets <- List.append (no_collisions_liste etat.ref_fragments true) etat.ref_objets;
     etat.ref_fragments <- collisions_sein_liste etat.ref_fragments true;
+    (*On repousse et éloigne les fragments les uns des autres*)
+    if not !pause then
+    calculate_collisions_frags etat.ref_fragments;
 
   if !time_since_last_spawn > time_spawn_asteroid then (
     time_since_last_spawn := 0.;
