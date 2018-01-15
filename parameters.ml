@@ -250,7 +250,7 @@ let ship_max_tourn_boost = 3.(*En radians.s⁻¹*)
 let ship_max_rotat = pi /. 6.(*En radians*)
 let ship_half_stop_rotat = 0.2(*En temps nécessaire pour perdre la moitié du moment angulaire*)
 (*Temps min entre deux téléportations aléatoires*)
-let cooldown_tp = 0.1
+let cooldown_tp = 5.
 let tp_time_invic = 1.(*Temps d'invincibilité après tp*)
 let time_last_tp = ref 0.
 
