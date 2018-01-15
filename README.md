@@ -27,7 +27,7 @@ v1.8 beta - MAYHEM update - WIP
 Features :
 - Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculation of collisions
 - Very satisfying and devastating death
-- Same for teleportation
+- Same for teleportation, not random anymore, goes where the mouse is
 - Better explosions, better fire, better screenshake, better time dilation, better flashes
 - Only infinitespace with mouse control available now
 

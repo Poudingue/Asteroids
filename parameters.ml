@@ -72,8 +72,8 @@ let last_count = ref 0
 let current_count = ref 0
 
 (*Dimensions fenêtre graphique.*)
-let width = 2500
-let height = 1400
+let width = 1920
+let height = 1080
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
 let max_dist = 6000.
 (*Dimensions de l'espace physique dans lequel les objets évoluent.
@@ -250,7 +250,9 @@ let ship_max_tourn_boost = 3.(*En radians.s⁻¹*)
 let ship_max_rotat = pi /. 6.(*En radians*)
 let ship_half_stop_rotat = 0.2(*En temps nécessaire pour perdre la moitié du moment angulaire*)
 (*Temps min entre deux téléportations aléatoires*)
-let cooldown_tp = 10.
+let cooldown_tp = 0.1
+let tp_time_invic = 1.(*Temps d'invincibilité après tp*)
+let time_last_tp = ref 0.
 
 (*Valeurs du projectile*)
 let projectile_recoil = ref 500. (*Recul appliqué au vaisseau*)

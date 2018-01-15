@@ -1483,14 +1483,16 @@ ce qui est une approximation généralement correcte*)
   ref_etat := etat;
   etat_suivant ref_etat
 
-let random_teleport ref_etat =
+let teleport ref_etat =
   let etat = !ref_etat in
   if etat.cooldown_tp <= 0. then (
     if !flashes then add_color := hdr_add !add_color (intensify {r=0.;v=4.;b=40.} flashes_teleport);
     game_exposure := !game_exposure *. game_exposure_tp;
     game_speed := ratio_time_tp *. !game_speed;
     let ship = !(etat.ref_ship) in
-    ship.position <- (Random.float !phys_width, Random.float !phys_height);
+    let status = wait_next_event[Poll] in
+    let newpos = ((float_of_int status.mouse_x) /. !ratio_rendu, (float_of_int status.mouse_y) /. !ratio_rendu) in
+    ship.position <- newpos;
     ship.velocity <- (0.,0.);
     etat.ref_chunks_explo <- List.append (spawn_n_chunks ship nb_chunks_explo {r=0.;v=1000.;b=10000.}) !ref_etat.ref_chunks_explo;
     etat.ref_ship := ship;
@@ -1539,7 +1541,7 @@ let rec mort ref_etat =
   if !flashes then add_color := hdr_add !add_color (intensify {r = 1000. ; v = 0. ; b = 0. } flashes_death);
   !ref_etat.ref_ship <- ref (spawn_ship ());
   (* not sure
-  random_teleport ref_etat;
+  teleport ref_etat;
   (!ref_etat).cooldown_tp <- 0.;
   *)
   game_speed_target := game_speed_target_boucle;
@@ -1571,7 +1573,7 @@ let rec boucle_interaction ref_etat =
     | 'z' -> if !ship_impulse_pos then boost ref_etat else acceleration ref_etat; boucle_interaction ref_etat (* acceleration vers l'avant *)
     | 'd' -> if !ship_impulse_pos then boost_droite ref_etat else rotation_droite ref_etat; boucle_interaction ref_etat (* rotation vers la gauche *)
     | 'e' -> strafe_right ref_etat; boucle_interaction ref_etat (*strafe vers la droite *)
-    | 'f' -> random_teleport ref_etat; boucle_interaction ref_etat
+    | 'f' -> teleport ref_etat; boucle_interaction ref_etat
     | ' ' -> tir ref_etat;boucle_interaction ref_etat (* tir d'un projectile *)
     | 'p' -> pause := not !pause
     | 'k' -> print_endline "Bye bye!"; exit 0 (* on quitte le jeu *)
