@@ -27,13 +27,8 @@ plutôt que de vérifier le type d'objet à la volée*)
   mutable ref_fragments : objet_physique ref list; (*On fait apparaître les fragments dans une liste séparée pour éviter qu'ils ne s'entre-collisionnent*)
   mutable ref_objets : objet_physique ref list;
   mutable ref_objets_outofscreen : objet_physique ref list;(*idem*)
-  mutable ref_objets_outofscreen2 : objet_physique ref list;(*idem*)
   mutable ref_objets_toosmall : objet_physique ref list; (*idem*)
-  mutable ref_objets_toosmall2 : objet_physique ref list; (*Pour répartir équitablement d'une frame sur 2*)
-  mutable ref_objets_oos_small1 : objet_physique ref list;
-  mutable ref_objets_oos_small2 : objet_physique ref list;
-  mutable ref_objets_oos_small3 : objet_physique ref list;
-  mutable ref_objets_oos_small4 : objet_physique ref list;
+  mutable ref_objets_oos_small : objet_physique ref list;
   mutable ref_chunks : objet_physique ref list;
   mutable ref_chunks_explo : objet_physique ref list;
   mutable ref_projectiles : objet_physique ref list;
@@ -103,14 +98,9 @@ let init_etat () =  game_screenshake:=0. ;{
   ref_ship = ref (spawn_ship ());
   ref_objets = [];
   ref_objets_outofscreen = [];
-  ref_objets_outofscreen2 = [];
   ref_fragments = [];
   ref_objets_toosmall = [];
-  ref_objets_toosmall2 = [];
-  ref_objets_oos_small1 = [];
-  ref_objets_oos_small2 = [];
-  ref_objets_oos_small3 = [];
-  ref_objets_oos_small4 = [];
+  ref_objets_oos_small = [];
   ref_chunks = [];
   ref_chunks_explo = [];
   ref_projectiles = [];
@@ -159,19 +149,6 @@ let render_visuals objet offset =
   );
   render_shapes visuals.shapes position objet.orientation (!game_exposure *. objet.hdr_exposure)
 
-let render_visuals_modulo objet =
-  render_visuals objet (~-. !phys_width,~-. !phys_height);
-  render_visuals objet (    0.         ,~-. !phys_height);
-  render_visuals objet (    !phys_width,~-. !phys_height);
-
-  render_visuals objet (~-. !phys_width, 0.);
-  render_visuals objet (    0.         , 0.);
-  render_visuals objet (    !phys_width, 0.);
-
-  render_visuals objet (~-. !phys_width, !phys_height);
-  render_visuals objet (    0.         , !phys_height);
-  render_visuals objet (    !phys_width, !phys_height)
-
 let render_objet ref_objet = render_visuals !ref_objet (0.,0.)
 let render_unspawned ref_objet = render_visuals !ref_objet (0.,0.)
 
@@ -219,15 +196,6 @@ let render_star_trail ref_star =
 		(intensify star_color_tmp (sqrt (1. /. (1. +. hypothenuse (soustuple pos1 pos2)))))
 		(hdr_add (intensify !space_color !game_exposure) (intensify !add_color !game_exposure))));(*Plus la trainée de lumière est grande par rapport au rayon de l'objet, moins la lumière est intense*)
     set_line_width 2 ; moveto x1 y1 ; lineto x2 y2);;
-
-
-let render_motion_blur ref_objet = (*TODO : Fonction ajouter, pour fondre avec le background*)
-  let objet = !ref_objet in
-  render_light_trail (!ratio_rendu *. objet.visuals.radius) objet.position objet.position objet.velocity (intensify objet.visuals.color (0.75 *. !game_exposure *. objet.hdr_exposure))
-  (*Pour garder le motion blur discret, on rend les trainées plus sombres que l'objet.
-  De même, on ne tient pas compte du déplacement de la caméra, car l'œuil humain va suivre ce type de mouvements.
-  Le motion blur ne doit être visible que pour les mouvements violents de type screenshake,
-  ou pour les objets allant vite.*)
 
 
 
@@ -413,44 +381,21 @@ let checknotspawn_objet ref_objet_unspawned = not (checkspawn_objet ref_objet_un
 let checkspawn_etat ref_etat =
   begin
     let etat = !ref_etat in
-    etat.ref_objets <- (List.append etat.ref_objets (List.filter checkspawn_objet (List.append etat.ref_objets_outofscreen etat.ref_objets_outofscreen2)));
-    etat.ref_objets_outofscreen <- List.filter checknotspawn_objet etat.ref_objets_outofscreen;
-    etat.ref_objets_outofscreen2 <- List.filter checknotspawn_objet etat.ref_objets_outofscreen2;
 
-    if (List.length etat.ref_objets_outofscreen) < (List.length etat.ref_objets_outofscreen2)
-      then
-      etat.ref_objets_outofscreen <- (List.append etat.ref_objets_outofscreen (List.filter checknotspawn_objet etat.ref_objets))
-      else
-      etat.ref_objets_outofscreen2 <- (List.append etat.ref_objets_outofscreen2 (List.filter checknotspawn_objet etat.ref_objets));
+    etat.ref_objets <- (List.append etat.ref_objets (List.filter checkspawn_objet etat.ref_objets_outofscreen));
+    etat.ref_objets_outofscreen <- List.filter checknotspawn_objet etat.ref_objets_outofscreen;
+
+    etat.ref_objets_outofscreen <- (List.append etat.ref_objets_outofscreen (List.filter checknotspawn_objet etat.ref_objets))
     etat.ref_objets <- (List.filter checkspawn_objet etat.ref_objets);
 
-    let l1 = List.length etat.ref_objets_oos_small1 and l2 = List.length etat.ref_objets_oos_small2 and l3 = List.length etat.ref_objets_oos_small3 and l4 = List.length etat.ref_objets_oos_small4
-    and totransfer = (List.append (List.filter checknotspawn_objet etat.ref_objets_toosmall) (List.filter checknotspawn_objet etat.ref_objets_toosmall2)) in
-    if (l1 <= l2 && l1 <= l3 && l1 <= l4) then
-      etat.ref_objets_oos_small1 <- List.append etat.ref_objets_oos_small1 totransfer
-    else if (l2 <= l1 && l2 <= l3 && l2 <= l4) then
-      etat.ref_objets_oos_small2 <- List.append etat.ref_objets_oos_small2 totransfer
-    else if (l3 <= l1 && l3 <= l2 && l3 <= l4) then
-      etat.ref_objets_oos_small3 <- List.append etat.ref_objets_oos_small3 totransfer
-    else
-      etat.ref_objets_oos_small4 <- List.append etat.ref_objets_oos_small4 totransfer;
+    let totransfer = List.filter checknotspawn_objet etat.ref_objets_toosmall
+    and totransfer2 = List.filter checkspawn_objet etat.ref_objets_oos_small in
 
     etat.ref_objets_toosmall <- List.filter checkspawn_objet etat.ref_objets_toosmall;
-    etat.ref_objets_toosmall2 <- List.filter checkspawn_objet etat.ref_objets_toosmall2;
+    etat.ref_objets_oos_small <- List.filter checknotspawn_objet etat.ref_objets_oos_small;
 
-    let totransfer2 = List.append
-      (List.append (List.filter checkspawn_objet etat.ref_objets_oos_small1) (List.filter checkspawn_objet etat.ref_objets_oos_small2))
-      (List.append (List.filter checkspawn_objet etat.ref_objets_oos_small3) (List.filter checkspawn_objet etat.ref_objets_oos_small4))
-       in
-    if (List.length etat.ref_objets_toosmall < List.length etat.ref_objets_toosmall2)
-    then etat.ref_objets_toosmall <- List.append etat.ref_objets_toosmall totransfer2
-    else etat.ref_objets_toosmall2 <- List.append etat.ref_objets_toosmall2 totransfer2;
-
-    etat.ref_objets_oos_small1 <- List.filter checknotspawn_objet etat.ref_objets_oos_small1;
-    etat.ref_objets_oos_small2 <- List.filter checknotspawn_objet etat.ref_objets_oos_small2;
-    etat.ref_objets_oos_small3 <- List.filter checknotspawn_objet etat.ref_objets_oos_small3;
-    etat.ref_objets_oos_small4 <- List.filter checknotspawn_objet etat.ref_objets_oos_small4;
-
+    etat.ref_objets_toosmall <- List.append etat.ref_objets_toosmall totransfer2;
+    etat.ref_objets_oos_small <- List.append etat.ref_objets_oos_small totransfer;
 
   ref_etat := etat end
 
@@ -498,8 +443,6 @@ let despawn ref_etat =
     etat.ref_objets_outofscreen <- (List.filter is_alive etat.ref_objets_outofscreen);
     etat.ref_objets_outofscreen <- (List.filter big_enough etat.ref_objets_outofscreen);
 
-    etat.ref_objets_outofscreen2 <- (List.filter is_alive etat.ref_objets_outofscreen2);
-    etat.ref_objets_outofscreen2 <- (List.filter big_enough etat.ref_objets_outofscreen2);
 
     etat.ref_fragments <- (List.filter is_alive etat.ref_fragments);
     etat.ref_fragments <- (List.filter big_enough etat.ref_fragments);
@@ -507,20 +450,10 @@ let despawn ref_etat =
     etat.ref_objets_toosmall <- (List.filter is_alive etat.ref_objets_toosmall);
     etat.ref_objets_toosmall <- (List.filter notchunk etat.ref_objets_toosmall);
 
-    etat.ref_objets_toosmall2 <- (List.filter is_alive etat.ref_objets_toosmall2);
-    etat.ref_objets_toosmall2 <- (List.filter notchunk etat.ref_objets_toosmall2);
 
-    etat.ref_objets_oos_small1 <- (List.filter is_alive etat.ref_objets_oos_small1);
-    etat.ref_objets_oos_small1 <- (List.filter notchunk etat.ref_objets_oos_small1);
+    etat.ref_objets_oos_small <- (List.filter is_alive etat.ref_objets_oos_small);
+    etat.ref_objets_oos_small <- (List.filter notchunk etat.ref_objets_oos_small);
 
-    etat.ref_objets_oos_small2 <- (List.filter is_alive etat.ref_objets_oos_small2);
-    etat.ref_objets_oos_small2 <- (List.filter notchunk etat.ref_objets_oos_small2);
-
-    etat.ref_objets_oos_small3 <- (List.filter is_alive etat.ref_objets_oos_small3);
-    etat.ref_objets_oos_small3 <- (List.filter notchunk etat.ref_objets_oos_small3);
-
-    etat.ref_objets_oos_small4 <- (List.filter is_alive etat.ref_objets_oos_small4);
-    etat.ref_objets_oos_small4 <- (List.filter notchunk etat.ref_objets_oos_small4);
 
 
     etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
@@ -706,23 +639,6 @@ let deplac_obj_modulo ref_objet (x,y) = (*x et y sont des entiers, en quantité 
   objet.position <- addtuple objet.position (!phys_width *. float_of_int x, !phys_height *. float_of_int y);
   ref_objet := objet
 
-(*Fonction permettant aux objets simultanément à plusieurs endroits de l'écran de réagir correctement au niveau physique*)
-let rec calculate_collisions_modulo ref_objet ref_objets precis =
-if List.length ref_objets > 0 then calculate_collisions_objet ref_objet ref_objets precis;;
-
-(*Même chose, pour une liste de ref objets*)
-let rec calculate_collisions_modulos ref_objets precis=
-if List.length ref_objets > 1 then (
-calculate_collisions_modulo (List.hd ref_objets) (List.tl ref_objets) precis;
-calculate_collisions_modulos (List.tl ref_objets) precis)
-else ()
-
-(*Même chose, mais collision entre deux listes*)
-let rec calculate_collisions_modulo_listes ref_objets1 ref_objets2 precis =
-if ref_objets1 = [] || ref_objets2 = [] then () else (
-calculate_collisions_modulo (List.hd ref_objets1) ref_objets2 precis;
-calculate_collisions_modulo_listes (List.tl ref_objets1) ref_objets2 precis)
-
 
 (* --- initialisations etat --- *)
 
@@ -898,16 +814,11 @@ let affiche_hud ref_etat =
     let total_norm =
       List.length etat.ref_objets
     + List.length etat.ref_objets_outofscreen
-    + List.length etat.ref_objets_outofscreen2
     + List.length etat.ref_fragments
-
     and total_small =
       List.length etat.ref_objets_toosmall
-    + List.length etat.ref_objets_toosmall2
-    + List.length etat.ref_objets_oos_small1
-    + List.length etat.ref_objets_oos_small2
-    + List.length etat.ref_objets_oos_small3
-    + List.length etat.ref_objets_oos_small4 in
+    + List.length etat.ref_objets_oos_small
+    in
 
     moveto 20 380;
     draw_string("Total collisions checked : " ^ string_of_int (!nb_collision_checked));
@@ -928,19 +839,15 @@ let affiche_hud ref_etat =
     moveto 20 240;
     draw_string ("Objets : " ^ string_of_int (List.length etat.ref_objets));
     moveto 20 220;
-    draw_string ("Outofscreen : " ^ string_of_int (List.length etat.ref_objets_outofscreen + List.length etat.ref_objets_outofscreen));
+    draw_string ("Outofscreen : " ^ string_of_int (List.length etat.ref_objets_outofscreen));
     moveto 20 200;
     draw_string ("Fragments : " ^ string_of_int (List.length etat.ref_fragments));
 
     moveto 20 180;
-    draw_string ("Small : " ^ string_of_int (List.length etat.ref_objets_toosmall + List.length etat.ref_objets_toosmall2));
+    draw_string ("Small : " ^ string_of_int (List.length etat.ref_objets_toosmall));
 
     moveto 20 160;
-    draw_string ("Small Outofscreen : " ^ string_of_int (
-      List.length etat.ref_objets_oos_small1
-    + List.length etat.ref_objets_oos_small2
-    + List.length etat.ref_objets_oos_small3
-    + List.length etat.ref_objets_oos_small4));
+    draw_string ("Small Outofscreen : " ^ string_of_int (List.length etat.ref_objets_oos_small));
 
     moveto 20 140;
     draw_string ("Chunks_explo : " ^ string_of_int (List.length etat.ref_chunks_explo));
@@ -1021,16 +928,11 @@ let affiche_etat ref_etat =
     deplac_objet_abso etat.ref_ship move_camera;
     deplac_objets_abso etat.ref_objets move_camera;
     deplac_objets_abso etat.ref_objets_outofscreen move_camera;
-    deplac_objets_abso etat.ref_objets_outofscreen2 move_camera;
     deplac_objets_abso etat.ref_fragments move_camera;
     deplac_objets_abso etat.ref_chunks move_camera;
     deplac_objets_abso etat.ref_chunks_explo move_camera;
     deplac_objets_abso etat.ref_objets_toosmall move_camera;
-    deplac_objets_abso etat.ref_objets_toosmall2 move_camera;
-    deplac_objets_abso etat.ref_objets_oos_small1 move_camera;
-    deplac_objets_abso etat.ref_objets_oos_small2 move_camera;
-    deplac_objets_abso etat.ref_objets_oos_small3 move_camera;
-    deplac_objets_abso etat.ref_objets_oos_small4 move_camera;
+    deplac_objets_abso etat.ref_objets_oos_small move_camera;
     deplac_objets_abso etat.ref_projectiles move_camera;
     deplac_objets_abso etat.ref_explosions move_camera;
     deplac_objets_abso etat.ref_smoke move_camera;
@@ -1123,108 +1025,83 @@ let etat_suivant ref_etat =
   inertie_objet etat.ref_ship;
   inertie_objets etat.ref_objets;
   inertie_objets etat.ref_objets_outofscreen;
-  inertie_objets etat.ref_objets_outofscreen2;
   inertie_objets etat.ref_fragments;
   inertie_objets etat.ref_chunks;
   inertie_objets etat.ref_chunks_explo;
   inertie_objets etat.ref_objets_toosmall;
-  inertie_objets etat.ref_objets_toosmall2;
-  inertie_objets etat.ref_objets_oos_small1;
-  inertie_objets etat.ref_objets_oos_small2;
-  inertie_objets etat.ref_objets_oos_small3;
-  inertie_objets etat.ref_objets_oos_small4;
-
+  inertie_objets etat.ref_objets_oos_small;
   inertie_objets etat.ref_projectiles;
   inertie_objets etat.ref_smoke;
 
   moment_objet etat.ref_ship;
   moment_objets etat.ref_objets;
   moment_objets etat.ref_objets_outofscreen;
-  moment_objets etat.ref_objets_outofscreen2;
   moment_objets etat.ref_fragments;
   moment_objets etat.ref_objets_toosmall;
-  moment_objets etat.ref_objets_toosmall2;
-  moment_objets etat.ref_objets_oos_small1;
-  moment_objets etat.ref_objets_oos_small2;
-  moment_objets etat.ref_objets_oos_small3;
-  moment_objets etat.ref_objets_oos_small4;
-  moment_objets etat.ref_chunks;
+  moment_objets etat.ref_objets_oos_small;
   (*Inutile de calculer le moment des projectiles, explosions ou fumée, comme leur rotation n'a aucune importance*)
 
-(* On ne rapproche plus les objets
-  (*On rapproche les objets non spawnés*)
-  List.iter closer_objet etat.ref_objets_outofscreen;
-
-    (*On rapproche les objets spawnés*)
-  List.iter closer_objet etat.ref_objets;
-  List.iter closer_objet etat.ref_fragments;
-*)
-
-  (*On calcule la friction et friction angulaire des objets*)
+  (*On calcule la friction et friction angulaire des objets pour lesquels ça peut avoir un intérêt*)
   friction_objet etat.ref_ship;
   friction_moment_objet etat.ref_ship;
 
 
   if not !pause then (
     (*Collisions entre le vaisseau et les objets*)
-    calculate_collisions_modulo etat.ref_ship etat.ref_objets true;
+    calculate_collisions_objets etat.ref_ship etat.ref_objets true;
     (*Collisions entre le vaisseau et les fragments*)
-    calculate_collisions_modulo etat.ref_ship etat.ref_fragments true;
+    calculate_collisions_objets etat.ref_ship etat.ref_fragments true;
 
     calculate_collisions_objet etat.ref_ship etat.ref_objets_toosmall false;
-    calculate_collisions_objet etat.ref_ship etat.ref_objets_toosmall2 false;
     (*Osef out of screen*)
 
     (*Collisions entre projectiles et objets*)
-    calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets true;
+    calculate_collisions_objets_listes etat.ref_projectiles etat.ref_objets true;
     (*Collisions entre projectiles et objets «non spawnés» - non modulo*)
-    (*calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_outofscreen false;(*osef la précision en dehors de l'écran*)
-    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_outofscreen2 false;(*osef la précision en dehors de l'écran*)
-    *)
-    (*Collisions entre les projectiles et les fragments*)
+    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_o_modutofscreen false;(*osef la précision en dehors de l'écran*)
 
-    calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_fragments false;
+    (*Collisions entre les projectiles et les fragments*)
+    calculate_collisions_objets_listes etat.ref_projectiles etat.ref_fragments false;
   (*Là c'est bon, la précision osef*)
-    calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets_toosmall false;
-    calculate_collisions_modulo_listes etat.ref_projectiles etat.ref_objets_toosmall2 false;
+    calculate_collisions_objets_listes etat.ref_projectiles etat.ref_objets_toosmall false;
     (*Osef pour small out of screen*)
 
 
     (*Collisions entre explosions et objets*)
-    calculate_collisions_modulo_listes etat.ref_explosions etat.ref_objets true;
+    calculate_collisions_objets_listes etat.ref_explosions etat.ref_objets true;
     (*Collisions entre explosions et objets «non spawnés» - non modulo*)
     calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_outofscreen false;
     calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_outofscreen2 false;
     (*Collisions entre explosions et les fragments*)
-    calculate_collisions_modulo_listes etat.ref_explosions etat.ref_fragments true;
+    calculate_collisions_objets_listes etat.ref_explosions etat.ref_fragments true;
 
     calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_toosmall false;
     calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_toosmall2 false;
     (*Osef pour small out of screen*)
 
     (*Collisions entre objets*)
-    calculate_collisions_modulos etat.ref_objets true;
+    calculate_collisions_listes_objets etat.ref_objets true;
 
     (*Collisions entre objets et fragments*)
-    calculate_collisions_modulo_listes etat.ref_objets etat.ref_fragments true;
+    calculate_collisions_objets_listes etat.ref_objets etat.ref_fragments true;
 
     if !even_frame
       then (
         calculate_collisions_listes_objets etat.ref_objets_toosmall etat.ref_objets false;
-  (*      calculate_collisions_modulo_listes etat.ref_objets etat.ref_objets_outofscreen2 false;*)
-        calculate_collisions_modulos etat.ref_objets_outofscreen false;
+  (*      calculate_collisions_objets_listes etat.ref_objets etat.ref_objets_outofscreen2 false;*)
+        calculate_collisions_listes_objets etat.ref_objets_outofscreen false;
         if !evener_frame
         then (
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small1 false;
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small false;
           calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small3 false
         )else(
           calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small3 false;
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small1 false
+          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small false
         );
       ) else (
         calculate_collisions_listes_objets etat.ref_objets_toosmall2 etat.ref_objets false;
-        (* calculate_collisions_modulo_listes etat.ref_objets etat.ref_objets_outofscreen false; *)
-        calculate_collisions_modulos etat.ref_objets_outofscreen2 false;
+        (* calculate_collisions_objets_listes etat.ref_objets etat.ref_objets_outofscreen false; *)
+        calculate_collisions_listes_objets etat.ref_objets_outofscreen2 false;
         if !evener_frame
         then (
           calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small2 false;
@@ -1288,7 +1165,7 @@ let etat_suivant ref_etat =
   + List.length (List.filter is_dead etat.ref_fragments)
   + List.length (List.filter is_dead etat.ref_objets_toosmall)
   + List.length (List.filter is_dead etat.ref_objets_toosmall2)
-  + List.length (List.filter is_dead etat.ref_objets_oos_small1)
+  + List.length (List.filter is_dead etat.ref_objets_oos_small)
   + List.length (List.filter is_dead etat.ref_objets_oos_small2)
   + List.length (List.filter is_dead etat.ref_objets_oos_small3)
   + List.length (List.filter is_dead etat.ref_objets_oos_small4)
@@ -1346,7 +1223,7 @@ let etat_suivant ref_etat =
   List.iter recenter_objet etat.ref_fragments;
   List.iter recenter_objet etat.ref_objets_toosmall;
   List.iter recenter_objet etat.ref_objets_toosmall2;
-  List.iter recenter_objet etat.ref_objets_oos_small1;
+  List.iter recenter_objet etat.ref_objets_oos_small;
   List.iter recenter_objet etat.ref_objets_oos_small2;
   List.iter recenter_objet etat.ref_objets_oos_small3;
   List.iter recenter_objet etat.ref_objets_oos_small4;
