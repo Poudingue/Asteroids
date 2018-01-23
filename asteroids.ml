@@ -379,14 +379,13 @@ let checknotspawn_objet ref_objet_unspawned = not (checkspawn_objet ref_objet_un
 
 (*Fait spawner tous les objets en ayant le droit*)
 let checkspawn_etat ref_etat =
-  begin
     let etat = !ref_etat in
 
     etat.ref_objets <- (List.append etat.ref_objets (List.filter checkspawn_objet etat.ref_objets_outofscreen));
     etat.ref_objets_outofscreen <- List.filter checknotspawn_objet etat.ref_objets_outofscreen;
 
-    etat.ref_objets_outofscreen <- (List.append etat.ref_objets_outofscreen (List.filter checknotspawn_objet etat.ref_objets))
-    etat.ref_objets <- (List.filter checkspawn_objet etat.ref_objets);
+    etat.ref_objets_outofscreen <- (List.append etat.ref_objets_outofscreen (List.filter checknotspawn_objet etat.ref_objets));
+    etat.ref_objets <- List.filter checkspawn_objet etat.ref_objets;
 
     let totransfer = List.filter checknotspawn_objet etat.ref_objets_toosmall
     and totransfer2 = List.filter checkspawn_objet etat.ref_objets_oos_small in
@@ -397,7 +396,7 @@ let checkspawn_etat ref_etat =
     etat.ref_objets_toosmall <- List.append etat.ref_objets_toosmall totransfer2;
     etat.ref_objets_oos_small <- List.append etat.ref_objets_oos_small totransfer;
 
-  ref_etat := etat end
+  ref_etat := etat
 
 (*Booléen indiquant qu'un objet est suffisamment proche pour être encore pris en compte dans l'espace de jeu*)
 let close_enough ref_objet =
@@ -433,7 +432,7 @@ let despawn ref_etat =
   (*On met les objets dans la liste de chunks, qui ne sont que décoratif et pour lesquels on ne calculera pas les collisions*)
     etat.ref_chunks <- (List.append
       (List.map decay_chunk etat.ref_chunks)
-      (List.append (List.filter ischunk etat.ref_objets_toosmall) (List.filter ischunk etat.ref_objets_toosmall2)));
+      (List.filter ischunk etat.ref_objets_toosmall));
 
     etat.ref_chunks_explo <- (List.map decay_chunk_explo etat.ref_chunks_explo);
 
@@ -900,7 +899,7 @@ let affiche_etat ref_etat =
       addtuple
         (addtuple ship.position (multuple ship.velocity camera_prediction))
         (multuple (center_of_attention
-          (List.append etat.ref_objets (List.append etat.ref_objets_outofscreen etat.ref_objets_outofscreen2))
+          (List.append etat.ref_objets etat.ref_objets_outofscreen)
           ship.position)
           camera_ratio_objects)) in
     (*move_camera décrit plutôt un déplacement de la totalité des objets en jeu.*)
@@ -949,7 +948,6 @@ let affiche_etat ref_etat =
   render_objet etat.ref_ship;
   List.iter render_chunk etat.ref_chunks;
   List.iter render_objet etat.ref_objets_toosmall;
-  List.iter render_objet etat.ref_objets_toosmall2;
   List.iter render_objet etat.ref_fragments;
   (*List.iter render_unspawned etat.ref_objets_outofscreen;*)
   List.iter render_objet etat.ref_objets;
@@ -1048,73 +1046,41 @@ let etat_suivant ref_etat =
 
   if not !pause then (
     (*Collisions entre le vaisseau et les objets*)
-    calculate_collisions_objets etat.ref_ship etat.ref_objets true;
+    calculate_collisions_objet etat.ref_ship etat.ref_objets true;
     (*Collisions entre le vaisseau et les fragments*)
-    calculate_collisions_objets etat.ref_ship etat.ref_fragments true;
+    calculate_collisions_objet etat.ref_ship etat.ref_fragments true;
 
     calculate_collisions_objet etat.ref_ship etat.ref_objets_toosmall false;
     (*Osef out of screen*)
 
     (*Collisions entre projectiles et objets*)
-    calculate_collisions_objets_listes etat.ref_projectiles etat.ref_objets true;
+    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets true;
     (*Collisions entre projectiles et objets «non spawnés» - non modulo*)
-    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_o_modutofscreen false;(*osef la précision en dehors de l'écran*)
+    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_outofscreen false;(*osef la précision en dehors de l'écran*)
 
     (*Collisions entre les projectiles et les fragments*)
-    calculate_collisions_objets_listes etat.ref_projectiles etat.ref_fragments false;
+    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_fragments false;
   (*Là c'est bon, la précision osef*)
-    calculate_collisions_objets_listes etat.ref_projectiles etat.ref_objets_toosmall false;
+    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets_toosmall false;
     (*Osef pour small out of screen*)
 
 
     (*Collisions entre explosions et objets*)
-    calculate_collisions_objets_listes etat.ref_explosions etat.ref_objets true;
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets true;
     (*Collisions entre explosions et objets «non spawnés» - non modulo*)
     calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_outofscreen false;
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_outofscreen2 false;
     (*Collisions entre explosions et les fragments*)
-    calculate_collisions_objets_listes etat.ref_explosions etat.ref_fragments true;
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_fragments true;
 
     calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_toosmall false;
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets_toosmall2 false;
     (*Osef pour small out of screen*)
 
-    (*Collisions entre objets*)
-    calculate_collisions_listes_objets etat.ref_objets true;
-
-    (*Collisions entre objets et fragments*)
-    calculate_collisions_objets_listes etat.ref_objets etat.ref_fragments true;
-
-    if !even_frame
-      then (
-        calculate_collisions_listes_objets etat.ref_objets_toosmall etat.ref_objets false;
-  (*      calculate_collisions_objets_listes etat.ref_objets etat.ref_objets_outofscreen2 false;*)
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen false;
-        if !evener_frame
-        then (
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small false;
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small3 false
-        )else(
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small3 false;
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small false
-        );
-      ) else (
-        calculate_collisions_listes_objets etat.ref_objets_toosmall2 etat.ref_objets false;
-        (* calculate_collisions_objets_listes etat.ref_objets etat.ref_objets_outofscreen false; *)
-        calculate_collisions_listes_objets etat.ref_objets_outofscreen2 false;
-        if !evener_frame
-        then (
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small2 false;
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small4 false
-        )else(
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small4 false;
-          calculate_collisions_listes_objets etat.ref_objets_outofscreen2 etat.ref_objets_oos_small2 false
-        );
-      );
-
-      calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_outofscreen2 false;
-  );
-
+    calculate_collisions_objets etat.ref_objets true;
+    calculate_collisions_listes_objets etat.ref_objets etat.ref_fragments true;
+    calculate_collisions_listes_objets etat.ref_objets_toosmall etat.ref_objets false;
+    calculate_collisions_objets etat.ref_objets_outofscreen false;
+    calculate_collisions_listes_objets etat.ref_objets_outofscreen etat.ref_objets_oos_small false;
+);
   (*Les explosions sont ajoutées à la fumée, et la fumée précédente avec decay. Uniquement si smoke = true.*)
   if !smoke then etat.ref_smoke <- List.append (List.map decay_smoke etat.ref_smoke) etat.ref_explosions else etat.ref_smoke <- [];
   (*On fait apparaitre les explosions correspondant aux projectiles détruits*)
@@ -1124,7 +1090,6 @@ let etat_suivant ref_etat =
   (*On fait apparaitre les explosions correspondant aux objets détruits*)
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen));
-  etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_outofscreen2));
 
   if not !pause then
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
@@ -1133,7 +1098,6 @@ let etat_suivant ref_etat =
   On fait par contre entrer les explosions dans les effets de fumée, pour l'effet visuel.*)
   if !smoke then(
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_toosmall));
-    etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets_toosmall2));
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments)));
 
   if (is_dead etat.ref_ship) && not !pause then (etat.ref_explosions <- (spawn_explosion etat.ref_ship) :: etat.ref_explosions);
@@ -1148,11 +1112,10 @@ let etat_suivant ref_etat =
 
   (*On fait apparaitre les fragments des astéroïdes détruits*)
   etat.ref_fragments <- spawn_n_frags (List.append etat.ref_objets etat.ref_objets_outofscreen) etat.ref_fragments !fragment_number;
-  etat.ref_fragments <- spawn_n_frags (List.append etat.ref_objets etat.ref_objets_outofscreen2) etat.ref_fragments !fragment_number;
   (*Pareil pour les fragments déjà cassés*)
   etat.ref_fragments <- spawn_n_frags etat.ref_fragments etat.ref_fragments !fragment_number;
   (*Pareil pour les asteroids too small*)
-  etat.ref_fragments <- spawn_n_frags (List.append etat.ref_objets_toosmall etat.ref_objets_toosmall2) etat.ref_fragments !fragment_number;
+  etat.ref_fragments <- spawn_n_frags etat.ref_objets_toosmall etat.ref_fragments !fragment_number;
 
 
   (*On ralentit le temps selon le nombre d'astéroïde détruits*)
@@ -1161,14 +1124,9 @@ let etat_suivant ref_etat =
   let nb_destroyed =
     List.length (List.filter is_dead etat.ref_objets)
   + List.length (List.filter is_dead etat.ref_objets_outofscreen)
-  + List.length (List.filter is_dead etat.ref_objets_outofscreen2)
   + List.length (List.filter is_dead etat.ref_fragments)
   + List.length (List.filter is_dead etat.ref_objets_toosmall)
-  + List.length (List.filter is_dead etat.ref_objets_toosmall2)
   + List.length (List.filter is_dead etat.ref_objets_oos_small)
-  + List.length (List.filter is_dead etat.ref_objets_oos_small2)
-  + List.length (List.filter is_dead etat.ref_objets_oos_small3)
-  + List.length (List.filter is_dead etat.ref_objets_oos_small4)
   in
   game_speed := !game_speed *. ratio_time_destr_asteroid ** (float_of_int nb_destroyed);
   etat.score <- etat.score + nb_destroyed; (*TODO meilleure version du score avec multiplicateurs*)
@@ -1180,15 +1138,7 @@ let etat_suivant ref_etat =
 
 
     (*On touche pas aux fragments, ils doivent rester entre eux, ils se reverseront dans les objets normaux, puis dans too_small*)
-    if (List.length etat.ref_objets_toosmall) < (List.length etat.ref_objets_toosmall2)
-    then
-      etat.ref_objets_toosmall <- (List.append
-        etat.ref_objets_toosmall
-        (List.filter too_small (List.append etat.ref_objets etat.ref_fragments)))
-    else
-      etat.ref_objets_toosmall2 <- (List.append
-        etat.ref_objets_toosmall2
-        (List.filter too_small (List.append etat.ref_objets etat.ref_fragments)));
+    etat.ref_objets_toosmall <- (List.append etat.ref_objets_toosmall (List.filter too_small (List.append etat.ref_objets etat.ref_fragments)));
 
     (*On transfère les fragments qui ne sont pas en collision avec les autres dans les objets physiques.*)
     etat.ref_objets <- List.append (no_collisions_liste etat.ref_fragments true) etat.ref_objets;
@@ -1219,14 +1169,9 @@ let etat_suivant ref_etat =
 
   List.iter recenter_objet etat.ref_objets;
   List.iter recenter_objet etat.ref_objets_outofscreen;
-  List.iter recenter_objet etat.ref_objets_outofscreen2;
   List.iter recenter_objet etat.ref_fragments;
   List.iter recenter_objet etat.ref_objets_toosmall;
-  List.iter recenter_objet etat.ref_objets_toosmall2;
   List.iter recenter_objet etat.ref_objets_oos_small;
-  List.iter recenter_objet etat.ref_objets_oos_small2;
-  List.iter recenter_objet etat.ref_objets_oos_small3;
-  List.iter recenter_objet etat.ref_objets_oos_small4;
 
   (*On ne recentre pas les projectiles car ils doivent despawner une fois sortis de l'espace de jeu*)
 

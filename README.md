@@ -22,25 +22,9 @@ Run it with ./asteroids (.exe for windows)
 
 ## Changelog
 
-v1.8 - MAYHEM update
+v1.9 - Optimisation update WIP
 
-Features :
-- Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculation of collisions
-- Very satisfying and devastating death
-- Same for teleportation, not random anymore, goes where the mouse is
-- Better explosions, better fire, better screenshake, better time dilation, better flashes
-- Only infinitespace with mouse control available now
-
-Fixed :
-- No more massive asteroid spawn, fixed interval between two asteroid spawning
-- Stupid performance problem where i forgot to despawn projectiles that are too far
-
-Bugs :
-- Momentum of objects still not taken into account for physics
-
-Not cool :
-- Final death can't be viewed yet.
-- Respawn and instant die because of asteroid
-- Teleport and instant die because of asteroid
+DONC TAKE THIS VERSION, NOT YET OPTIMISED !
+take the version 1.8 in the archives folder, it has better performances for now.
 
 For all changelogs, see changelog.txt
