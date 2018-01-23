@@ -302,9 +302,15 @@ let explosion_max_radius = 200.
 let explosion_min_radius = 150.
 let explosion_min_exposure = 0.4(*Détermine la luminosité max et min des explosions au spawn*)
 let explosion_max_exposure = 1.5
-let explosion_damages = 150.
+
+let explosion_damages_projectile = 150.
+let explosion_damages_objet = 100.
+let explosion_damages_chunk = 300.
+let explosion_damages_death = 3000. (*by second*)
+
 (*Pour les explosions héritant d'un objet*)
 let explosion_ratio_radius = 2.
+let explosion_death_ratio_radius = 2.
 let explosion_saturate = 10.
 let explosion_min_exposure_heritate = 2.(*Détermine la luminosité max et min des explosions héritant d'objets au spawn*)
 let explosion_max_exposure_heritate = 6.

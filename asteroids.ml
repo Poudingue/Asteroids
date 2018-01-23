@@ -358,40 +358,22 @@ let phys_damage ref_objet damage =
   game_screenshake := !game_screenshake +. damage *. screenshake_phys_ratio *. objet.mass /. screenshake_phys_mass;
   ref_objet := objet
 
-
 let is_alive ref_objet = !ref_objet.health >= 0.
 let is_dead ref_objet = !ref_objet.health <0.
-
 (*Vérifie si un objet dépasse potentiellement dans l'écran*)
 let checkspawn_objet ref_objet_unspawned =
   let objet = !ref_objet_unspawned in
   let (x, y) = objet.position in
   let rad = objet.hitbox.ext_radius in
- (x -. rad < !phys_width) && (x +. rad > 0.)
-  && (y -. rad < !phys_height) && (y +. rad > 0.)
+ (x -. rad < !phys_width) && (x +. rad > 0.) && (y -. rad < !phys_height) && (y +. rad > 0.)
 
 let checknotspawn_objet ref_objet_unspawned = not (checkspawn_objet ref_objet_unspawned)
-
-(*Booléen indiquant qu'un objet est suffisamment proche pour être encore pris en compte dans l'espace de jeu*)
-let close_enough ref_objet =
-  let (x, y) = !ref_objet.position in
-  hypothenuse (soustuple (x,y) (!phys_width /. 2., !phys_height /. 2.)) < max_dist
-
+let close_enough ref_objet = hypothenuse (soustuple !ref_objet.position (!phys_width /. 2., !phys_height /. 2.)) < max_dist
 let too_far ref_objet = not (close_enough ref_objet)
-
-let close_enough_bullet ref_objet =
-  let (x, y) = !ref_objet.position in
-    hypothenuse (x,y) < max_dist
-
+let close_enough_bullet ref_objet = hypothenuse !ref_objet.position < max_dist
 let positive_radius ref_objet = !ref_objet.visuals.radius > 0.
-
-let big_enough ref_objet = !ref_objet.hitbox.int_radius > asteroid_min_size
-let too_small ref_objet = not (big_enough ref_objet)
-
 let ischunk ref_objet = !ref_objet.hitbox.int_radius < chunk_max_size
 let notchunk ref_objet = !ref_objet.hitbox.int_radius >= chunk_max_size
-
-
 
 let rec center_of_attention ref_objets pos =
   match ref_objets with
@@ -422,32 +404,15 @@ let despawn ref_etat =
     etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
     etat.ref_chunks <- (List.filter positive_radius etat.ref_chunks);
     etat.ref_chunks_explo <- (List.filter positive_radius etat.ref_chunks_explo);
-    etat.ref_chunks <- (List.filter checkspawn_objet etat.ref_chunks);
+
   ref_etat := etat
 
-
-(*Fonction permettant de rapprocher les objets lointains*)
-let closer_objet ref_objet =
-  let objet = !ref_objet in
-  let (x,y) = objet.position in
-  objet.position <- addtuple (!phys_width /. 2., !phys_height /. 2.) (exp_decay (x -. !phys_width /. 2.) half_close, exp_decay (y -. !phys_height /. 2.) half_close);
-  objet.velocity <- addtuple objet.velocity (multuple (!phys_width /. 2. -. x, !phys_height /. 2. -. y) accel_close);
-  ref_objet := objet;;
-
-
-(*On recentre les objets qui sont hors de l'écran, mais selon un écran 3 fois plus large et haut*)
 let recenter_objet ref_objet =
   let objet = !ref_objet in
   objet.position <- modulo_3reso objet.position;
 ref_objet := objet
 
-(*La racine carrée est une opération assez lourde,
-Donc plutôt que de comparer la distance entre deux objets avec la somme de leur radii,
-On compare le carré de leur distance avec le carré de la somme de leurs radii..
-On travaille par hitbox circulaire pour 1-La simplicité du calcul 2-La proximité avec les formes réelles*)
-
 let collision_circles pos0 r0 pos1 r1 = distancecarre pos0 pos1 < carre (r0 +. r1)
-
 let collision_point pos_point pos_circle radius = distancecarre pos_point pos_circle < carre radius
 
 let rec collisions_points pos_points pos_circle radius =
@@ -455,11 +420,11 @@ match pos_points with
 |[] -> false
 |hd::tl -> collision_point hd pos_circle radius || collisions_points tl pos_circle radius
 
+(*Dirty workaround for now. Will maybe do something more clean one day.*)
 let collision_poly pos poly rotat circle_pos radius =
   let pos_points = (depl_affine_poly (poly_to_affine poly rotat 1.) pos) in
   collisions_points pos_points circle_pos radius
 
-(*Fonction vérifiant la collision entre deux objets*)
 let collision objet1 objet2 precis=
   nb_collision_checked := !nb_collision_checked +1;
 (*Si on essaye de collisionner un objet avec lui-même, ça ne fonctionne pas*)
@@ -482,7 +447,6 @@ let rec collision_objet_liste ref_objet ref_objets precis =
   match ref_objets with
   | [] -> false
   | _ -> collision !ref_objet !(List.hd ref_objets) precis || collision_objet_liste ref_objet (List.tl ref_objets) precis
-
 
 (*S'applique seulement aux fragments -> on repousse selon la normale*)
 (*Retourne les objets de la liste 1 étant en collision avec des objets de la liste 2*)
@@ -510,7 +474,7 @@ La fonction pourrait être améliorée, avec une variable friction sur les objet
 et transfert entre moment et inertie.*)
 let consequences_collision ref_objet1 ref_objet2 =
   match !ref_objet1.objet with
-  | Explosion -> damage ref_objet2 explosion_damages (*On applique les dégats de l'explosion*)
+  | Explosion -> damage ref_objet2 !ref_objet1.mass (*On applique les dégats de l'explosion*)
   | Projectile -> damage ref_objet1 0.1 (*On endommage le projectile pour qu'il meure*)
   | _ -> (*Si ce n'est ni une explosion ni un projectile, on calcule les effets de la collision physique*)
     (let objet1 = !ref_objet1 and objet2 = !ref_objet2 in
@@ -770,14 +734,31 @@ let affiche_hud ref_etat =
     moveto 20 20;
     draw_string ("Framerate : " ^ string_of_int !last_count);
 
+    let nb_objets = List.length etat.ref_objets + List.length etat.ref_fragments
+    and nb_impacteurs = List.length etat.ref_projectiles + List.length etat.ref_explosions + 1 (*Le vaisseau*)
+    in
+    let nb_potential_impacts = (nb_objets*nb_impacteurs + ((nb_objets-1)*nb_objets)/2)
+    in
+    moveto 20 400;
+    draw_string("Potential collisions : " ^ string_of_int nb_potential_impacts);
 
     moveto 20 380;
-    draw_string("Total collisions checked : " ^ string_of_int (!nb_collision_checked));
+    draw_string("Collisions checked   : " ^ string_of_int (!nb_collision_checked));
+
+    let taux_verif =  (float_of_int !nb_collision_checked) /.(float_of_int nb_potential_impacts) in
+    let begx = 20. /. (float_of_int width) and begy = 360. /. (float_of_int height)
+    and endx = 150. /. (float_of_int width) and endy = 370. /. (float_of_int height) in
+    affiche_barre 1. [(begx,begy);(begx,endy);(endx,endy);(endx,begy)] (rgb 0 255 0);
+    if taux_verif > 1. then (
+    affiche_barre taux_verif [(begx,begy);(begx,endy);(endx,endy);(endx,begy)] (rgb 255 0 0);
+    affiche_barre 1. [(begx,begy);(begx,endy);(endx,endy);(endx,begy)] (rgb 128 128 128)
+    )else(
+    affiche_barre 1. [(begx,begy);(begx,endy);(endx,endy);(endx,begy)] (rgb 0 255 0);
+    affiche_barre taux_verif [(begx,begy);(begx,endy);(endx,endy);(endx,begy)] (rgb 128 128 128));
+    set_color white;
 
     moveto 20 320;
-    draw_string ("Objets : " ^ string_of_int
-      (List.length etat.ref_objets
-    + List.length etat.ref_fragments));
+    draw_string ("Objets : " ^ string_of_int nb_objets);
 
     moveto 20 280;
     draw_string ("Deco : " ^ string_of_int (List.length etat.ref_chunks + List.length etat.ref_smoke));
@@ -996,12 +977,10 @@ let etat_suivant ref_etat =
   if not !pause then
   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
   (* etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_chunk etat.ref_chunks); *)
-  (*On ne fait pas exploser les fragments, car ils sont tous superposés, et en quelques frames ils meurent tous.
-  On fait par contre entrer les explosions dans les effets de fumée, pour l'effet visuel.*)
   if !smoke then(
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments)));
 
-  if (is_dead etat.ref_ship) && not !pause then (etat.ref_explosions <- (spawn_explosion etat.ref_ship) :: etat.ref_explosions);
+  if (is_dead etat.ref_ship) && not !pause then (etat.ref_explosions <- (spawn_explosion_death etat.ref_ship (!time_current_frame -. !time_last_frame)) :: etat.ref_explosions);
 
   (*On ralentit le temps selon le nombre d'explosions*)
   game_speed := !game_speed *. ratio_time_explosion ** (float_of_int (List.length etat.ref_explosions));
@@ -1203,7 +1182,6 @@ let teleport ref_etat =
     ship.velocity <- (0.,0.);
     etat.ref_chunks_explo <- List.append (spawn_n_chunks ship nb_chunks_explo {r=0.;v=1000.;b=10000.}) !ref_etat.ref_chunks_explo;
     etat.ref_ship := ship;
-    etat.ref_explosions <- (spawn_explosion_tp ship) :: etat.ref_explosions;
     etat.cooldown_tp <- etat.cooldown_tp +. cooldown_tp;
     ref_etat:=etat)
 

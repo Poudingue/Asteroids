@@ -264,7 +264,7 @@ let spawn_explosion ref_projectile =
     ext_radius = rad;
     points = [];
   };
-  mass = 0.;
+  mass = explosion_damages_projectile;
   health = 0.;
   max_health = 0.;
 
@@ -304,7 +304,7 @@ let spawn_explosion_object ref_objet =
     ext_radius = rad;
     points = [];
   };
-  mass = 0.;
+  mass = explosion_damages_objet;
   health = 0.;
   max_health = 0.;
 
@@ -328,6 +328,48 @@ let spawn_explosion_object ref_objet =
   hdr_exposure = randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate ;
 }
 
+(*Spawne une explosion héritant du vaisseau lors de sa mort*)
+let spawn_explosion_death ref_objet time =
+  let rad = explosion_death_ratio_radius *. !ref_objet.hitbox.int_radius in (*On récupère le rayon de l'objet*)
+  if !flashes then add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color flashes_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
+  if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_explosions;
+  ref {
+  objet = Explosion;
+  visuals = {
+    color = intensify (saturate !ref_objet.visuals.color explosion_saturate) (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate);
+    radius = rad;
+    shapes = [];
+  };
+  hitbox = {
+    int_radius = rad;
+    ext_radius = rad;
+    points = [];
+  };
+  mass = time *. explosion_damages_death;
+  health = 0.;
+  max_health = 0.;
+
+  dam_res = 0.;
+  dam_ratio = 0.;
+  phys_res = 0.;
+  phys_ratio = 0.;
+
+  last_position = !ref_objet.position;
+  position = !ref_objet.position;
+  (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
+  velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
+  half_stop = 0.;
+  orientation = 0.;
+  moment = 0.;
+  half_stop_rotat = 0.;
+
+  proper_time = 1.;
+(*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
+
+  hdr_exposure = randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate ;
+}
+
+
 let spawn_explosion_chunk ref_objet =
   let rad = explosion_ratio_radius *. !ref_objet.visuals.radius in (*On récupère le rayon de l'objet*)
   if !flashes then add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color flashes_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
@@ -344,7 +386,7 @@ let spawn_explosion_chunk ref_objet =
     ext_radius = rad;
     points = [];
   };
-  mass = 0.;
+  mass = explosion_damages_chunk (*Replace with a function of time spent on frame*);
   health = 0.;
   max_health = 0.;
 
@@ -367,49 +409,6 @@ let spawn_explosion_chunk ref_objet =
 
   hdr_exposure = explosion_min_exposure +. (Random.float (explosion_max_exposure -. explosion_min_exposure));
 }
-
-(*Spawne une explosion venant d'une téléportation*)
-let spawn_explosion_tp objet =
-  let rad = 1000. in (*On récupère le rayon de l'objet*)
-  ref {
-  objet = Explosion;
-  visuals = {
-    color = {r = 0.; v = 4000.; b = 40000.};
-    radius = rad;
-    shapes = [];
-  };
-  hitbox = {
-    int_radius = rad;
-    ext_radius = rad;
-    points = [];
-  };
-  mass = 0.;
-  health = 0.;
-  max_health = 0.;
-
-  dam_res = 0.;
-  dam_ratio = 0.;
-  phys_res = 0.;
-  phys_ratio = 0.;
-
-  last_position = objet.position;
-  position = objet.position;
-  (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
-  velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
-  half_stop = 0.;
-  orientation = 0.;
-  moment = 0.;
-  half_stop_rotat = 0.;
-
-  proper_time = 1.;
-(*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
-
-  hdr_exposure = 1. ;
-}
-
-
-(*TODO pour l'instant les muzzle et le feu héritent bien trop des explosions et sont bien trop hardcodés.
-Définir leurs propres valeurs*)
 
 (*Spawne un muzzleflash à la position donnée*)
 let spawn_muzzle ref_projectile = ref {
