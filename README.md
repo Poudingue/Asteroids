@@ -22,7 +22,7 @@ Run it with ./asteroids (.exe for windows)
 
 ## Changelog
 
-v1.8 beta - MAYHEM update - WIP
+v1.8 - MAYHEM update
 
 Features :
 - Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculation of collisions

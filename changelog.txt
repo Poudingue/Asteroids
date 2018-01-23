@@ -1,13 +1,24 @@
-v1.8 - ???
-  Powerups ?
-  Guns, vies, propulsion, vie totale, autoregen
-  Trou noir ?
-  Nébuleuses "volumétriques" ?
-  Étincelles ?
-  Vraie explosion après la mort ?
-  (Et au passage faire les dégats en fonction d'elapsed time)
-  (Et tant qu'on y est, faire des dégats PAR explosion. Masse serait bien pour régler ça.)
-  Astéroides apparaissant progressivement et pas en bloc
+v1.8 - MAYHEM update
+
+Features :
+- Support for a huge number of asteroids at the same time, thanks to smart optimisation in the calculation of collisions
+- Very satisfying and devastating death
+- Same for teleportation, not random anymore, goes where the mouse is
+- Better explosions, better fire, better screenshake, better time dilation, better flashes
+- Only infinitespace with mouse control available now
+
+Fixed :
+- No more massive asteroid spawn, fixed interval between two asteroid spawning
+- Stupid performance problem where i forgot to despawn projectiles that are too far
+
+Bugs :
+- Momentum of objects still not taken into account for physics
+
+Not cool :
+- Final death can't be viewed yet.
+- Respawn and instant die because of asteroid
+- Teleport and instant die because of asteroid
+
 
 v1.7 - MORE FUN update
 Features :
