@@ -194,7 +194,7 @@ let asteroid_polygon_max = 1.3 (*En ratio du rayon*)
 (*Contrôle du nombre d'astéroïde apparaissant à chaque vague*)
 let asteroid_min_nb = 2
 let asteroid_stage_nb = 1
-let time_spawn_asteroid = 5. (*secondes*)
+let time_spawn_asteroid = 1. (*secondes*)
 let current_stage_asteroids = ref 3
 let time_since_last_spawn = ref 4.5
 (*Paramètres pour rapprocher l'air de rien les objets trop lointains (plus utilisé)*)
@@ -335,7 +335,7 @@ let star_prox_lum = 5.(*Pour ajouter de la luminosité aux étoiles plus proches
 let star_min_lum = 0.
 let star_max_lum = 4.
 let star_rand_lum = 2. (*Effet de scintillement des étoiles*)
-let stars_nb_default = 500
+let stars_nb_default = 100
 let stars_nb = ref 200
 let stars_nb_previous = ref 200
 
