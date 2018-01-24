@@ -329,14 +329,17 @@ let spawn_explosion_object ref_objet =
 }
 
 (*Spawne une explosion héritant du vaisseau lors de sa mort*)
-let spawn_explosion_death ref_objet time =
-  let rad = explosion_death_ratio_radius *. !ref_objet.hitbox.int_radius in (*On récupère le rayon de l'objet*)
-  if !flashes then add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color flashes_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
-  if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_explosions;
+let spawn_explosion_death ref_ship elapsed_time =
+  let rad = explosion_death_min_radius +. (Random.float (explosion_death_max_radius -. explosion_death_min_radius)) in
+  let rand_lum = (randfloat explosion_min_exposure explosion_max_exposure) in
   ref {
   objet = Explosion;
   visuals = {
-    color = intensify (saturate !ref_objet.visuals.color explosion_saturate) (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate);
+    color = intensify {
+      r = 2000.;
+      v = 500. ;
+      b = 200.}
+    rand_lum;
     radius = rad;
     shapes = [];
   };
@@ -345,7 +348,7 @@ let spawn_explosion_death ref_objet time =
     ext_radius = rad;
     points = [];
   };
-  mass = time *. explosion_damages_death;
+  mass = explosion_damages_death *. elapsed_time;
   health = 0.;
   max_health = 0.;
 
@@ -354,8 +357,8 @@ let spawn_explosion_death ref_objet time =
   phys_res = 0.;
   phys_ratio = 0.;
 
-  last_position = !ref_objet.position;
-  position = !ref_objet.position;
+  last_position = !ref_ship.position;
+  position = !ref_ship.position;
   (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
   half_stop = 0.;
@@ -364,9 +367,7 @@ let spawn_explosion_death ref_objet time =
   half_stop_rotat = 0.;
 
   proper_time = 1.;
-(*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
-
-  hdr_exposure = randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate ;
+  hdr_exposure = 1.;
 }
 
 

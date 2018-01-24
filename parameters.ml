@@ -110,7 +110,6 @@ let dither_power_radius = 0.5
 Cela permet de s'assurer une consistance spatiale dans tout le rendu.*)
 let current_jitter_double = ref (0.,0.)
 
-
 let filter_half_life = 1.
 let filter_saturation = 0.5
 
@@ -120,6 +119,9 @@ let ratio_rendu = ref (sqrt ((float_of_int width) *. (float_of_int height) /. (g
 (*Tailles «physiques» du terrain*)
 let phys_width = ref (float_of_int width /. !ratio_rendu)
 let phys_height = ref (float_of_int height /. !ratio_rendu)
+
+let width_collision_table = 9
+let height_collision_table = 6
 
 
 (******************************************************************************)
@@ -168,7 +170,6 @@ let min_bounce = 0.
 (*Paramètres des astéroïdes*)
 let asteroid_max_spawn_radius = 800. (*Taille max d'astéroïde au spawn.*)
 let asteroid_min_spawn_radius = 500. (*Taille min de spawn*)
-let asteroid_min_size = 200. (*En dessous de la taille minimale, un asteroide se transforme en too_small*)
 let asteroid_max_moment = 2. (*Rotation max d'un astéroïde au spawn (dans un sens aléatoire)*)
 let asteroid_max_velocity = 2000. (*Velocité max au spawn*)
 let asteroid_min_velocity = 1500. (*Velocité min au spawn*)
@@ -194,9 +195,10 @@ let asteroid_polygon_max = 1.3 (*En ratio du rayon*)
 (*Contrôle du nombre d'astéroïde apparaissant à chaque vague*)
 let asteroid_min_nb = 2
 let asteroid_stage_nb = 1
-let time_spawn_asteroid = 1. (*secondes*)
+let asteroid_min_size = 200.
+let time_spawn_asteroid = 5. (*secondes*)
 let current_stage_asteroids = ref 3
-let time_since_last_spawn = ref 4.5
+let time_since_last_spawn = ref 9.5
 (*Paramètres pour rapprocher l'air de rien les objets trop lointains (plus utilisé)*)
 let half_close = 10. (*Demi-temps de rapprochement d'un objet par rapport au centre de l'écran*)
 let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le centre de l'écran*)
@@ -205,10 +207,10 @@ let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le
 let fragment_max_velocity = 3000. (*Velocité max au spawn*)
 let fragment_min_velocity = 2000. (*Velocité min au spawn*)
 let fragment_max_size = 0.6 (*En ratio de la taille de l'astéroïde parent*)
-let fragment_min_size = 0.4 (*En ratio de la taille de l'astéroïde parent*)
+let fragment_min_size = 0.3 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.666 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
 let fragment_max_exposure = 1.5 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
-let fragment_number = ref 2
+let fragment_number = 5
 let fragment_min_repulsion = 10.
 let fragment_min_bounce = 5.
 let chunk_max_size = 50.
@@ -218,7 +220,7 @@ let chunk_radius_decay = 25. (*Pour la décroissance des particules n'ayant pas 
 
 let nb_chunks_explo = 15
 let chunks_explo_min_radius = 100.
-let chunks_explo_max_radius = 200.
+let chunks_explo_max_radius = 250.
 let chunks_explo_min_speed = 4000.
 let chunks_explo_max_speed = 8000.
 let chunk_explo_radius_decay = 100.
@@ -298,19 +300,20 @@ let machine_radius_hitbox = 25.
 let machine_number = 1
 
 (*Valeurs des explosions*)
-let explosion_max_radius = 200.
-let explosion_min_radius = 150.
+let explosion_max_radius = 250.
+let explosion_min_radius = 200.
 let explosion_min_exposure = 0.4(*Détermine la luminosité max et min des explosions au spawn*)
 let explosion_max_exposure = 1.5
 
 let explosion_damages_projectile = 150.
-let explosion_damages_objet = 100.
+let explosion_damages_objet = 50.
 let explosion_damages_chunk = 300.
-let explosion_damages_death = 3000. (*by second*)
+let explosion_damages_death = 1000000. (*by second*)
 
 (*Pour les explosions héritant d'un objet*)
 let explosion_ratio_radius = 2.
-let explosion_death_ratio_radius = 2.
+let explosion_death_max_radius = 150.
+let explosion_death_min_radius = 100.
 let explosion_saturate = 10.
 let explosion_min_exposure_heritate = 2.(*Détermine la luminosité max et min des explosions héritant d'objets au spawn*)
 let explosion_max_exposure_heritate = 6.
@@ -360,7 +363,7 @@ let scanlines_offset = ref 0
 pour le garder tant que possible au centre de l'écran*)
 let camera_prediction = 1.5 (*En secondes de déplacement du vaisseau dans le futur.*)
 let camera_half_depl = 1. (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
-let camera_ratio_objects = 3. (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
+let camera_ratio_objects = 5. (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
 let camera_ratio_vision = 0.3 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
 let camera_start_bound = 0.5 (*En ratio de la taille de l'écran : distance du bord à laquelle la caméra commence à se recentrer*)
 let camera_max_force = 1. (*En ratio de la taille de l'écran : vitesse appliquée à la caméra pour la recentrer si on ATTEINT le bord de l'écran*)
