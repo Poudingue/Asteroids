@@ -1007,6 +1007,10 @@ let etat_suivant ref_etat =
     calculate_collisions_listes_objets etat.ref_projectiles etat.ref_fragments false;
     calculate_collisions_listes_objets etat.ref_projectiles etat.ref_toosmall false;
 
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets false;
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_fragments false;
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_toosmall false;
+
     List.iter decay_smoke etat.ref_smoke;
     if !smoke then etat.ref_smoke <- List.append etat.ref_smoke etat.ref_explosions else etat.ref_smoke <- [];
     etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
@@ -1014,9 +1018,7 @@ let etat_suivant ref_etat =
     etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_toosmall));
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments));
 
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets false;
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_fragments false;
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_toosmall false;
+    ref_etat := etat;
 
 );
 
