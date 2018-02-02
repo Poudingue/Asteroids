@@ -26,6 +26,7 @@ type etat = {
 (*Il est plus simple de gérer la physique en séparant les objets par type
 plutôt que de vérifier le type d'objet à la volée*)
   mutable ref_objets : objet_physique ref list;
+  mutable ref_objets_oos : objet_physique ref list;
   mutable ref_toosmall : objet_physique ref list;
   mutable ref_toosmall_oos : objet_physique ref list;
   mutable ref_fragments : objet_physique ref list; (*On fait apparaître les fragments dans une liste séparée pour éviter qu'ils ne s'entre-collisionnent*)
@@ -97,6 +98,7 @@ let init_etat () =  game_screenshake:=0. ;{
   last_health = ship_max_health;
   ref_ship = ref (spawn_ship ());
   ref_objets = [];
+  ref_objets_oos = [];
   ref_toosmall = [];
   ref_toosmall_oos = [];
   ref_fragments = [];
@@ -397,6 +399,27 @@ match ref_objets with
     if (xobj -. rad < xmax) && (xobj +. rad > xmin) && (yobj -. rad < ymax) && (yobj +. rad > ymin)
     then (hd :: (filtertable tl x y)) else (filtertable tl x y);;
 
+let rec rev_filtertable ref_objets collision_table =
+match ref_objets with
+| [] -> ()
+| hd::tl ->
+    let objet = !hd in
+    let (x1, y1) = (addtuple objet.position (!phys_width, !phys_height)) in
+    let (x2, y2) =
+      ((float_of_int width_collision_table) *. x1 /. (3. *. !phys_width),
+       (float_of_int height_collision_table) *. y1 /. (3. *. !phys_height)) in
+    let (xint, yint) = ((int_of_float x2), (int_of_float y2)) in
+    if (x2 < 0. ||y2 < 0.|| x2 >= (float_of_int width_collision_table) || y2 >= (float_of_int height_collision_table))
+    then (
+      print_endline("Object out of table : ");
+      print_endline((string_of_float x2) ^ "/" ^ (string_of_int width_collision_table) ^ ", " ^ (string_of_float y2) ^ "/" ^ (string_of_int height_collision_table));
+    )else (
+      let already_in_table = Array.get collision_table (xint*height_collision_table+yint) in
+      Array.set collision_table (xint*height_collision_table+yint) (hd :: already_in_table);
+      );
+   rev_filtertable tl collision_table
+
+
 let rec center_of_attention ref_objets pos =
   match ref_objets with
   | [] -> (0.,0.)
@@ -415,9 +438,11 @@ let despawn ref_etat =
     etat.ref_chunks <- (List.append etat.ref_chunks
         (List.filter ischunk etat.ref_toosmall));
 
-
     etat.ref_objets <- (List.filter notchunk etat.ref_objets);
     etat.ref_objets <- (List.filter is_alive etat.ref_objets);
+
+    etat.ref_objets_oos <- (List.filter notchunk etat.ref_objets_oos);
+    etat.ref_objets_oos <- (List.filter is_alive etat.ref_objets_oos);
 
     etat.ref_toosmall <- (List.filter notchunk etat.ref_toosmall);
     etat.ref_toosmall <- (List.filter is_alive etat.ref_toosmall);
@@ -501,6 +526,7 @@ let rec no_collisions_liste ref_objets precis = no_collision_objets_listes ref_o
 La fonction pourrait être améliorée, avec une variable friction sur les objets,
 et transfert entre moment et inertie.*)
 let consequences_collision ref_objet1 ref_objet2 =
+    if !ref_objet2.objet == Explosion then () else
   match !ref_objet1.objet with
   | Explosion -> damage ref_objet2 !ref_objet1.mass (*On applique les dégats de l'explosion*)
   | Projectile -> damage ref_objet1 0.1 (*On endommage le projectile pour qu'il meure*)
@@ -760,9 +786,10 @@ let affiche_hud ref_etat =
     set_color white;
 
     let nb_objets = List.length etat.ref_objets + List.length etat.ref_fragments + List.length etat.ref_toosmall
+    and nb_objets_oos = List.length etat.ref_objets_oos + List.length etat.ref_toosmall_oos
     and nb_impacteurs = List.length etat.ref_projectiles + List.length etat.ref_explosions + 1 (*Le vaisseau*)
     in
-    let nb_potential_impacts = (nb_objets*nb_impacteurs + ((nb_objets-1)*nb_objets)/2)
+    let nb_potential_impacts = (nb_objets*nb_impacteurs + ((nb_objets-1)*nb_objets)/2 + ((nb_objets_oos-1)*nb_objets_oos)/2)
     in
     moveto 20 400;
     draw_string("Potential collisions : " ^ string_of_int nb_potential_impacts);
@@ -782,18 +809,20 @@ let affiche_hud ref_etat =
     affiche_barre taux_verif [(begx,begy);(begx,endy);(endx,endy);(endx,begy)] (rgb 128 128 128));
     set_color white;
 
+    moveto 20 260;
+    draw_string ("Objets :       " ^ string_of_int nb_objets);
     moveto 20 240;
-    draw_string ("Objets : " ^ string_of_int nb_objets);
+    draw_string ("Objets oos :   " ^ string_of_int nb_objets_oos);
     moveto 20 220;
-    draw_string ("toosmall : " ^ string_of_int (List.length etat.ref_toosmall));
+    draw_string ("TooSmall :     " ^ string_of_int (List.length etat.ref_toosmall));
     moveto 20 200;
-    draw_string ("tOOSmall : " ^ string_of_int (List.length etat.ref_toosmall_oos));
+    draw_string ("TooSmall oos : " ^ string_of_int (List.length etat.ref_toosmall_oos));
     moveto 20 180;
-    draw_string ("Chunks_explo : " ^ string_of_int (List.length etat.ref_chunks_explo));
+    draw_string ("Chunks explo : " ^ string_of_int (List.length etat.ref_chunks_explo));
     moveto 20 160;
-    draw_string ("Projectiles : " ^ string_of_int (List.length etat.ref_projectiles));
+    draw_string ("Projectiles :  " ^ string_of_int (List.length etat.ref_projectiles));
     moveto 20 140;
-    draw_string ("Explosions : " ^ string_of_int (List.length etat.ref_explosions));
+    draw_string ("Explosions :   " ^ string_of_int (List.length etat.ref_explosions));
 
     moveto 20 100;
     draw_string ("Deco : " ^ string_of_int (List.length etat.ref_chunks + List.length etat.ref_smoke));
@@ -841,7 +870,7 @@ let affiche_etat ref_etat =
       addtuple (polar_to_affine ship.orientation (!phys_width *. camera_ratio_vision)) (
       addtuple
         (addtuple ship.position (multuple ship.velocity camera_prediction))
-        (multuple (center_of_attention etat.ref_objets ship.position)
+        (multuple (center_of_attention (List.append etat.ref_objets etat.ref_objets_oos) ship.position)
           camera_ratio_objects)) in
     (*move_camera décrit plutôt un déplacement de la totalité des objets en jeu.*)
   let elapsed_time = !game_speed *. (!time_last_frame -. !time_current_frame) in
@@ -888,7 +917,7 @@ let affiche_etat ref_etat =
   render_objet etat.ref_ship;
   List.iter render_chunk etat.ref_chunks;
   List.iter render_objet etat.ref_fragments;
-  List.iter render_objet (List.filter checkspawn_objet etat.ref_objets);
+  List.iter render_objet etat.ref_objets;
   List.iter render_objet etat.ref_toosmall;
   List.iter render_objet etat.ref_explosions;
 
@@ -960,6 +989,7 @@ let etat_suivant ref_etat =
 
   inertie_objet etat.ref_ship;
   inertie_objets etat.ref_objets;
+  inertie_objets etat.ref_objets_oos;
   inertie_objets etat.ref_toosmall;
   inertie_objets etat.ref_toosmall_oos;
   inertie_objets etat.ref_fragments;
@@ -970,14 +1000,15 @@ let etat_suivant ref_etat =
 
   moment_objet etat.ref_ship;
   moment_objets etat.ref_objets;
+  moment_objets etat.ref_objets_oos;
   moment_objets etat.ref_toosmall;
   moment_objets etat.ref_toosmall_oos;
   moment_objets etat.ref_fragments;
   (*Inutile de calculer le moment des projectiles, explosions ou fumée, comme leur rotation n'a aucune importance*)
 
   (*On calcule la friction et friction angulaire des objets pour lesquels ça peut avoir un intérêt*)
-  friction_objet etat.ref_ship;
-  friction_moment_objet etat.ref_ship;
+    friction_objet etat.ref_ship;
+    friction_moment_objet etat.ref_ship;
 
     etat.ref_toosmall <- (List.append (List.filter too_small etat.ref_objets) etat.ref_toosmall);
     etat.ref_objets <- (List.filter big_enough etat.ref_objets);
@@ -986,30 +1017,80 @@ let etat_suivant ref_etat =
     etat.ref_toosmall <- List.filter checkspawn_objet (List.append etat.ref_toosmall_oos etat.ref_toosmall);
     etat.ref_toosmall_oos <- (List.filter checknotspawn_objet (List.append etat.ref_toosmall_oos togoout));
 
-  if not !pause then (
-    for x = 0 to width_collision_table-1 do
-        for y = 0 to height_collision_table-1 do
+    let togoout = List.filter checknotspawn_objet etat.ref_objets in
+    etat.ref_objets <- List.filter checkspawn_objet (List.append etat.ref_objets_oos etat.ref_objets);
+    etat.ref_objets_oos <- (List.filter checknotspawn_objet (List.append etat.ref_objets_oos togoout));
+
+
+if not !pause then (
+    let temptime = Unix.gettimeofday() in
+    let objets_ref = etat.ref_ship :: (List.append (List.append etat.ref_explosions etat.ref_objets) (List.append etat.ref_toosmall etat.ref_objets_oos)) in
+    for i=0 to height_collision_table*width_collision_table -1 do
+      Array.set collision_table i [];
+      done;
+    rev_filtertable objets_ref collision_table;
+
+    (*
+    for x = width_collision_table/3 to 2*width_collision_table/3 -1 do
+        for y = height_collision_table/3 to 2*height_collision_table/3-1 do
             Array.set collision_table (x*height_collision_table+y) (filtertable
-                (etat.ref_ship :: etat.ref_objets)
+                (List.append (List.append etat.ref_explosions etat.ref_objets) etat.ref_toosmall)
                     (float_of_int x) (float_of_int y));
         done;
+    done; *)
+    print_endline("time_constru : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+(*
+    let temptime = Unix.gettimeofday() in
+    for x = 0 to width_collision_table-1 do
+
+        if (x<width_collision_table/3 || x > 2*width_collision_table/3 -1) then (
+        for y = 0 to height_collision_table-1 do
+            if (y<height_collision_table/3 || y > 2*height_collision_table/3 -1)
+            then (
+            Array.set collision_table_oos (x*height_collision_table+y) (filtertable
+                (etat.ref_objets_oos)
+                    (float_of_int x) (float_of_int y));
+            );
+        done;
+        );
     done;
+    print_endline("time_constru_oos : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms"); *)
 
+    let temptime = Unix.gettimeofday() in
     Array.iter calculate_collisions_objets collision_table;
+    for x = 0 to width_collision_table-2 do
+        for y = 0 to height_collision_table-2 do
+        calculate_collisions_listes_objets (Array.get collision_table (x*height_collision_table+y)) (Array.get collision_table (x*height_collision_table+y+1)) false;
+        calculate_collisions_listes_objets (Array.get collision_table (x*height_collision_table+y)) (Array.get collision_table ((x+1)*height_collision_table+y)) false;
+        calculate_collisions_listes_objets (Array.get collision_table (x*height_collision_table+y)) (Array.get collision_table ((x+1)*height_collision_table+y+1)) false;
+        done;
+   done;
 
-    (*Collisions with objects already calculated*)
+    print_endline("time_collisions : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+
+    let temptime = Unix.gettimeofday() in(*
+    Array.iter calculate_collisions_objets collision_table_oos;
+    print_endline("time_collisions_oos : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms"); *)
+(*
+    let temptime = Unix.gettimeofday() in
+
+    calculate_collisions_objet etat.ref_ship etat.ref_objets true;
     calculate_collisions_objet etat.ref_ship etat.ref_fragments false;
     calculate_collisions_objet etat.ref_ship etat.ref_toosmall false;
 
-    calculate_collisions_listes_objets etat.ref_toosmall etat.ref_objets false;
+    calculate_collisions_listes_objets etat.ref_toosmall etat.ref_objets false; *)
 
     calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets false;
     calculate_collisions_listes_objets etat.ref_projectiles etat.ref_fragments false;
     calculate_collisions_listes_objets etat.ref_projectiles etat.ref_toosmall false;
 
+(*
     calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets false;
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_fragments false;
     calculate_collisions_listes_objets etat.ref_explosions etat.ref_toosmall false;
+    calculate_collisions_listes_objets etat.ref_explosions etat.ref_fragments false;*)
+
+    print_endline("other collisions : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+    print_endline("");
 
     List.iter decay_smoke etat.ref_smoke;
     if !smoke then etat.ref_smoke <- List.append etat.ref_smoke etat.ref_explosions else etat.ref_smoke <- [];
@@ -1017,7 +1098,6 @@ let etat_suivant ref_etat =
     etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
     etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_toosmall));
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments));
-
     ref_etat := etat;
 
 );
@@ -1083,14 +1163,12 @@ let etat_suivant ref_etat =
       space_color_goal := saturate (intensify new_col 10.) space_saturation;
       star_color_goal := saturate (intensify new_col 100.) star_saturation );
 
-    etat.ref_objets <- (ref (spawn_random_asteroid etat.stage)) :: etat.ref_objets;
+    etat.ref_objets_oos <- (ref (spawn_random_asteroid etat.stage)) :: etat.ref_objets_oos;
     current_stage_asteroids := !current_stage_asteroids + 1
   );
   time_since_last_spawn := !time_since_last_spawn +. (!time_current_frame -. !time_last_frame) *. !game_speed;
 
-    List.iter recenter_objet etat.ref_objets;
-    (*toosmall are in the screen*)
-    List.iter recenter_objet etat.ref_toosmall;
+    List.iter recenter_objet etat.ref_objets_oos;
     List.iter recenter_objet etat.ref_toosmall_oos;
     List.iter recenter_objet etat.ref_fragments;
 

@@ -120,8 +120,8 @@ let ratio_rendu = ref (sqrt ((float_of_int width) *. (float_of_int height) /. (g
 let phys_width = ref (float_of_int width /. !ratio_rendu)
 let phys_height = ref (float_of_int height /. !ratio_rendu)
 
-let width_collision_table = 9
-let height_collision_table = 6
+let width_collision_table = 15
+let height_collision_table = 9
 
 
 (******************************************************************************)
@@ -196,7 +196,7 @@ let asteroid_polygon_max = 1.3 (*En ratio du rayon*)
 let asteroid_min_nb = 2
 let asteroid_stage_nb = 1
 let asteroid_min_size = 200.
-let time_spawn_asteroid = 5. (*secondes*)
+let time_spawn_asteroid = 1. (*secondes*)
 let current_stage_asteroids = ref 3
 let time_since_last_spawn = ref 9.5
 (*Paramètres pour rapprocher l'air de rien les objets trop lointains (plus utilisé)*)
@@ -210,7 +210,7 @@ let fragment_max_size = 0.6 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_size = 0.3 (*En ratio de la taille de l'astéroïde parent*)
 let fragment_min_exposure = 0.666 (*Pour les variations relative de luminosité par rapport à l'astéroïde parent*)
 let fragment_max_exposure = 1.5 (*On ne met pas 2, pour qu'en moyenne, les astéroïdes deviennent plus sombres en rétrécissant*)
-let fragment_number = 5
+let fragment_number = 10
 let fragment_min_repulsion = 10.
 let fragment_min_bounce = 5.
 let chunk_max_size = 50.
