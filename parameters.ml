@@ -195,7 +195,7 @@ let asteroid_polygon_max = 1.3 (*En ratio du rayon*)
 (*Contrôle du nombre d'astéroïde apparaissant à chaque vague*)
 let asteroid_min_nb = 2
 let asteroid_stage_nb = 1
-let asteroid_min_size = 200.
+let asteroid_min_size = 250.
 let time_spawn_asteroid = 1. (*secondes*)
 let current_stage_asteroids = ref 3
 let time_since_last_spawn = ref 9.5

@@ -11,7 +11,10 @@ let even_frame = ref true
 let evener_frame = ref true (*change toutes les 2 frames*)
 let nb_collision_checked = ref 0
 
-let collision_table = Array.make (width_collision_table*height_collision_table) []
+let collision_table=         Array.make (width_collision_table*height_collision_table) []
+let collision_table_toosmall=Array.make (width_collision_table*height_collision_table) []
+let collision_table_other=   Array.make (width_collision_table*height_collision_table) []
+let collision_table_frag=    Array.make (width_collision_table*height_collision_table) []
 
 type etat = {
   mutable buttons : buttonboolean list;
@@ -411,8 +414,8 @@ match ref_objets with
     let (xint, yint) = ((int_of_float x2), (int_of_float y2)) in
     if (x2 < 0. ||y2 < 0.|| x2 >= (float_of_int width_collision_table) || y2 >= (float_of_int height_collision_table))
     then (
-      print_endline("Object out of table : ");
-      print_endline((string_of_float x2) ^ "/" ^ (string_of_int width_collision_table) ^ ", " ^ (string_of_float y2) ^ "/" ^ (string_of_int height_collision_table));
+      (* print_endline("Object out of table : ");
+      print_endline((string_of_float x2) ^ "/" ^ (string_of_int width_collision_table) ^ ", " ^ (string_of_float y2) ^ "/" ^ (string_of_int height_collision_table)); *)
     )else (
       let already_in_table = Array.get collision_table (xint*height_collision_table+yint) in
       Array.set collision_table (xint*height_collision_table+yint) (hd :: already_in_table);
@@ -608,6 +611,20 @@ let rec calculate_collisions_listes_objets ref_objets1 ref_objets2 precis =
 if ref_objets1 = [] || ref_objets2 = [] then () else (
   calculate_collisions_objet (List.hd ref_objets1) ref_objets2 precis;
   calculate_collisions_listes_objets (List.tl ref_objets1) ref_objets2 precis)
+
+let calculate_collision_tables tab1 tab2 extend =
+   for x = 0 to width_collision_table-2 do
+      for y = 0 to height_collision_table-2 do
+         let base_xy = x*height_collision_table+y in
+         calculate_collisions_listes_objets (Array.get tab1 base_xy) (Array.get tab2 base_xy) false;
+         if(extend)then(
+            let offset_x = height_collision_table and offset_y = 1 in
+            calculate_collisions_listes_objets (Array.get tab1 base_xy) (Array.get tab2 (base_xy+offset_y)) false;
+            calculate_collisions_listes_objets (Array.get tab1 base_xy) (Array.get tab2 (base_xy+offset_x)) false;
+            calculate_collisions_listes_objets (Array.get tab1 base_xy) (Array.get tab2 (base_xy+offset_x+offset_y)) false;
+         );
+      done;
+   done;;
 
 (*Petite fonction de déplacement d'objet exprès pour les modulos*)
 (*Car la fonction de déplacement standard dépend de Δt*)
@@ -1024,72 +1041,35 @@ let etat_suivant ref_etat =
 
 if not !pause then (
     let temptime = Unix.gettimeofday() in
-    let objets_ref = etat.ref_ship :: (List.append (List.append etat.ref_explosions etat.ref_objets) (List.append etat.ref_toosmall etat.ref_objets_oos)) in
+    let objets_ref = List.append etat.ref_objets etat.ref_objets_oos
+    and toosmall_ref = List.append etat.ref_toosmall etat.ref_toosmall_oos
+    and other_ref = etat.ref_ship :: (List.append etat.ref_explosions etat.ref_projectiles)
+    in
     for i=0 to height_collision_table*width_collision_table -1 do
       Array.set collision_table i [];
+      Array.set collision_table_toosmall i [];
+      Array.set collision_table_other i [];
+      Array.set collision_table_frag i [];
       done;
     rev_filtertable objets_ref collision_table;
-
-    (*
-    for x = width_collision_table/3 to 2*width_collision_table/3 -1 do
-        for y = height_collision_table/3 to 2*height_collision_table/3-1 do
-            Array.set collision_table (x*height_collision_table+y) (filtertable
-                (List.append (List.append etat.ref_explosions etat.ref_objets) etat.ref_toosmall)
-                    (float_of_int x) (float_of_int y));
-        done;
-    done; *)
-    print_endline("time_constru : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
-(*
-    let temptime = Unix.gettimeofday() in
-    for x = 0 to width_collision_table-1 do
-
-        if (x<width_collision_table/3 || x > 2*width_collision_table/3 -1) then (
-        for y = 0 to height_collision_table-1 do
-            if (y<height_collision_table/3 || y > 2*height_collision_table/3 -1)
-            then (
-            Array.set collision_table_oos (x*height_collision_table+y) (filtertable
-                (etat.ref_objets_oos)
-                    (float_of_int x) (float_of_int y));
-            );
-        done;
-        );
-    done;
-    print_endline("time_constru_oos : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms"); *)
+    rev_filtertable toosmall_ref collision_table_toosmall;
+    rev_filtertable other_ref collision_table_other;
+    rev_filtertable etat.ref_fragments collision_table_frag;
+    print_endline("time constru : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
     let temptime = Unix.gettimeofday() in
-    Array.iter calculate_collisions_objets collision_table;
-    for x = 0 to width_collision_table-2 do
-        for y = 0 to height_collision_table-2 do
-        calculate_collisions_listes_objets (Array.get collision_table (x*height_collision_table+y)) (Array.get collision_table (x*height_collision_table+y+1)) false;
-        calculate_collisions_listes_objets (Array.get collision_table (x*height_collision_table+y)) (Array.get collision_table ((x+1)*height_collision_table+y)) false;
-        calculate_collisions_listes_objets (Array.get collision_table (x*height_collision_table+y)) (Array.get collision_table ((x+1)*height_collision_table+y+1)) false;
-        done;
-   done;
-
-    print_endline("time_collisions : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
-
-    let temptime = Unix.gettimeofday() in(*
-    Array.iter calculate_collisions_objets collision_table_oos;
-    print_endline("time_collisions_oos : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms"); *)
-(*
+    calculate_collision_tables collision_table collision_table true;
+    print_endline("time coll objets: " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
     let temptime = Unix.gettimeofday() in
+    calculate_collision_tables collision_table_toosmall collision_table true;
+    print_endline("time coll toosmall : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+    let temptime = Unix.gettimeofday() in
+    (* calculate_collision_tables collision_table collision_table_frag true; *)
+    print_endline("time coll frag : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+    let temptime = Unix.gettimeofday() in
+    calculate_collision_tables collision_table_other collision_table true;
+    print_endline("time coll other : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
-    calculate_collisions_objet etat.ref_ship etat.ref_objets true;
-    calculate_collisions_objet etat.ref_ship etat.ref_fragments false;
-    calculate_collisions_objet etat.ref_ship etat.ref_toosmall false;
-
-    calculate_collisions_listes_objets etat.ref_toosmall etat.ref_objets false; *)
-
-    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_objets false;
-    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_fragments false;
-    calculate_collisions_listes_objets etat.ref_projectiles etat.ref_toosmall false;
-
-(*
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_objets false;
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_toosmall false;
-    calculate_collisions_listes_objets etat.ref_explosions etat.ref_fragments false;*)
-
-    print_endline("other collisions : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
     print_endline("");
 
     List.iter decay_smoke etat.ref_smoke;
