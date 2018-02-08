@@ -42,17 +42,13 @@ type objet_physique = {
 
   mutable last_position : (float*float);(*Sert à stocker l'emplacement précédent pour calcul correct du motion blur*)
   mutable position : (float*float);(*En pixels non entiers*)
-  (*On stocke l'inertie en tuples, les calculs sont plus simples que direction + vitesse, aussi bien pour l'humain que pour la machine.*)
   mutable velocity : (float*float);(*En pixels.s⁻¹*)
-  half_stop : float;(*Friction en temps de demi arrêt*)
 
   (*orientation en radians, moment en radians.s⁻¹*)
   mutable orientation : float;
   mutable moment : float;
-  half_stop_rotat : float;(*Friction angulaire, en temps de demi-arrêt*)
 
   mutable proper_time : float;
-
   mutable hdr_exposure : float;
 }
 
@@ -139,12 +135,9 @@ let spawn_ship () = {
     last_position = (!phys_width /. 2., !phys_height /. 2.);
     position = (!phys_width /. 2., !phys_height /. 2.);
     velocity = (0.,0.);
-    half_stop = ship_half_stop;
 
     orientation = pi /. 2.;
     moment = 0.;
-    half_stop_rotat = ship_half_stop_rotat;
-    (*C'est ici que l'on détermine la forme du vaisseau. *)
 
     proper_time = 1.;
     hdr_exposure = 1.;
@@ -178,11 +171,9 @@ let spawn_projectile position velocity = {
     last_position = position;
     position = position;
     velocity = velocity;
-    half_stop = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
 
     orientation = 0.;
     moment = 0.;
-    half_stop_rotat = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
 
     proper_time = 1.;
     hdr_exposure = 4.;
@@ -226,11 +217,9 @@ let rec spawn_n_projectiles ship n =
       last_position = position;
       position = position;
       velocity = velocity;
-      half_stop = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
 
       orientation = 0.;
       moment = 0.;
-      half_stop_rotat = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
 
       proper_time = 1.;
       hdr_exposure = 4.;
@@ -277,10 +266,8 @@ let spawn_explosion ref_projectile =
   position = !ref_projectile.position;
   (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
-  half_stop = 0.;
   orientation = 0.;
   moment = 0.;
-  half_stop_rotat = 0.;
 
   proper_time = 1.;
   hdr_exposure = 1.;
@@ -317,10 +304,8 @@ let spawn_explosion_object ref_objet =
   position = !ref_objet.position;
   (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
-  half_stop = 0.;
   orientation = 0.;
   moment = 0.;
-  half_stop_rotat = 0.;
 
   proper_time = 1.;
 (*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
@@ -361,10 +346,8 @@ let spawn_explosion_death ref_ship elapsed_time =
   position = !ref_ship.position;
   (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
-  half_stop = 0.;
   orientation = 0.;
   moment = 0.;
-  half_stop_rotat = 0.;
 
   proper_time = 1.;
   hdr_exposure = 1.;
@@ -374,7 +357,7 @@ let spawn_explosion_death ref_ship elapsed_time =
 let spawn_explosion_chunk ref_objet =
   let rad = explosion_ratio_radius *. !ref_objet.visuals.radius in (*On récupère le rayon de l'objet*)
   if !flashes then add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color flashes_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
-  if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_explosions;
+  (* if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_explosions; *)
   ref {
   objet = Explosion;
   visuals = {
@@ -400,10 +383,8 @@ let spawn_explosion_chunk ref_objet =
   position = !ref_objet.position;
   (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
-  half_stop = 0.;
   orientation = 0.;
   moment = 0.;
-  half_stop_rotat = 0.;
 
   proper_time = 1.;
 (*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
@@ -436,10 +417,8 @@ let spawn_muzzle ref_projectile = ref {
   last_position = !ref_projectile.position;
   position = !ref_projectile.position;
   velocity = multuple !ref_projectile.velocity muzzle_ratio_speed;
-  half_stop = 0.;
   orientation = 0.;
   moment = 0.;
-  half_stop_rotat = 0.;
 
   proper_time = 1.;
   hdr_exposure = explosion_min_exposure +. (Random.float (explosion_max_exposure -. explosion_min_exposure));
@@ -471,10 +450,8 @@ let spawn_fire ref_ship = ref {
   last_position = !ref_ship.position;
   position = addtuple !ref_ship.position (polar_to_affine (!ref_ship.orientation +. pi) !ref_ship.hitbox.int_radius);
   velocity = addtuple !ref_ship.velocity (addtuple (polar_to_affine (!ref_ship.orientation +. pi) (fire_min_speed +. (Random.float (fire_max_speed -. fire_min_speed)))) (polar_to_affine (Random.float 2. *. pi) (Random.float fire_max_random)));
-  half_stop = 0.;
   orientation = 0.;
   moment = 0.;
-  half_stop_rotat = 0.;
 
   proper_time = 1.;
   hdr_exposure = explosion_min_exposure +. (Random.float (explosion_max_exposure -. explosion_min_exposure));
@@ -521,10 +498,8 @@ let spawn_asteroid (x, y) (dx, dy) radius =
   last_position = (x,y);
   position = (x, y);
   velocity = (dx, dy);
-  half_stop = ~-. 1.;(*On le définit en négatif pour l'ignorer lors du calcul*)
   orientation = Random.float (2. *. pi);
   moment = Random.float (2. *. asteroid_max_moment) -. asteroid_max_moment ;
-  half_stop_rotat = ~-.1.;(*On le définit négatif pour l'ignorer lors du calcul*)
 
   proper_time = 1.;
   hdr_exposure = 1.;

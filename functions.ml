@@ -54,6 +54,7 @@ let dither_radius fl = if dither_aa then int_of_float (fl -. 0.5 +. Random.float
 (*Permet un dithering suivant le dithering global sur un tuple. Permet une meilleure consistance visuelle entre éléments «ditherés»*)
 let dither_tuple (x,y) = if dither_aa then inttuple (addtuple !current_jitter_double (x,y)) else inttuple (x,y)
 
+
 (*Permet l'addition de deux tuples, en poundérant le second par le ratio*)
 let proj tuple1 tuple2 ratio = addtuple tuple1 (multuple tuple2 ratio)
 
@@ -75,7 +76,7 @@ let distancecarre (x1, y1) (x2, y2) = carre (x2 -. x1) +. carre (y2 -. y1)
 
 let modulo_float value modulo = if value < 0. then value +. modulo else if value >= modulo then value -. modulo else value
 
-(*Modulo pour le recentrage des asteroïdes*)
+(*Modulo pour le recentrage des étoiles*)
 let modulo_reso (x, y) = (modulo_float x !phys_width, modulo_float y !phys_height)
 
 (*Modulo pour le recentrage des objets hors de l'écran.
@@ -84,3 +85,6 @@ On considère une surface de 3x3 la surface de jeu.*)
 let modulo_3reso (x, y) =
   ((modulo_float (x +. !phys_width ) (!phys_width  *. 3.)) -. !phys_width,
    (modulo_float (y +. !phys_height) (!phys_height *. 3.)) -. !phys_height)
+
+
+let diff l1 l2 = List.filter (fun x -> not (List.mem x l2)) l1

@@ -321,16 +321,6 @@ let inertie_objet ref_objet = deplac_objet ref_objet (!ref_objet).velocity
 let inertie_objets ref_objets =
 List.iter inertie_objet ref_objets (*TODO laisser tomber cette fonction, l'écrire direct telle-quelle dans la boucle de jeu.*)
 
-let friction_objet ref_objet =
-  let objet = !ref_objet in
-  objet.velocity <- multuple objet.velocity (exp_decay 1. objet.half_stop);
-  ref_objet:=objet
-
-let friction_moment_objet ref_objet =
-  let objet = !ref_objet in
-  objet.moment <- exp_decay objet.moment objet.half_stop_rotat;
-  ref_objet:=objet
-
 (*On calcule l'inertie en rotation des objets*)
 let moment_objet ref_objet = rotat_objet ref_objet (!ref_objet).moment
 
@@ -366,7 +356,13 @@ let phys_damage ref_objet damage =
   ref_objet := objet
 
 let is_alive ref_objet = !ref_objet.health >= 0.
-let is_dead ref_objet = !ref_objet.health <0.
+let is_dead ref_objet = !ref_objet.health < 0.
+
+(*Fonction permettant de spawner un nombre de fragments d'astéroïde*)
+let rec spawn_n_frags ref_source ref_dest n =
+   if n=0 then ref_dest
+   else List.append (spawn_n_frags ref_source ref_dest (n-1)) (List.map frag_asteroid (List.filter is_dead ref_source))
+
 (*Vérifie si un objet dépasse potentiellement dans l'écran*)
 let checkspawn_objet ref_objet_unspawned =
   let objet = !ref_objet_unspawned in
@@ -408,13 +404,13 @@ match ref_objets with
 | hd::tl ->
     let objet = !hd in
     let (x1, y1) = (addtuple objet.position (!phys_width, !phys_height)) in
-    let (x2, y2) =
+    let (x2, y2) = addtuple !current_jitter_coll_table
       ((float_of_int width_collision_table) *. x1 /. (3. *. !phys_width),
        (float_of_int height_collision_table) *. y1 /. (3. *. !phys_height)) in
     let (xint, yint) = ((int_of_float x2), (int_of_float y2)) in
     if (x2 < 0. ||y2 < 0.|| x2 >= (float_of_int width_collision_table) || y2 >= (float_of_int height_collision_table))
     then (
-      (* print_endline("Object out of table : ");
+       (* print_endline("Object out of table : ");
       print_endline((string_of_float x2) ^ "/" ^ (string_of_int width_collision_table) ^ ", " ^ (string_of_float y2) ^ "/" ^ (string_of_int height_collision_table)); *)
     )else (
       let already_in_table = Array.get collision_table (xint*height_collision_table+yint) in
@@ -428,40 +424,42 @@ let rec center_of_attention ref_objets pos =
   | [] -> (0.,0.)
   | hd::tl ->
     let rel_pos = (soustuple (!hd).position pos) in
-      addtuple (multuple (soustuple (!hd).position (!phys_width /. 2., !phys_height /. 2.)) ((!hd).mass /. (5. +. (distancecarre rel_pos (0.,0.)))))  (center_of_attention tl pos)
+      addtuple (multuple (soustuple (!hd).position (!phys_width /. 2., !phys_height /. 2.)) ((!hd).mass /. (10. +. (distancecarre rel_pos (0.,0.)))))  (center_of_attention tl pos)
 
 (*Fonction despawnant les objets trop lointains et morts, ou avec rayon négatif*)
 let despawn ref_etat =
     let etat = !ref_etat in
 
-    List.iter decay_chunk etat.ref_chunks;
-    List.iter decay_chunk_explo etat.ref_chunks_explo;
-    etat.ref_chunks <- (List.append etat.ref_chunks
-        (List.filter ischunk etat.ref_objets));
-    etat.ref_chunks <- (List.append etat.ref_chunks
-        (List.filter ischunk etat.ref_toosmall));
+   List.iter decay_chunk etat.ref_chunks;
+   List.iter decay_chunk_explo etat.ref_chunks_explo;
 
-    etat.ref_objets <- (List.filter notchunk etat.ref_objets);
-    etat.ref_objets <- (List.filter is_alive etat.ref_objets);
+   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_objets));
+   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_objets_oos));
+   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_toosmall));
+   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_toosmall_oos));
+   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_fragments));
 
-    etat.ref_objets_oos <- (List.filter notchunk etat.ref_objets_oos);
-    etat.ref_objets_oos <- (List.filter is_alive etat.ref_objets_oos);
+   etat.ref_objets <- (List.filter notchunk etat.ref_objets);
+   etat.ref_objets <- (List.filter is_alive etat.ref_objets);
 
-    etat.ref_toosmall <- (List.filter notchunk etat.ref_toosmall);
-    etat.ref_toosmall <- (List.filter is_alive etat.ref_toosmall);
+   etat.ref_objets_oos <- (List.filter notchunk etat.ref_objets_oos);
+   etat.ref_objets_oos <- (List.filter is_alive etat.ref_objets_oos);
 
-    etat.ref_toosmall_oos <- (List.filter notchunk etat.ref_toosmall_oos);
-    etat.ref_toosmall_oos <- (List.filter is_alive etat.ref_toosmall_oos);
+   etat.ref_toosmall <- (List.filter notchunk etat.ref_toosmall);
+   etat.ref_toosmall <- (List.filter is_alive etat.ref_toosmall);
 
-    etat.ref_fragments <- (List.filter notchunk etat.ref_fragments);
-    etat.ref_fragments <- (List.filter is_alive etat.ref_fragments);
+   etat.ref_toosmall_oos <- (List.filter notchunk etat.ref_toosmall_oos);
+   etat.ref_toosmall_oos <- (List.filter is_alive etat.ref_toosmall_oos);
 
-    etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
-    etat.ref_projectiles <- (List.filter close_enough etat.ref_projectiles);
+   etat.ref_fragments <- (List.filter notchunk etat.ref_fragments);
+   etat.ref_fragments <- (List.filter is_alive etat.ref_fragments);
 
-    etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
-    etat.ref_chunks <- (List.filter positive_radius etat.ref_chunks);
-    etat.ref_chunks_explo <- (List.filter positive_radius etat.ref_chunks_explo);
+   etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
+   etat.ref_projectiles <- (List.filter close_enough_bullet etat.ref_projectiles);
+
+   etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
+   etat.ref_chunks <- (List.filter positive_radius etat.ref_chunks);
+   etat.ref_chunks_explo <- (List.filter positive_radius etat.ref_chunks_explo);
 
   ref_etat := etat
 
@@ -529,12 +527,11 @@ let rec no_collisions_liste ref_objets precis = no_collision_objets_listes ref_o
 La fonction pourrait être améliorée, avec une variable friction sur les objets,
 et transfert entre moment et inertie.*)
 let consequences_collision ref_objet1 ref_objet2 =
-    if !ref_objet2.objet == Explosion then () else
   match !ref_objet1.objet with
   | Explosion -> damage ref_objet2 !ref_objet1.mass (*On applique les dégats de l'explosion*)
   | Projectile -> damage ref_objet1 0.1 (*On endommage le projectile pour qu'il meure*)
   | _ ->  (*Si ce n'est ni une explosion ni un projectile, on calcule les effets de la collision physique*)
-    (let objet1 = !ref_objet1 and objet2 = !ref_objet2 in
+    let objet1 = !ref_objet1 and objet2 = !ref_objet2 in
     let total_mass = objet1.mass +. objet2.mass in
     let moy_velocity = moytuple objet1.velocity objet2.velocity (objet1.mass /. total_mass) in
     let (angle_obj1, dist1) = affine_to_polar (soustuple objet1.position objet2.position) in
@@ -551,13 +548,15 @@ let consequences_collision ref_objet1 ref_objet2 =
     if not !pause then (
     let oldpos1 = objet1.position and oldpos2 = objet2.position in
     let oldvel1 = objet1.velocity and oldvel2 = objet2.velocity in
-    (*Pour éloigner les objets intriqués*)
-    objet1.position <- addtuple oldpos1 (polar_to_affine angle_obj1 min_repulsion);
-    objet2.position <- addtuple oldpos2 (polar_to_affine angle_obj2 min_repulsion);
+    let elapsed_time = !time_current_frame -. !time_last_frame in
 
     (*Pour éloigner les objets intriqués*)
-    objet1.velocity <- addtuple oldvel1 (polar_to_affine angle_obj1 min_bounce);
-    objet2.velocity <- addtuple oldvel2 (polar_to_affine angle_obj2 min_bounce));
+    objet1.position <- addtuple oldpos1 (polar_to_affine angle_obj1 (min_repulsion *. elapsed_time));
+    objet2.position <- addtuple oldpos2 (polar_to_affine angle_obj2 (min_repulsion *. elapsed_time));
+
+    (*Pour éloigner les objets intriqués*)
+    objet1.velocity <- addtuple oldvel1 (polar_to_affine angle_obj1 (min_bounce *. elapsed_time));
+    objet2.velocity <- addtuple oldvel2 (polar_to_affine angle_obj2 (min_bounce *. elapsed_time));
 
     (*Changement de velocité subi par l'objet*)
     let g1 = hypothenuse (soustuple old_vel1 objet1.velocity) in
@@ -577,23 +576,27 @@ let consequences_collision_frags ref_frag1 ref_frag2 =
   let (angle_obj2, dist2) = affine_to_polar (soustuple frag2.position frag1.position) in
   let oldpos1 = frag1.position and oldpos2 = frag2.position in
   let oldvel1 = frag1.velocity and oldvel2 = frag2.velocity in
-    frag1.position <- addtuple oldpos1 (polar_to_affine angle_obj1 fragment_min_repulsion);
-    frag2.position <- addtuple oldpos2 (polar_to_affine angle_obj2 fragment_min_repulsion);
-    frag1.velocity <- addtuple oldvel1 (polar_to_affine angle_obj1 fragment_min_bounce);
-    frag2.velocity <- addtuple oldvel2 (polar_to_affine angle_obj2 fragment_min_bounce);
+  let elapsed_time = !time_current_frame -. !time_last_frame in
+    frag1.position <- addtuple oldpos1 (polar_to_affine angle_obj1 (elapsed_time *. fragment_min_repulsion));
+    frag2.position <- addtuple oldpos2 (polar_to_affine angle_obj2 (elapsed_time *. fragment_min_repulsion));
+    frag1.velocity <- addtuple oldvel1 (polar_to_affine angle_obj1 (elapsed_time *. fragment_min_bounce));
+    frag2.velocity <- addtuple oldvel2 (polar_to_affine angle_obj2 (elapsed_time *. fragment_min_bounce));
   ref_frag1 := frag1;
-  ref_frag2 := frag2;
-  ()
+  ref_frag2 := frag2
 
 let rec calculate_collisions_fragvfrags ref_frag ref_frags =
   match ref_frags with
-  | [] -> ()
-  | hd::tl -> (consequences_collision_frags ref_frag hd)
+  | [] -> []
+  | hd::tl -> if (collision !ref_frag !hd false)
+      then (consequences_collision_frags ref_frag hd;ref_frag::[hd])
+      else (calculate_collisions_fragvfrags ref_frag tl);;
 
 let rec calculate_collisions_frags ref_frags =
   match ref_frags with
-  | [] -> ()
-  | hd::tl -> (calculate_collisions_fragvfrags hd tl; calculate_collisions_frags tl)
+  | [] -> []
+  | hd::tl ->
+      let colliding = calculate_collisions_fragvfrags hd tl in
+      List.append colliding (calculate_collisions_frags (diff tl colliding))
 
 (*Fonction vérifiant la collision entre un objet et les autres objets
 et appliquant les effets de collision*)
@@ -613,18 +616,23 @@ if ref_objets1 = [] || ref_objets2 = [] then () else (
   calculate_collisions_listes_objets (List.tl ref_objets1) ref_objets2 precis)
 
 let calculate_collision_tables tab1 tab2 extend =
-   for x = 0 to width_collision_table-2 do
-      for y = 0 to height_collision_table-2 do
-         let base_xy = x*height_collision_table+y in
-         calculate_collisions_listes_objets (Array.get tab1 base_xy) (Array.get tab2 base_xy) false;
-         if(extend)then(
+   for x = 0 to width_collision_table-1 do
+      for y = 0 to height_collision_table-1 do
+         calculate_collisions_listes_objets (Array.get tab1 (x*height_collision_table+y)) (Array.get tab2 (x*height_collision_table+y)) true;
+      done;
+   done;
+
+   if(extend)then(
+      for x = 0 to width_collision_table-2 do
+         for y = 0 to height_collision_table-2 do
+            let base_xy = x*height_collision_table+y in
             let offset_x = height_collision_table and offset_y = 1 in
             calculate_collisions_listes_objets (Array.get tab1 base_xy) (Array.get tab2 (base_xy+offset_y)) false;
             calculate_collisions_listes_objets (Array.get tab1 base_xy) (Array.get tab2 (base_xy+offset_x)) false;
             calculate_collisions_listes_objets (Array.get tab1 base_xy) (Array.get tab2 (base_xy+offset_x+offset_y)) false;
-         );
+         done;
       done;
-   done;;
+   );;
 
 (*Petite fonction de déplacement d'objet exprès pour les modulos*)
 (*Car la fonction de déplacement standard dépend de Δt*)
@@ -835,10 +843,12 @@ let affiche_hud ref_etat =
     moveto 20 200;
     draw_string ("TooSmall oos : " ^ string_of_int (List.length etat.ref_toosmall_oos));
     moveto 20 180;
-    draw_string ("Chunks explo : " ^ string_of_int (List.length etat.ref_chunks_explo));
+    draw_string ("frags        : " ^ string_of_int (List.length etat.ref_fragments));
     moveto 20 160;
-    draw_string ("Projectiles :  " ^ string_of_int (List.length etat.ref_projectiles));
+    draw_string ("Chunks explo : " ^ string_of_int (List.length etat.ref_chunks_explo));
     moveto 20 140;
+    draw_string ("Projectiles :  " ^ string_of_int (List.length etat.ref_projectiles));
+    moveto 20 120;
     draw_string ("Explosions :   " ^ string_of_int (List.length etat.ref_explosions));
 
     moveto 20 100;
@@ -878,9 +888,10 @@ let affiche_hud ref_etat =
 
 
 let affiche_etat ref_etat =
-  let etat = !ref_etat in
-  (*On actualise la caméra en fonction du vaisseau.
-  Dans les faits on bouge les objets, mais tous de la même valeur donc pas de réel impact*)
+   let temptime = Unix.gettimeofday() in
+   let etat = !ref_etat in
+   (*On actualise la caméra en fonction du vaisseau.
+   Dans les faits on bouge les objets, mais tous de la même valeur donc pas de réel impact*)
     (*On calcule les déplacements de la caméra pour le rendu de caméra dynamique*)
     let ship = !(etat.ref_ship) in
     let (next_x, next_y) =
@@ -898,29 +909,33 @@ let affiche_etat ref_etat =
 
   let (movex, movey) = move_camera in
   let (x, y) = ship.position in
-  let move_camera = (
-    (if x +. movex < camera_start_bound *. !phys_width
-      then movex -. camera_max_force *. elapsed_time *. ( ~-. x -. movex +. camera_start_bound *. !phys_width)
-    else if x +. movex > (1. -. camera_start_bound) *. !phys_width
-      then movex -. camera_max_force *. elapsed_time *. ( ~-. x -. movex +. (1. -. camera_start_bound) *. !phys_width)
-    else movex),
-    (if y +. movey < camera_start_bound *. !phys_height
-      then movey -. camera_max_force *. elapsed_time *. ( ~-. y -. movey +. camera_start_bound *. !phys_height)
-    else if y +. movey > (1. -. camera_start_bound) *. !phys_height
-      then movey -. camera_max_force *. elapsed_time *. ( ~-. y -. movey +. (1. -. camera_start_bound) *. !phys_height)
-    else movey)) in
 
-    if not !pause then ignore (deplac_stars etat.ref_stars move_camera);
-    deplac_objet_abso etat.ref_ship move_camera;
-    deplac_objets_abso etat.ref_objets move_camera;
-    deplac_objets_abso etat.ref_toosmall move_camera;
-    deplac_objets_abso etat.ref_toosmall_oos move_camera;
-    deplac_objets_abso etat.ref_fragments move_camera;
-    deplac_objets_abso etat.ref_chunks move_camera;
-    deplac_objets_abso etat.ref_chunks_explo move_camera;
-    deplac_objets_abso etat.ref_projectiles move_camera;
-    deplac_objets_abso etat.ref_explosions move_camera;
-    deplac_objets_abso etat.ref_smoke move_camera;
+   let move_camera = (
+  (if x +. movex < camera_start_bound *. !phys_width
+   then movex -. camera_max_force *. elapsed_time *. ( ~-. x -. movex +. camera_start_bound *. !phys_width)
+   else if x +. movex > (1. -. camera_start_bound) *. !phys_width
+      then movex -. camera_max_force *. elapsed_time *. ( ~-. x -. movex +. (1. -. camera_start_bound) *. !phys_width)
+      else movex),
+   (if y +. movey < camera_start_bound *. !phys_height
+      then movey -. camera_max_force *. elapsed_time *. ( ~-. y -. movey +. camera_start_bound *. !phys_height)
+      else if y +. movey > (1. -. camera_start_bound) *. !phys_height
+      then movey -. camera_max_force *. elapsed_time *. ( ~-. y -. movey +. (1. -. camera_start_bound) *. !phys_height)
+      else movey)) in
+
+   if not !pause then ignore (deplac_stars etat.ref_stars move_camera);
+   deplac_objet_abso etat.ref_ship move_camera;
+   deplac_objets_abso etat.ref_objets move_camera;
+   deplac_objets_abso etat.ref_objets_oos move_camera;
+   deplac_objets_abso etat.ref_toosmall move_camera;
+   deplac_objets_abso etat.ref_toosmall_oos move_camera;
+   deplac_objets_abso etat.ref_fragments move_camera;
+   deplac_objets_abso etat.ref_chunks move_camera;
+   deplac_objets_abso etat.ref_chunks_explo move_camera;
+   deplac_objets_abso etat.ref_projectiles move_camera;
+   deplac_objets_abso etat.ref_explosions move_camera;
+   deplac_objets_abso etat.ref_smoke move_camera;
+
+   print_endline("time prep_affich : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
   (*Fond d'espace*)
   if !retro then set_color black else set_color (rgb_of_hdr (intensify !space_color !game_exposure));
@@ -932,11 +947,11 @@ let affiche_etat ref_etat =
   List.iter render_objet etat.ref_smoke;
   List.iter render_projectile etat.ref_projectiles;
   render_objet etat.ref_ship;
-  List.iter render_chunk etat.ref_chunks;
   List.iter render_objet etat.ref_fragments;
-  List.iter render_objet etat.ref_objets;
   List.iter render_objet etat.ref_toosmall;
+  List.iter render_objet etat.ref_objets;
   List.iter render_objet etat.ref_explosions;
+  List.iter render_chunk etat.ref_chunks;
 
   affiche_hud ref_etat;
   synchronize ()
@@ -973,6 +988,7 @@ let etat_suivant ref_etat =
 
   (*On calcule le jitter, pour l'appliquer de manière uniforme sur tous les objets et tous les rayons.*)
   current_jitter_double := (Random.float dither_power, Random.float dither_power);
+  current_jitter_coll_table := soustuple (Random.float 1., Random.float 1.) (0.5,0.5);
 
   if not !pause then (
     (*On calcule la puissance du screenshake. Basé sur le temps en jeu. (Sauf si le jeu est en pause, auquel cas on actualise plus)*)
@@ -1023,110 +1039,119 @@ let etat_suivant ref_etat =
   moment_objets etat.ref_fragments;
   (*Inutile de calculer le moment des projectiles, explosions ou fumée, comme leur rotation n'a aucune importance*)
 
-  (*On calcule la friction et friction angulaire des objets pour lesquels ça peut avoir un intérêt*)
-    friction_objet etat.ref_ship;
-    friction_moment_objet etat.ref_ship;
+   let temptime = Unix.gettimeofday() in
 
-    etat.ref_toosmall <- (List.append (List.filter too_small etat.ref_objets) etat.ref_toosmall);
-    etat.ref_objets <- (List.filter big_enough etat.ref_objets);
+   etat.ref_toosmall <- (List.append (List.filter too_small etat.ref_objets) etat.ref_toosmall);
+   etat.ref_objets <- (List.filter big_enough etat.ref_objets);
 
-    let togoout = List.filter checknotspawn_objet etat.ref_toosmall in
-    etat.ref_toosmall <- List.filter checkspawn_objet (List.append etat.ref_toosmall_oos etat.ref_toosmall);
-    etat.ref_toosmall_oos <- (List.filter checknotspawn_objet (List.append etat.ref_toosmall_oos togoout));
+   etat.ref_toosmall <- (List.append (List.filter too_small etat.ref_fragments) etat.ref_toosmall);
+   etat.ref_fragments <- (List.filter big_enough etat.ref_fragments);
 
-    let togoout = List.filter checknotspawn_objet etat.ref_objets in
-    etat.ref_objets <- List.filter checkspawn_objet (List.append etat.ref_objets_oos etat.ref_objets);
-    etat.ref_objets_oos <- (List.filter checknotspawn_objet (List.append etat.ref_objets_oos togoout));
+   let togoout_small = List.filter checknotspawn_objet etat.ref_toosmall in
+   etat.ref_toosmall <- List.filter checkspawn_objet (List.append etat.ref_toosmall_oos etat.ref_toosmall);
+   etat.ref_toosmall_oos <- (List.filter checknotspawn_objet (List.append etat.ref_toosmall_oos togoout_small));
 
+   let togoout = List.filter checknotspawn_objet etat.ref_objets in
+   etat.ref_objets <- List.filter checkspawn_objet (List.append etat.ref_objets_oos etat.ref_objets);
+   etat.ref_objets_oos <- (List.append (List.filter checknotspawn_objet  etat.ref_objets_oos) togoout);
+
+   print_endline("time transferts : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
 if not !pause then (
-    let temptime = Unix.gettimeofday() in
-    let objets_ref = List.append etat.ref_objets etat.ref_objets_oos
-    and toosmall_ref = List.append etat.ref_toosmall etat.ref_toosmall_oos
-    and other_ref = etat.ref_ship :: (List.append etat.ref_explosions etat.ref_projectiles)
-    in
-    for i=0 to height_collision_table*width_collision_table -1 do
+   let temptime = Unix.gettimeofday() in
+   let objets_ref = List.append etat.ref_objets etat.ref_objets_oos
+   and toosmall_ref = List.append etat.ref_toosmall etat.ref_toosmall_oos
+   and other_ref = etat.ref_ship :: (List.append etat.ref_explosions etat.ref_projectiles)
+   in
+   for i=0 to height_collision_table*width_collision_table -1 do
       Array.set collision_table i [];
       Array.set collision_table_toosmall i [];
       Array.set collision_table_other i [];
       Array.set collision_table_frag i [];
-      done;
-    rev_filtertable objets_ref collision_table;
-    rev_filtertable toosmall_ref collision_table_toosmall;
-    rev_filtertable other_ref collision_table_other;
-    rev_filtertable etat.ref_fragments collision_table_frag;
-    print_endline("time constru : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+   done;
 
-    let temptime = Unix.gettimeofday() in
-    calculate_collision_tables collision_table collision_table true;
-    print_endline("time coll objets: " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
-    let temptime = Unix.gettimeofday() in
-    calculate_collision_tables collision_table_toosmall collision_table true;
-    print_endline("time coll toosmall : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
-    let temptime = Unix.gettimeofday() in
-    (* calculate_collision_tables collision_table collision_table_frag true; *)
-    print_endline("time coll frag : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
-    let temptime = Unix.gettimeofday() in
-    calculate_collision_tables collision_table_other collision_table true;
-    print_endline("time coll other : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+   rev_filtertable objets_ref collision_table;
+   rev_filtertable toosmall_ref collision_table_toosmall;
+   rev_filtertable other_ref collision_table_other;
+   rev_filtertable etat.ref_fragments collision_table_frag;
+   print_endline("time constru : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
-    print_endline("");
+   let temptime = Unix.gettimeofday() in
+   calculate_collision_tables collision_table collision_table true;
+   print_endline("time coll objets: " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
-    List.iter decay_smoke etat.ref_smoke;
-    if !smoke then etat.ref_smoke <- List.append etat.ref_smoke etat.ref_explosions else etat.ref_smoke <- [];
-    etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
-    etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
-    etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_object (List.filter is_dead etat.ref_toosmall));
-    etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments));
-    ref_etat := etat;
+   let temptime = Unix.gettimeofday() in
+   calculate_collision_tables collision_table collision_table_toosmall false;
+   print_endline("time coll toosmall : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+
+   let temptime = Unix.gettimeofday() in
+   (* calculate_collision_tables collision_table collision_table_frag true; *)
+   print_endline("time coll frag : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+
+   let temptime = Unix.gettimeofday() in
+   calculate_collision_tables collision_table_other collision_table true;
+   (* calculate_collision_tables collision_table_other collision_table_frag true; *)
+   calculate_collision_tables collision_table_other collision_table_toosmall true;
+   calculate_collision_tables collision_table_other collision_table_frag true;
+   print_endline("time coll other : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+
+   (*On fait apparaitre les fragments des astéroïdes détruits*)
+   etat.ref_fragments <- spawn_n_frags etat.ref_objets etat.ref_fragments fragment_number;
+   (*On fait apparaitre les fragments des toosmall. Ils vont direct dans toosmall, pas d'inter-collisions*)
+   etat.ref_fragments <- spawn_n_frags etat.ref_toosmall etat.ref_fragments fragment_number;
+   (*Pareil pour les fragments déjà cassés*)
+   etat.ref_fragments <- spawn_n_frags etat.ref_fragments etat.ref_fragments fragment_number;
+
+   (*On ralentit le temps selon le nombre d'astéroïde détruits*)
+   (*TODO : Baser le ralentissement de temps non sur la quantité d'astéroïdes détruits et le nombre d'explosions,
+   mais selon les dégats et dégats physiques, comme pour le screenshake.*)
+   let nb_destroyed =
+     List.length (List.filter is_dead etat.ref_objets)
+   + List.length (List.filter is_dead etat.ref_fragments)
+   in
+   game_speed := !game_speed *. ratio_time_destr_asteroid ** (float_of_int nb_destroyed);
+   etat.score <- etat.score + nb_destroyed; (*TODO meilleure version du score avec multiplicateurs*)
+   shake_score := (exp_decay !shake_score shake_score_half_life) +. shake_score_ratio *. (float_of_int nb_destroyed);
+
+   if !chunks then etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_fragments));
+   etat.ref_fragments <- (List.filter notchunk etat.ref_fragments); (*Éviter de détruire les perfs avec des fragments minuscules*)
+
+
+   List.iter decay_smoke etat.ref_smoke;
+   if !smoke then etat.ref_smoke <- List.append etat.ref_smoke etat.ref_explosions else etat.ref_smoke <- [];
+   (* On vire les explosions précédentes *)
+   etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
+   etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
+   etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_toosmall));
+   etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments));
+   ref_etat := etat;
+
+
+   if (is_dead etat.ref_ship)
+   then (etat.ref_explosions <- (spawn_explosion_death etat.ref_ship ((!time_current_frame -. !time_last_frame) *. !game_speed) :: etat.ref_explosions));
+
+   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
+   (* etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_chunk etat.ref_chunks); *)
+
+
 
 );
 
-  (*Les explosions sont ajoutées à la fumée, et la fumée précédente avec decay. Uniquement si smoke = true.*)
-  if not !pause then
-  etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
-  (* etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_chunk etat.ref_chunks); *)
   if !smoke then(
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments)));
 
-  if (is_dead etat.ref_ship) && not !pause
-  then (etat.ref_explosions <- (spawn_explosion_death etat.ref_ship ((!time_current_frame -. !time_last_frame) *. !game_speed) :: etat.ref_explosions));
 
   (*On ralentit le temps selon le nombre d'explosions*)
   game_speed := !game_speed *. ratio_time_explosion ** (float_of_int (List.length etat.ref_explosions));
 
-  (*Fonction permettant de spawner un nombre de fragments d'astéroïde*)
-  let rec spawn_n_frags ref_source ref_dest n = (
-    if n=0 then ref_dest else List.append (spawn_n_frags ref_source ref_dest (n-1)) (List.map frag_asteroid (List.filter is_dead ref_source))
-) in
 
-  (*On fait apparaitre les fragments des astéroïdes détruits*)
-  etat.ref_fragments <- spawn_n_frags etat.ref_objets etat.ref_fragments fragment_number;
-  (*On fait apparaitre les fragments des toosmall*)
-  etat.ref_fragments <- spawn_n_frags etat.ref_toosmall etat.ref_fragments fragment_number;
-  (*Pareil pour les fragments déjà cassés*)
-  etat.ref_fragments <- spawn_n_frags etat.ref_fragments etat.ref_fragments fragment_number;
-
-  (*On ralentit le temps selon le nombre d'astéroïde détruits*)
-  (*TODO : Baser le ralentissement de temps non sur la quantité d'astéroïdes détruits et le nombre d'explosions,
-  mais selon les dégats et dégats physiques, comme pour le screenshake.*)
-  let nb_destroyed =
-    List.length (List.filter is_dead etat.ref_objets)
-  + List.length (List.filter is_dead etat.ref_fragments)
-  in
-  game_speed := !game_speed *. ratio_time_destr_asteroid ** (float_of_int nb_destroyed);
-  etat.score <- etat.score + nb_destroyed; (*TODO meilleure version du score avec multiplicateurs*)
-  shake_score := (exp_decay !shake_score shake_score_half_life) +. shake_score_ratio *. (float_of_int nb_destroyed);
-
-  if !chunks then etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_fragments));
-  etat.ref_fragments <- (List.filter notchunk etat.ref_fragments); (*Éviter de détruire les perfs avec des fragments minuscules*)
-
-    (*On transfère les fragments qui ne sont pas en collision avec les autres dans les objets physiques.*)
-    etat.ref_objets <- List.append (no_collisions_liste etat.ref_fragments true) etat.ref_objets;
-    etat.ref_fragments <- collisions_sein_liste etat.ref_fragments true;
-    (*On repousse et éloigne les fragments les uns des autres*)
-    if not !pause then
-    calculate_collisions_frags etat.ref_fragments;
+  if not !pause then (
+   let temptime = Unix.gettimeofday() in
+   (*On repousse et éloigne les fragments les uns des autres*)
+   let tokeep = calculate_collisions_frags etat.ref_fragments in
+   etat.ref_objets <- List.append etat.ref_objets (diff etat.ref_fragments tokeep);
+   etat.ref_fragments <- tokeep;
+   print_endline("time frags eloigne: " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
   if !time_since_last_spawn > time_spawn_asteroid then (
     time_since_last_spawn := 0.;
@@ -1148,9 +1173,11 @@ if not !pause then (
   );
   time_since_last_spawn := !time_since_last_spawn +. (!time_current_frame -. !time_last_frame) *. !game_speed;
 
-    List.iter recenter_objet etat.ref_objets_oos;
-    List.iter recenter_objet etat.ref_toosmall_oos;
-    List.iter recenter_objet etat.ref_fragments;
+   List.iter recenter_objet etat.ref_objets;
+   List.iter recenter_objet etat.ref_toosmall;
+   List.iter recenter_objet etat.ref_objets_oos;
+   List.iter recenter_objet etat.ref_toosmall_oos;
+   List.iter recenter_objet etat.ref_fragments;
 
   (*On ne recentre pas les projectiles car ils doivent despawner une fois sortis de l'espace de jeu*)
 
@@ -1168,27 +1195,21 @@ if not !pause then (
   etat.ref_ship := ship;
   (*Suppression des objets qu'il faut*)
   despawn ref_etat;
+  );
+  let temptime = Unix.gettimeofday() in
   affiche_etat ref_etat;
-  (*Équivalent bidouillé de sleepf en millisecondes, pour que le programme fonctionne aussi avec les anciennes versions d'Ocaml*)
-  (*TODO trouver pourquoi ça ne marche pas sur les systèmes linux. Penser à le régler avant de le rendre.*)
-  if !locked_framerate then ignore (Unix.select [] [] [] (max 0. ((1. /. framerate_limit) -. elapsed_time)));;
-  (*ne marche pas sur linux*)
-
+  print_endline("time affich : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+  print_endline("")
 
 (* acceleration du vaisseau *)
 let acceleration ref_etat =
   let etat = !ref_etat in
   let orientation = !(etat.ref_ship).orientation in
-if !ship_direct_pos then
-  deplac_objet etat.ref_ship (polar_to_affine orientation ship_max_depl)
-else
-  (*Dans le cas d'un contrôle de la vélocité et non de la position.*)
-  (*C'est à dire en respectant le TP, et c'est bien mieux en terme d'expérience de jeu :) *)
   accel_objet etat.ref_ship (polar_to_affine orientation ship_max_accel);
-(*Feu à l'arrière du vaisseau. Spawne à chaque frame
-plus de frames = plus de particules, pertes de perf = moins de particules.*)
-if !(etat.ref_ship).health > 0. then (let list_fire = [spawn_fire etat.ref_ship;spawn_fire etat.ref_ship] in
-if !smoke then etat.ref_smoke <- etat.ref_smoke @ list_fire;);
+  (*Feu à l'arrière du vaisseau. Spawne à chaque frame
+  plus de frames = plus de particules, pertes de perf = moins de particules.*)
+   if !(etat.ref_ship).health > 0. then (
+   if !smoke then etat.ref_smoke <- etat.ref_smoke @ [spawn_fire etat.ref_ship]);
 ref_etat:=etat;
 etat_suivant ref_etat;;
 

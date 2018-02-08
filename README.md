@@ -24,7 +24,6 @@ Run it with ./asteroids (.exe for windows)
 
 v1.9 - Optimisation update WIP
 
-DONC TAKE THIS VERSION, NOT YET OPTIMISED !
-take the version 1.8 in the archives folder, it has better performances for now.
+There still can be problems
 
 For all changelogs, see changelog.txt
