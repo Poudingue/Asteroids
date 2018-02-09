@@ -28,8 +28,10 @@ Features :
 - Runs a lot smoother, even with a lot of objects, thanks to an other way to optimise collisions calculation
 - Better camera behavior
 - Gameplay tweaks everywhere
+
 Fixed :
 - Objects and fragments bouncing now time-based.
+
 Bugs :
 - Momentum of objects still not taken into account for physics
 - ???
