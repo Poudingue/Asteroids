@@ -24,6 +24,15 @@ Run it with ./asteroids (.exe for windows)
 
 v1.9 - Optimisation update WIP
 
-There still can be problems
+Features :
+- Runs a lot smoother, even with a lot of objects, thanks to an other way to optimise collisions calculation
+- Better camera behavior
+- Gameplay tweaks everywhere
+Fixed :
+- Objects and fragments bouncing now time-based.
+Bugs :
+- Momentum of objects still not taken into account for physics
+- ???
+
 
 For all changelogs, see changelog.txt

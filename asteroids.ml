@@ -457,8 +457,10 @@ let despawn ref_etat =
    etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
    etat.ref_projectiles <- (List.filter close_enough_bullet etat.ref_projectiles);
 
-   etat.ref_smoke <- (List.filter positive_radius etat.ref_smoke);
-   etat.ref_chunks <- (List.filter positive_radius etat.ref_chunks);
+   etat.ref_smoke  <- (List.filter positive_radius  etat.ref_smoke);
+   etat.ref_chunks <- (List.filter positive_radius  etat.ref_chunks);
+   etat.ref_smoke  <- (List.filter checkspawn_objet etat.ref_smoke);
+   etat.ref_chunks <- (List.filter checkspawn_objet etat.ref_chunks);
    etat.ref_chunks_explo <- (List.filter positive_radius etat.ref_chunks_explo);
 
   ref_etat := etat
@@ -787,7 +789,7 @@ let affiche_hud ref_etat =
     set_line_width buttonframewidth; set_color buttonframe;
     draw_poly (Array.of_list (relative_poly[(0.95,0.6);(0.95,0.55);(0.9,0.55);(0.85,0.6)]));
     (*Affichage du score*)
-    set_color (rgb_of_hdr (intensify {r=10000.;v=1000.;b=300.} (1. /. (1. +. 10. *. !shake_score))));
+    set_color (rgb_of_hdr (intensify {r=50000.;v=1000.;b=300.} (1. /. (1. +. 10. *. !shake_score))));
     set_line_width 0;
     render_string ("SCORE " ^ string_of_int etat.score) (*(string_of_int etat.score)*)
       (0.02 *. !phys_width, 0.82 *. !phys_height *. (1. -. (0.05 *. !shake_score *.0.08)))
@@ -945,13 +947,13 @@ let affiche_etat ref_etat =
   set_line_width 0;
 
   List.iter render_objet etat.ref_smoke;
+  List.iter render_chunk etat.ref_chunks;
   List.iter render_projectile etat.ref_projectiles;
   render_objet etat.ref_ship;
   List.iter render_objet etat.ref_fragments;
   List.iter render_objet etat.ref_toosmall;
   List.iter render_objet etat.ref_objets;
   List.iter render_objet etat.ref_explosions;
-  List.iter render_chunk etat.ref_chunks;
 
   affiche_hud ref_etat;
   synchronize ()
@@ -1107,6 +1109,9 @@ if not !pause then (
    mais selon les dégats et dégats physiques, comme pour le screenshake.*)
    let nb_destroyed =
      List.length (List.filter is_dead etat.ref_objets)
+   + List.length (List.filter is_dead etat.ref_objets_oos)
+   + List.length (List.filter is_dead etat.ref_toosmall)
+   + List.length (List.filter is_dead etat.ref_toosmall_oos)
    + List.length (List.filter is_dead etat.ref_fragments)
    in
    game_speed := !game_speed *. ratio_time_destr_asteroid ** (float_of_int nb_destroyed);
@@ -1131,19 +1136,14 @@ if not !pause then (
    then (etat.ref_explosions <- (spawn_explosion_death etat.ref_ship ((!time_current_frame -. !time_last_frame) *. !game_speed) :: etat.ref_explosions));
 
    etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
-   (* etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_chunk etat.ref_chunks); *)
-
-
 
 );
 
   if !smoke then(
     etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments)));
 
-
   (*On ralentit le temps selon le nombre d'explosions*)
   game_speed := !game_speed *. ratio_time_explosion ** (float_of_int (List.length etat.ref_explosions));
-
 
   if not !pause then (
    let temptime = Unix.gettimeofday() in
