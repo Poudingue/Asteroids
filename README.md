@@ -28,11 +28,14 @@ Features :
 - Runs a lot smoother, even with a lot of objects, thanks to an other way to optimise collisions calculation
 - Better camera behavior
 - Gameplay tweaks everywhere
+- Changed pause options
 
 Fixed :
 - Objects and fragments bouncing now time-based.
+- Proper time correctly taken into account for every object, for physics and rendering
 
-Bugs :
+Problems :
+- Now that the collision algorithm is optimised, what takes up most of the time is the rendering. Disable chunks and smoke effects for huge performance improvements.
 - Momentum of objects still not taken into account for physics
 - ???
 

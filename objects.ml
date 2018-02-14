@@ -144,7 +144,7 @@ let spawn_ship () = {
 }
 
 
-let spawn_projectile position velocity = {
+let spawn_projectile position velocity proper_time = {
     objet = Projectile;
 
     visuals = {
@@ -175,7 +175,7 @@ let spawn_projectile position velocity = {
     orientation = 0.;
     moment = 0.;
 
-    proper_time = 1.;
+    proper_time = proper_time;
     hdr_exposure = 4.;
 }
 
@@ -186,11 +186,11 @@ let rec spawn_n_projectiles ship n =
     then addtuple ship.velocity (polar_to_affine (((Random.float 1.) -. 0.5) *. !projectile_deviation +. ship.orientation) (!projectile_min_speed +. Random.float (!projectile_max_speed -. !projectile_min_speed)))
     else (polar_to_affine (((Random.float 1.) -. 0.5) *. !projectile_deviation +. ship.orientation) (!projectile_min_speed +. Random.float (!projectile_max_speed -. !projectile_min_speed)))
   and pos = addtuple ship.position (polar_to_affine ship.orientation ship.hitbox.ext_radius) in (*On fait spawner les projectiles au bout du vaisseau*)
-  ref (spawn_projectile pos vel) :: spawn_n_projectiles ship (n-1))
+  ref (spawn_projectile pos vel ship.proper_time) :: spawn_n_projectiles ship (n-1))
 
 
 
-  let spawn_chunk_explo position velocity color= {
+  let spawn_chunk_explo position velocity color proper_time = {
       objet = Asteroid;
 
       visuals = {
@@ -221,7 +221,7 @@ let rec spawn_n_projectiles ship n =
       orientation = 0.;
       moment = 0.;
 
-      proper_time = 1.;
+      proper_time = proper_time;
       hdr_exposure = 4.;
   }
 
@@ -230,7 +230,7 @@ let rec spawn_n_projectiles ship n =
     if n = 0 then [] else (
     let vel = addtuple ship.velocity (polar_to_affine (Random.float (2. *. pi)) (chunks_explo_min_speed +. Random.float (chunks_explo_max_speed -. chunks_explo_min_speed)))
       and pos = ship.position in
-    ref (spawn_chunk_explo pos vel color) :: spawn_n_chunks ship (n-1) color)
+    ref (spawn_chunk_explo pos vel color ship.proper_time) :: spawn_n_chunks ship (n-1) color)
 
 
 (*Spawne une explosion d'impact de projectile*)
@@ -278,7 +278,7 @@ let spawn_explosion ref_projectile =
 let spawn_explosion_object ref_objet =
   let rad = explosion_ratio_radius *. !ref_objet.hitbox.int_radius in (*On récupère le rayon de l'objet*)
   if !flashes then add_color := hdr_add !add_color (intensify (saturate !ref_objet.visuals.color flashes_saturate) (!ref_objet.mass *. flashes_explosion *. (randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate) /. flashes_normal_mass));
-  if variable_exposure then game_exposure := !game_exposure *. exposure_ratio_explosions;
+  if !variable_exposure then game_exposure := !game_exposure *. exposure_ratio_explosions;
   ref {
   objet = Explosion;
   visuals = {
@@ -307,7 +307,7 @@ let spawn_explosion_object ref_objet =
   orientation = 0.;
   moment = 0.;
 
-  proper_time = 1.;
+  proper_time = !ref_objet.proper_time;
 (*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
 
   hdr_exposure = randfloat explosion_min_exposure_heritate explosion_max_exposure_heritate ;
@@ -349,7 +349,7 @@ let spawn_explosion_death ref_ship elapsed_time =
   orientation = 0.;
   moment = 0.;
 
-  proper_time = 1.;
+  proper_time = !ref_ship.proper_time;
   hdr_exposure = 1.;
 }
 
@@ -386,7 +386,7 @@ let spawn_explosion_chunk ref_objet =
   orientation = 0.;
   moment = 0.;
 
-  proper_time = 1.;
+  proper_time = !ref_objet.proper_time;
 (*La nouvelle exposition est partagée entre couleur et exposition, pour que la fumée ne finisse pas trop sombre*)
 
   hdr_exposure = explosion_min_exposure +. (Random.float (explosion_max_exposure -. explosion_min_exposure));
@@ -420,7 +420,7 @@ let spawn_muzzle ref_projectile = ref {
   orientation = 0.;
   moment = 0.;
 
-  proper_time = 1.;
+  proper_time = !ref_projectile.proper_time;
   hdr_exposure = explosion_min_exposure +. (Random.float (explosion_max_exposure -. explosion_min_exposure));
 }
 
@@ -453,7 +453,7 @@ let spawn_fire ref_ship = ref {
   orientation = 0.;
   moment = 0.;
 
-  proper_time = 1.;
+  proper_time = !ref_ship.proper_time;
   hdr_exposure = explosion_min_exposure +. (Random.float (explosion_max_exposure -. explosion_min_exposure));
 }
 
@@ -510,3 +510,14 @@ let spawn_asteroid (x, y) (dx, dy) radius =
 let rec random_out_of_screen radius =
   let (x,y) = ((Random.float ( 3. *. !phys_width)) -. !phys_width, (Random.float ( 3. *. !phys_height)) -. !phys_height) in
   if (y +. radius > 0. && y -. radius < !phys_height && x +. radius > 0. && x -. radius < !phys_width) then  random_out_of_screen radius else (x,y)
+
+let spawn_random_star () =
+let randpos = (Random.float !phys_width, Random.float !phys_height) in {
+ last_pos = randpos;
+ pos = randpos;
+ proximity = (randfloat star_min_prox star_max_prox) ** 4.;
+ lum = randfloat star_min_lum star_max_lum;
+}
+
+let rec n_stars n =
+ if n=0 then [] else (ref (spawn_random_star ()) :: n_stars (n-1));;

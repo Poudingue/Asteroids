@@ -21,9 +21,9 @@ let mul_color = ref {r=0.;v=0.;b=0.}
 let intensify hdr_in i = {r = i*. hdr_in.r ; v = i *. hdr_in.v ; b = i *. hdr_in.b}
 
 let half_color col1 col2 half_life = (hdr_add col2 {
-	r = (exp_decay (col1.r -. col2.r) half_life);
-	v = (exp_decay (col1.v -. col2.v) half_life);
-	b = (exp_decay (col1.b -. col2.b) half_life)})
+	r = (abso_exp_decay (col1.r -. col2.r) half_life);
+	v = (abso_exp_decay (col1.v -. col2.v) half_life);
+	b = (abso_exp_decay (col1.b -. col2.b) half_life)})
 
 (*Redirige la saturation d'une couleur vers les couleurs proches*)
 let redirect_spectre col = {

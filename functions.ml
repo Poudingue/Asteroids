@@ -10,7 +10,7 @@ let randfloat min max = min +. Random.float (max -. min)
 let carre v = v *. v
 
 (*Fonction de décroissance exponentielle de n au bout de t secondes en float. Basée sur le temps ingame*)
-let exp_decay n half_life = n *. 2. ** (!game_speed *. (!time_last_frame -. !time_current_frame) /. half_life)
+let exp_decay n half_life proper_time = n *. 2. ** (!observer_proper_time *. !game_speed *. (!time_last_frame -. !time_current_frame) /. (proper_time *. half_life))
 
 (*Fonction de décroissance exponentielle de n au bout de t secondes en float. Basée sur le temps réel, pas sur le temps de jeu*)
 let abso_exp_decay n half_life = n *. 2. ** ((!time_last_frame -. !time_current_frame) /. half_life)

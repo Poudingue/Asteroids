@@ -150,10 +150,10 @@ let applique_slider ref_slider =
     boolean = smoke;
     lastmousestate = false;}
 
-  let button_framerate={
-    pos1 = ((7./.16.) *. !phys_width,(3./.24.) *. !phys_height);
-    pos2 = ((9./.16.) *. !phys_width,(5./.24.) *. !phys_height);
-    text = "locked framerate";
-    text_over = "Avoids calculating extra images, at the cost of fluidity";
-    boolean = locked_framerate;
-    lastmousestate = false;}
+let button_chunks={
+  pos1 = ((7./.16.) *. !phys_width,(3./.24.) *. !phys_height);
+  pos2 = ((9./.16.) *. !phys_width,(5./.24.) *. !phys_height);
+  text = "chunk particles";
+  text_over = "Allows chunks. Disable for better performance.";
+  boolean = chunks;
+  lastmousestate = false;}

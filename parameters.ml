@@ -1,4 +1,3 @@
-
 (*Parameters of the whole game*)
 
 open Graphics
@@ -72,8 +71,8 @@ let last_count = ref 0
 let current_count = ref 0
 
 (*Dimensions fenêtre graphique.*)
-let width = 2550
-let height = 1400
+let width = 1360
+let height = 760
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
 let max_dist = 20000.
 (*Dimensions de l'espace physique dans lequel les objets évoluent.
@@ -195,13 +194,10 @@ let asteroid_polygon_max = 1.3 (*En ratio du rayon*)
 (*Contrôle du nombre d'astéroïde apparaissant à chaque vague*)
 let asteroid_min_nb = 2
 let asteroid_stage_nb = 1
-let asteroid_min_size = 150.
+let asteroid_min_size = 100.
 let time_spawn_asteroid = 2. (*secondes*)
 let current_stage_asteroids = ref 3
 let time_since_last_spawn = ref 9.5
-(*Paramètres pour rapprocher l'air de rien les objets trop lointains (plus utilisé)*)
-let half_close = 10. (*Demi-temps de rapprochement d'un objet par rapport au centre de l'écran*)
-let accel_close = 0.00001 (*acceleration appliquée aux objets unspawned vers le centre de l'écran*)
 
 (*Caractéristiques des fragments. Principalement hérité des parents.*)
 let fragment_max_velocity = 2500. (*Velocité max au spawn*)
@@ -221,9 +217,9 @@ let chunk_radius_decay = 25. (*Pour la décroissance des particules n'ayant pas 
 let nb_chunks_explo = 15
 let chunks_explo_min_radius = 100.
 let chunks_explo_max_radius = 250.
-let chunks_explo_min_speed = 4000.
-let chunks_explo_max_speed = 8000.
-let chunk_explo_radius_decay = 100.
+let chunks_explo_min_speed = 8000.
+let chunks_explo_max_speed = 16000.
+let chunk_explo_radius_decay = 500.
 
 (*Paramètres du vaisseau*)
 (*Pour l'autoregen*)
@@ -365,13 +361,13 @@ let camera_prediction    = 3. (*En secondes de déplacement du vaisseau dans le 
 let camera_half_depl     = 1.5 (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
 let camera_ratio_objects = 0.4 (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
 let camera_ratio_vision  = 0.2 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
-let camera_start_bound   = 0.4 (*En ratio de la taille de l'écran : distance du bord à laquelle la caméra commence à se recentrer*)
-let camera_max_force     = 5. (*En ratio de la taille de l'écran : vitesse appliquée à la caméra pour la recentrer si on ATTEINT le bord de l'écran*)
+let camera_start_bound   = 0.3 (*En ratio de la taille de l'écran : distance du bord à laquelle la caméra commence à se recentrer*)
+let camera_max_force     = 2. (*En ratio de la taille de l'écran : vitesse appliquée à la caméra pour la recentrer si on ATTEINT le bord de l'écran*)
 
 (*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
 let screenshake = ref true
 let screenshake_smooth = true (*Permet un screenshake moins agressif, plus lisse et réaliste physiquement. Sorte de passe-bas sur les mouvements*)
-let screenshake_smoothness = 0.9 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
+let screenshake_smoothness = 0.8 (*0 = aucun changement, 0.5 =  1 = lissage infini, screenshake supprimé.*)
 let screenshake_tir_ratio = 400.
 let screenshake_death = 6000.
 let screenshake_dam_ratio = 0.005
@@ -404,7 +400,7 @@ let current_jitter_double = ref (0.,0.)
 let current_jitter_coll_table = ref (0.,0.)
 
 (*L'exposition variable permet des variations de luminosité en fonction des évènements*)
-let variable_exposure = true
+let variable_exposure = ref true
 let exposure_ratio_damage = 0.995
 let exposure_tir = 0.98
 let exposure_ratio_explosions = 0.99
