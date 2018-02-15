@@ -215,10 +215,10 @@ let chunk_radius_decay = 25. (*Pour la décroissance des particules n'ayant pas 
 
 
 let nb_chunks_explo = 15
-let chunks_explo_min_radius = 100.
-let chunks_explo_max_radius = 250.
-let chunks_explo_min_speed = 8000.
-let chunks_explo_max_speed = 16000.
+let chunks_explo_min_radius = 150.
+let chunks_explo_max_radius = 300.
+let chunks_explo_min_speed = 10000.
+let chunks_explo_max_speed = 20000.
 let chunk_explo_radius_decay = 500.
 
 (*Paramètres du vaisseau*)
@@ -326,8 +326,8 @@ let fire_ratio_radius = 1.4
 
 (*Valeurs de la fumée*)
 let smoke = ref true
-let smoke_half_col = 0.25 (*Vitesse de la décroissance de la couleur*)
-let smoke_half_radius = 0.8 (*Vitesse de la décroissance du rayon*)
+let smoke_half_col = 0.3 (*Vitesse de la décroissance de la couleur*)
+let smoke_half_radius = 0.5 (*Vitesse de la décroissance du rayon*)
 let smoke_radius_decay = 5. (*Diminution du rayon des particules de fumée*)
 let smoke_max_speed = 400.(*Vitesse random dans une direction random de la fumée*)
 
@@ -357,12 +357,12 @@ let scanlines_offset = ref 0
 
 (*La camera predictive oriente la camera vers l'endroit où le vaisseau va,
 pour le garder tant que possible au centre de l'écran*)
-let camera_prediction    = 3. (*En secondes de déplacement du vaisseau dans le futur.*)
+let camera_prediction    = 2.5 (*En secondes de déplacement du vaisseau dans le futur.*)
 let camera_half_depl     = 1.5 (*Temps pour se déplacer de moitié vers l'objectif de la caméra*)
 let camera_ratio_objects = 0.4 (*La caméra va vers la moyenne des positions des objets, pondérés par leur masse et leur distance au carré*)
-let camera_ratio_vision  = 0.2 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
+let camera_ratio_vision  = 0.25 (*La caméra va vers là où regarde le vaisseau, à une distance correspondant au ratio x la largeur du terrain*)
 let camera_start_bound   = 0.3 (*En ratio de la taille de l'écran : distance du bord à laquelle la caméra commence à se recentrer*)
-let camera_max_force     = 2. (*En ratio de la taille de l'écran : vitesse appliquée à la caméra pour la recentrer si on ATTEINT le bord de l'écran*)
+let camera_max_force     = 3. (*En ratio de la taille de l'écran : vitesse appliquée à la caméra pour la recentrer si on ATTEINT le bord de l'écran*)
 
 (*Le screenshake ajoute des effets de tremblements à l'intensité dépendant  des évènements*)
 let screenshake = ref true
@@ -389,7 +389,7 @@ let shake_score_half_life = 0.2
 C'est une forme de dithering spatial
 afin de compenser la perte de précision due à la rastérisation
 lors du placement des objets et du tracé des contours.*)
-let dither_aa = false
+let dither_aa = true
 (*La puissance du jitter détermine à quel point le rendu peut se décaler.*)
 (*Déterminer à 1 ou moins pour éviter un effet de flou et de fatigue visuelle*)
 let dither_power = 0.5 (*En ratio de la taille d'un pixel*)

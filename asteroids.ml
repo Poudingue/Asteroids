@@ -25,19 +25,19 @@ type etat = {
   mutable cooldown_tp : float; (*Le cooldown est le temps restant avant de pouvoir de nouveau tirer*)
   mutable last_health : float;
   mutable ref_ship : objet_physique ref;
-(*Les objets sont des listes de référence, pour la simplicité de la gestion*)
-(*Il est plus simple de gérer la physique en séparant les objets par type
-plutôt que de vérifier le type d'objet à la volée*)
+  (*OOS = Out of screen, to avoid loss of time when rendering.*)
   mutable ref_objets : objet_physique ref list;
   mutable ref_objets_oos : objet_physique ref list;
   mutable ref_toosmall : objet_physique ref list;
   mutable ref_toosmall_oos : objet_physique ref list;
-  mutable ref_fragments : objet_physique ref list; (*On fait apparaître les fragments dans une liste séparée pour éviter qu'ils ne s'entre-collisionnent*)
+  mutable ref_fragments : objet_physique ref list;
   mutable ref_chunks : objet_physique ref list;
+  mutable ref_chunks_oos : objet_physique ref list;
   mutable ref_chunks_explo : objet_physique ref list;
   mutable ref_projectiles : objet_physique ref list;
   mutable ref_explosions : objet_physique ref list;
   mutable ref_smoke : objet_physique ref list;
+  mutable ref_smoke_oos : objet_physique ref list;
   mutable ref_sparks : objet_physique ref list;
   mutable ref_stars : star ref list;
 }
@@ -96,10 +96,12 @@ let init_etat () =  game_screenshake:=0. ;{
   ref_toosmall_oos = [];
   ref_fragments = [];
   ref_chunks = [];
+  ref_chunks_oos = [];
   ref_chunks_explo = [];
   ref_projectiles = [];
   ref_explosions = [];
   ref_smoke = [];
+  ref_smoke_oos = [];
   ref_sparks = [];
   ref_stars = n_stars !stars_nb;
 }
@@ -110,11 +112,11 @@ Pas très bien présenté ni trié, je n'ai pas pris le temps de rendre ça plus
 (*Système de rotation de polygone pour rendu.*)
 let rec rotat_poly poly rotat =
   let rotat_point (theta,rayon) rotat = (theta +. rotat,rayon) in
-  if poly = [] then [] else List.append [(rotat_point (List.hd poly) rotat)] (rotat_poly (List.tl poly) rotat)
+  if poly = [] then [] else [(rotat_point (List.hd poly) rotat)] @ (rotat_poly (List.tl poly) rotat)
 
 let rec scale_poly poly scale =
   let scale_point (theta,rayon) scale = (theta, rayon *. scale) in
-  if poly = [] then [] else List.append [(scale_point (List.hd poly) scale)] (scale_poly (List.tl poly) scale)
+  if poly = [] then [] else [(scale_point (List.hd poly) scale)] @ (scale_poly (List.tl poly) scale)
 
 let poly_to_affine poly rotat scale = List.map polar_to_affine_tuple (scale_poly (rotat_poly poly rotat) scale)
 
@@ -154,12 +156,12 @@ let rec relative_poly points_list =
 
 (*permet le rendu de motion blur sur des objets sphériques*)
 (*Part de l'endroit où un objet était à l'état précédent pour décider*)
-let render_light_trail radius last_pos pos velocity hdr_color proper_time =
+let render_light_trail radius pos velocity hdr_color proper_time =
 (*TODO corriger le fait que le shutter_speed ne semble pas avoir d'influence sur la longueur des trainées de lumière dues au screenshake*)
   set_line_width (dither_radius (2.*.radius)); (*line_width en est le diamètre, d'où la multiplication par 2 du rayon*)
   let pos1 = (multuple (addtuple pos !game_screenshake_pos) !ratio_rendu) in (*Position actuelle de l'objet*)
   let veloc = multuple velocity ~-. ((!observer_proper_time /. proper_time) *. !game_speed *. (max (1. /. framerate_render) (1. *.(!time_current_frame -. !time_last_frame)))) in (*On projette d'une distance dépendant du temps depuis la dernière frame.*)
-  let last_position = (multuple (addtuple (addtuple last_pos !game_screenshake_previous_pos) veloc) !ratio_rendu) in (*On calcule la position où l'objet était à la dernière frame en tenant compte de la vélocité et du screenshake.*)
+  let last_position = (multuple (soustuple (addtuple pos !game_screenshake_previous_pos) veloc) !ratio_rendu) in (*On calcule la position où l'objet était à la dernière frame en tenant compte de la vélocité et du screenshake.*)
   let pos2 = moytuple last_position pos1 shutter_speed in (*Plus la shutter_speed s'approche de 1, plus on se rapproche effectivement du point de l'image précédente pour la trainée.*)
   set_color (rgb_of_hdr (intensify hdr_color (!game_exposure *. 0.5 *. (sqrt (radius /. (radius +. hypothenuse (soustuple pos1 pos2)))))));(*Plus la trainée de lumière est grande par rapport au rayon de l'objet, moins la lumière est intense*)
   let (x1,y1) = dither_tuple pos1 in
@@ -216,24 +218,23 @@ let render_projectile ref_projectile =
       set_color white; fill_circle x y (dither_radius rad))
     else (
       (*On récupère les valeurs qu'on va utiliser plusieurs fois *)
-      let last = objet.last_position and pos = objet.position and vel = objet.velocity
+      let pos = objet.position and vel = objet.velocity
       and col = intensify visuals.color (objet.hdr_exposure *. !game_exposure) in
       (*On rend plusieurs traits concentriques pour un effet de dégradé*)
       let proper_time = objet.proper_time in
-      render_light_trail rad last pos vel (intensify col 0.25) proper_time;
-      render_light_trail (rad *. 0.75) last pos vel (intensify col 0.5) proper_time;
-      render_light_trail (rad *. 0.5) last pos vel col proper_time;
-      render_light_trail (rad *. 0.25) last pos vel (intensify col 2.) proper_time)
+      render_light_trail rad pos vel (intensify col 0.25) proper_time;
+      render_light_trail (rad *. 0.75) pos vel (intensify col 0.5) proper_time;
+      render_light_trail (rad *. 0.5) pos vel col proper_time;
+      render_light_trail (rad *. 0.25) pos vel (intensify col 2.) proper_time)
 
 let render_spark ref_spark =
   let objet = !ref_spark in
-  render_light_trail objet.visuals.radius objet.last_position objet.position objet.velocity (intensify objet.visuals.color (objet.hdr_exposure *. !game_exposure)) objet.proper_time
+  render_light_trail objet.visuals.radius objet.position objet.velocity (intensify objet.visuals.color (objet.hdr_exposure *. !game_exposure)) objet.proper_time
 
 
 (*Fonction déplaçant un objet instantanémment sans prendre en compte le temps de jeu*)
 let deplac_objet_abso ref_objet velocity =
 let objet = !ref_objet in
-objet.last_position <- objet.position;
 objet.position <- proj objet.position velocity 1.;
 ref_objet := objet;;
 
@@ -352,7 +353,7 @@ let is_dead ref_objet = !ref_objet.health < 0.
 (*Fonction permettant de spawner un nombre de fragments d'astéroïde*)
 let rec spawn_n_frags ref_source ref_dest n =
    if n=0 then ref_dest
-   else List.append (spawn_n_frags ref_source ref_dest (n-1)) (List.map frag_asteroid (List.filter is_dead ref_source))
+   else (spawn_n_frags ref_source ref_dest (n-1)) @ (List.map frag_asteroid (List.filter is_dead ref_source))
 
 (*Vérifie si un objet dépasse potentiellement dans l'écran*)
 let checkspawn_objet ref_objet_unspawned =
@@ -424,37 +425,39 @@ let despawn ref_etat =
    List.iter decay_chunk_explo etat.ref_chunks_explo;
    if !chunks then (
    List.iter decay_chunk etat.ref_chunks;
+   List.iter decay_chunk etat.ref_chunks_oos;
 
-   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_objets));
-   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_objets_oos));
-   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_toosmall));
-   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_toosmall_oos));
-   etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_fragments));
+   etat.ref_chunks <- etat.ref_chunks @ (List.filter ischunk etat.ref_objets);
+   etat.ref_chunks <- etat.ref_chunks @ (List.filter ischunk etat.ref_objets_oos);
+   etat.ref_chunks <- etat.ref_chunks @ (List.filter ischunk etat.ref_toosmall);
+   etat.ref_chunks <- etat.ref_chunks @ (List.filter ischunk etat.ref_toosmall_oos);
+   etat.ref_chunks <- etat.ref_chunks @ (List.filter ischunk etat.ref_fragments);
    )else(etat.ref_chunks <- []);
 
-   etat.ref_objets <- (List.filter notchunk etat.ref_objets);
-   etat.ref_objets <- (List.filter is_alive etat.ref_objets);
+   etat.ref_objets       <- List.filter is_alive etat.ref_objets;
+   etat.ref_objets       <- List.filter notchunk etat.ref_objets;
 
-   etat.ref_objets_oos <- (List.filter notchunk etat.ref_objets_oos);
-   etat.ref_objets_oos <- (List.filter is_alive etat.ref_objets_oos);
+   etat.ref_objets_oos   <- List.filter is_alive etat.ref_objets_oos;
+   etat.ref_objets_oos   <- List.filter notchunk etat.ref_objets_oos;
 
-   etat.ref_toosmall <- (List.filter notchunk etat.ref_toosmall);
-   etat.ref_toosmall <- (List.filter is_alive etat.ref_toosmall);
+   etat.ref_toosmall     <- List.filter is_alive etat.ref_toosmall;
+   etat.ref_toosmall     <- List.filter notchunk etat.ref_toosmall;
 
-   etat.ref_toosmall_oos <- (List.filter notchunk etat.ref_toosmall_oos);
-   etat.ref_toosmall_oos <- (List.filter is_alive etat.ref_toosmall_oos);
+   etat.ref_toosmall_oos <- List.filter is_alive etat.ref_toosmall_oos;
+   etat.ref_toosmall_oos <- List.filter notchunk etat.ref_toosmall_oos;
 
-   etat.ref_fragments <- (List.filter notchunk etat.ref_fragments);
-   etat.ref_fragments <- (List.filter is_alive etat.ref_fragments);
+   etat.ref_fragments    <- List.filter is_alive etat.ref_fragments;
+   etat.ref_fragments    <- List.filter notchunk etat.ref_fragments;
 
-   etat.ref_projectiles <- (List.filter is_alive etat.ref_projectiles);
-   etat.ref_projectiles <- (List.filter close_enough_bullet etat.ref_projectiles);
+   etat.ref_projectiles  <- List.filter is_alive etat.ref_projectiles;
+   etat.ref_projectiles  <- List.filter close_enough_bullet etat.ref_projectiles;
 
-   etat.ref_smoke  <- (List.filter positive_radius  etat.ref_smoke);
-   etat.ref_chunks <- (List.filter positive_radius  etat.ref_chunks);
-   etat.ref_smoke  <- (List.filter checkspawn_objet etat.ref_smoke);
-   etat.ref_chunks <- (List.filter checkspawn_objet etat.ref_chunks);
-   etat.ref_chunks_explo <- (List.filter positive_radius etat.ref_chunks_explo);
+   etat.ref_smoke        <- List.filter positive_radius  etat.ref_smoke;
+   etat.ref_smoke_oos    <- List.filter positive_radius  etat.ref_smoke_oos;
+   etat.ref_chunks       <- List.filter positive_radius  etat.ref_chunks;
+   etat.ref_chunks_oos   <- List.filter positive_radius  etat.ref_chunks_oos;
+
+   etat.ref_chunks_explo <- List.filter positive_radius  etat.ref_chunks_explo;
 
   ref_etat := etat
 
@@ -601,7 +604,7 @@ let rec calculate_collisions_frags ref_frags =
   | [] -> []
   | hd::tl ->
       let colliding = calculate_collisions_fragvfrags hd tl in
-      List.append colliding (calculate_collisions_frags (diff tl colliding))
+      colliding @ (calculate_collisions_frags (diff tl colliding))
 
 (*Fonction vérifiant la collision entre un objet et les autres objets
 et appliquant les effets de collision*)
@@ -792,13 +795,13 @@ let affiche_hud ref_etat =
     set_line_width buttonframewidth; set_color buttonframe;
     draw_poly (Array.of_list (relative_poly[(0.95,0.6);(0.95,0.55);(0.9,0.55);(0.85,0.6)]));
     (*Affichage du score*)
-    (* set_color (rgb_of_hdr (intensify {r=50000.;v=1000.;b=300.} (1. /. (1. +. 10. *. !shake_score))));
+    set_color (rgb_of_hdr (intensify {r=50000.;v=1000.;b=300.} (1. /. (1. +. 10. *. !shake_score))));
     set_line_width 0;
     render_string ("SCORE " ^ string_of_int etat.score) (*(string_of_int etat.score)*)
       (0.02 *. !phys_width, 0.82 *. !phys_height *. (1. -. (0.05 *. !shake_score *.0.08)))
       ((1. +. 0.05 *. !shake_score) *.0.03 *. !phys_width)
       ((1. +. 0.05 *. !shake_score) *.0.08 *. !phys_height)
-      ((1. +. 0.05 *. !shake_score) *.0.01 *. !phys_width) (!shake_score *. 7.); *)
+      ((1. +. 0.05 *. !shake_score) *.0.01 *. !phys_width) (!shake_score *. 7.);
     (*Affichage du niveau de difficulté*)
     set_color white ; set_line_width 0;
     render_string ("STAGE " ^ (string_of_int etat.stage))
@@ -902,12 +905,12 @@ let affiche_etat ref_etat =
     (*On calcule les déplacements de la caméra pour le rendu de caméra dynamique*)
     let ship = !(etat.ref_ship) in
     let (next_x, next_y) =
-      addtuple (polar_to_affine ship.orientation (!phys_width *. camera_ratio_vision)) (
+      addtuple (polar_to_affine ship.orientation (!phys_width *. camera_ratio_vision))
+      (if !pause then ship.position else(
       addtuple
         (addtuple ship.position (multuple ship.velocity (camera_prediction)))
-        (multuple (center_of_attention (List.append etat.ref_objets etat.ref_objets_oos) ship.position)
-          camera_ratio_objects)) in
-    (*move_camera décrit plutôt un déplacement de la totalité des objets en jeu.*)
+        (multuple (center_of_attention (etat.ref_objets @ etat.ref_objets_oos) ship.position)
+          camera_ratio_objects))) in
   let elapsed_time = !game_speed *. (!time_last_frame -. !time_current_frame) in
 
   let move_camera =
@@ -929,20 +932,22 @@ let affiche_etat ref_etat =
       then movey -. camera_max_force *. elapsed_time *. ( ~-. y -. movey +. (1. -. camera_start_bound) *. !phys_height)
       else movey)) in
 
-   if not !pause then ignore (deplac_stars etat.ref_stars move_camera);
-   deplac_objet_abso etat.ref_ship move_camera;
-   deplac_objets_abso etat.ref_objets move_camera;
-   deplac_objets_abso etat.ref_objets_oos move_camera;
-   deplac_objets_abso etat.ref_toosmall move_camera;
+   ignore (deplac_stars etat.ref_stars      move_camera);
+   deplac_objet_abso  etat.ref_ship         move_camera;
+   deplac_objets_abso etat.ref_objets       move_camera;
+   deplac_objets_abso etat.ref_objets_oos   move_camera;
+   deplac_objets_abso etat.ref_toosmall     move_camera;
    deplac_objets_abso etat.ref_toosmall_oos move_camera;
-   deplac_objets_abso etat.ref_fragments move_camera;
-   deplac_objets_abso etat.ref_chunks move_camera;
+   deplac_objets_abso etat.ref_fragments    move_camera;
+   deplac_objets_abso etat.ref_chunks       move_camera;
+   deplac_objets_abso etat.ref_chunks_oos   move_camera;
    deplac_objets_abso etat.ref_chunks_explo move_camera;
-   deplac_objets_abso etat.ref_projectiles move_camera;
-   deplac_objets_abso etat.ref_explosions move_camera;
-   deplac_objets_abso etat.ref_smoke move_camera;
+   deplac_objets_abso etat.ref_projectiles  move_camera;
+   deplac_objets_abso etat.ref_explosions   move_camera;
+   deplac_objets_abso etat.ref_smoke        move_camera;
+   deplac_objets_abso etat.ref_smoke_oos    move_camera;
 
-   print_endline("time prep_affich : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+   print_endline("prep_affich : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
   (*Fond d'espace*)
   if !retro then set_color black else set_color (rgb_of_hdr (intensify !space_color !game_exposure));
@@ -1006,9 +1011,7 @@ let etat_suivant ref_etat =
     if !screenshake then game_screenshake_pos := multuple ((Random.float 2.) -. 1., (Random.float 2.) -. 1.) !game_screenshake;
     (*Dans le cas du lissage de screenshake, on fait une moyenne entre le précédent et l'actuel, pour un lissage du mouvement*)
     if screenshake_smooth then game_screenshake_pos := moytuple !game_screenshake_previous_pos !game_screenshake_pos screenshake_smoothness;
-    (*On calcule le changement d'exposition du jeu. Basé sur le temps en jeu *)
     game_exposure := !game_exposure_target +. abso_exp_decay (!game_exposure -. !game_exposure_target) exposure_half_life;
-    (*On calcule le changement de flashes du jeu. Basé sur le temps en jeu *)
     add_color := intensify !add_color (abso_exp_decay 1. flashes_half_life);
 
     if !dyn_color then (
@@ -1048,27 +1051,36 @@ let etat_suivant ref_etat =
 
    let temptime = Unix.gettimeofday() in
 
-   etat.ref_toosmall <- (List.append (List.filter too_small etat.ref_objets) etat.ref_toosmall);
+   etat.ref_toosmall <- (List.filter too_small etat.ref_objets) @ etat.ref_toosmall;
    etat.ref_objets <- (List.filter big_enough etat.ref_objets);
 
-   etat.ref_toosmall <- (List.append (List.filter too_small etat.ref_fragments) etat.ref_toosmall);
+   etat.ref_toosmall <- (List.filter too_small etat.ref_fragments) @ etat.ref_toosmall;
    etat.ref_fragments <- (List.filter big_enough etat.ref_fragments);
 
    let togoout_small = List.filter checknotspawn_objet etat.ref_toosmall in
-   etat.ref_toosmall <- List.filter checkspawn_objet (List.append etat.ref_toosmall_oos etat.ref_toosmall);
-   etat.ref_toosmall_oos <- (List.filter checknotspawn_objet (List.append etat.ref_toosmall_oos togoout_small));
+   etat.ref_toosmall <- List.filter checkspawn_objet (etat.ref_toosmall_oos @ etat.ref_toosmall);
+   etat.ref_toosmall_oos <- (List.filter checknotspawn_objet (etat.ref_toosmall_oos @ togoout_small));
 
    let togoout = List.filter checknotspawn_objet etat.ref_objets in
-   etat.ref_objets <- List.filter checkspawn_objet (List.append etat.ref_objets_oos etat.ref_objets);
-   etat.ref_objets_oos <- (List.append (List.filter checknotspawn_objet  etat.ref_objets_oos) togoout);
+   etat.ref_objets <- List.filter checkspawn_objet (etat.ref_objets_oos @ etat.ref_objets);
+   etat.ref_objets_oos <- (List.filter checknotspawn_objet etat.ref_objets_oos) @ togoout;
+   print_endline("transferts :  " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+   let temptime = Unix.gettimeofday() in
+   let togoout_chunks =   List.filter checknotspawn_objet etat.ref_chunks in
+   etat.ref_chunks     <- List.filter checkspawn_objet   (etat.ref_chunks @ etat.ref_chunks_oos);
+   etat.ref_chunks_oos <-(List.filter checknotspawn_objet etat.ref_chunks_oos) @ togoout_chunks ;
 
-   print_endline("time transferts : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+   let togoout_smoke =   List.filter checknotspawn_objet etat.ref_smoke in
+   etat.ref_smoke     <- List.filter checkspawn_objet   (etat.ref_smoke @ etat.ref_smoke_oos);
+   etat.ref_smoke_oos <-(List.filter checknotspawn_objet etat.ref_smoke_oos) @ togoout_smoke ;
+
+   print_endline("trans déco :  " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
 if not !pause then (
    let temptime = Unix.gettimeofday() in
-   let objets_ref = List.append etat.ref_objets etat.ref_objets_oos
-   and toosmall_ref = List.append etat.ref_toosmall etat.ref_toosmall_oos
-   and other_ref = etat.ref_ship :: (List.append etat.ref_explosions etat.ref_projectiles)
+   let objets_ref   = etat.ref_objets @ etat.ref_objets_oos
+   and toosmall_ref = etat.ref_toosmall @ etat.ref_toosmall_oos
+   and other_ref = etat.ref_ship :: etat.ref_explosions @ etat.ref_projectiles
    in
    for i=0 to height_collision_table*width_collision_table -1 do
       Array.set collision_table i [];
@@ -1077,11 +1089,11 @@ if not !pause then (
       Array.set collision_table_frag i [];
    done;
 
-   rev_filtertable objets_ref collision_table;
+   rev_filtertable objets_ref   collision_table;
    rev_filtertable toosmall_ref collision_table_toosmall;
-   rev_filtertable other_ref collision_table_other;
+   rev_filtertable other_ref    collision_table_other;
    rev_filtertable etat.ref_fragments collision_table_frag;
-   print_endline("time constru : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+   print_endline("constru :     " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
    let temptime = Unix.gettimeofday() in
    calculate_collision_tables collision_table collision_table true;
@@ -1091,7 +1103,7 @@ if not !pause then (
    (* calculate_collision_tables collision_table_other collision_table_frag true; *)
    calculate_collision_tables collision_table_other collision_table_toosmall true;
    calculate_collision_tables collision_table_other collision_table_frag true;
-   print_endline("time coll all : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+   print_endline("coll all :    " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
    (*On fait apparaitre les fragments des astéroïdes détruits*)
    etat.ref_fragments <- spawn_n_frags etat.ref_objets etat.ref_fragments fragment_number;
@@ -1114,29 +1126,30 @@ if not !pause then (
    etat.score <- etat.score + nb_destroyed; (*TODO meilleure version du score avec multiplicateurs*)
    shake_score := (abso_exp_decay !shake_score shake_score_half_life) +. shake_score_ratio *. (float_of_int nb_destroyed);
 
-   if !chunks then etat.ref_chunks <- (List.append etat.ref_chunks (List.filter ischunk etat.ref_fragments));
+   if !chunks then etat.ref_chunks <- (etat.ref_chunks @ (List.filter ischunk etat.ref_fragments));
    etat.ref_fragments <- (List.filter notchunk etat.ref_fragments); (*Éviter de détruire les perfs avec des fragments minuscules*)
 
 
+   List.iter decay_smoke etat.ref_smoke_oos;
    List.iter decay_smoke etat.ref_smoke;
-   if !smoke then etat.ref_smoke <- List.append etat.ref_smoke etat.ref_explosions else etat.ref_smoke <- [];
+   if !smoke then etat.ref_smoke <- etat.ref_smoke @ etat.ref_explosions else etat.ref_smoke <- [];
    (* On vire les explosions précédentes *)
    etat.ref_explosions <- List.map spawn_explosion (List.filter is_dead etat.ref_projectiles);
-   etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
-   etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_toosmall));
-   etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments));
+   etat.ref_smoke <- etat.ref_smoke @ (List.map spawn_explosion_object (List.filter is_dead etat.ref_objets));
+   etat.ref_smoke <- etat.ref_smoke @ (List.map spawn_explosion_object (List.filter is_dead etat.ref_toosmall));
+   etat.ref_smoke <- etat.ref_smoke @ (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments));
    ref_etat := etat;
 
 
-   if (is_dead etat.ref_ship)
+   if (is_dead etat.ref_ship) && not !pause
    then (etat.ref_explosions <- (spawn_explosion_death etat.ref_ship ((!time_current_frame -. !time_last_frame) *. !game_speed) :: etat.ref_explosions));
 
-   etat.ref_explosions <- List.append etat.ref_explosions (List.map spawn_explosion_chunk etat.ref_chunks_explo);
+   if not !pause then etat.ref_explosions <- etat.ref_explosions @ (List.map spawn_explosion_chunk etat.ref_chunks_explo);
 
 );
 
   if !smoke then(
-    etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments)));
+    etat.ref_smoke <- etat.ref_smoke @ (List.map spawn_explosion_object (List.filter is_dead etat.ref_fragments)));
 
   (*On ralentit le temps selon le nombre d'explosions*)
   game_speed := !game_speed *. ratio_time_explosion ** (float_of_int (List.length etat.ref_explosions));
@@ -1145,9 +1158,9 @@ if not !pause then (
    let temptime = Unix.gettimeofday() in
    (*On repousse et éloigne les fragments les uns des autres*)
    let tokeep = calculate_collisions_frags etat.ref_fragments in
-   etat.ref_objets <- List.append etat.ref_objets (diff etat.ref_fragments tokeep);
+   etat.ref_objets <- etat.ref_objets @ (diff etat.ref_fragments tokeep);
    etat.ref_fragments <- tokeep;
-   print_endline("time fragments : " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
+   print_endline("fragments :   " ^ string_of_float (1000. *. (Unix.gettimeofday()-.temptime)) ^ " ms");
 
   if !time_since_last_spawn > time_spawn_asteroid then (
     time_since_last_spawn := 0.;
@@ -1289,9 +1302,9 @@ ce qui est une approximation généralement correcte*)
     if !variable_exposure then game_exposure := !game_exposure *. exposure_tir;
     game_screenshake := !game_screenshake +. screenshake_tir_ratio;
     (*On ajoute les projectiles *)
-    etat.ref_projectiles <- List.append (spawn_n_projectiles ship !projectile_number) etat.ref_projectiles;
+    etat.ref_projectiles <- (spawn_n_projectiles ship !projectile_number) @ etat.ref_projectiles;
     (*Ajout du muzzleflash correspondant aux tirs*)
-    if !smoke then etat.ref_smoke <- List.append etat.ref_smoke (List.map spawn_muzzle (spawn_n_projectiles ship !projectile_number));
+    if !smoke then etat.ref_smoke <- etat.ref_smoke @ (List.map spawn_muzzle (spawn_n_projectiles ship !projectile_number));
     etat.cooldown <- etat.cooldown +. !projectile_cooldown;
     ship.velocity <- addtuple ship.velocity (polar_to_affine (ship.orientation +. pi) !projectile_recoil)
   done;
@@ -1310,7 +1323,7 @@ let teleport ref_etat =
     let newpos = ((float_of_int status.mouse_x) /. !ratio_rendu, (float_of_int status.mouse_y) /. !ratio_rendu) in
     ship.position <- newpos;
     ship.velocity <- (0.,0.);
-    etat.ref_chunks_explo <- List.append (spawn_n_chunks ship nb_chunks_explo {r=0.;v=1000.;b=10000.}) !ref_etat.ref_chunks_explo;
+    etat.ref_chunks_explo <- (spawn_n_chunks ship nb_chunks_explo {r=0.;v=1000.;b=10000.}) @ !ref_etat.ref_chunks_explo;
     etat.ref_ship := ship;
     etat.cooldown_tp <- etat.cooldown_tp +. cooldown_tp;
     ref_etat:=etat)
@@ -1350,7 +1363,7 @@ let rec mort ref_etat =
     else mort ref_etat)
   else (
   if (!ref_etat).lifes <= 0 then (ref_etat := init_etat ();pause := true) else (
-  !ref_etat.ref_chunks_explo <- List.append (spawn_n_chunks !(!ref_etat.ref_ship) nb_chunks_explo {r=1500.;v=400.;b=200.}) !ref_etat.ref_chunks_explo;
+  !ref_etat.ref_chunks_explo <- (spawn_n_chunks !(!ref_etat.ref_ship) nb_chunks_explo {r=1500.;v=400.;b=200.}) @ !ref_etat.ref_chunks_explo;
   game_speed := ratio_time_death *. !game_speed;
   game_screenshake := !game_screenshake +. screenshake_death;
   if !flashes then add_color := hdr_add !add_color (intensify {r = 1000. ; v = 0. ; b = 0. } flashes_death);
@@ -1371,7 +1384,7 @@ let rec boucle_interaction ref_etat =
   if !(!ref_etat.ref_ship).health<0. then (
     time_of_death := Unix.gettimeofday ();
     (!ref_etat).lifes <- (!ref_etat).lifes - 1;
-    !ref_etat.ref_chunks_explo <- List.append (spawn_n_chunks !(!ref_etat.ref_ship) nb_chunks_explo {r=1500.;v=400.;b=200.}) !ref_etat.ref_chunks_explo;
+    !ref_etat.ref_chunks_explo <- (spawn_n_chunks !(!ref_etat.ref_ship) nb_chunks_explo {r=1500.;v=400.;b=200.}) @ !ref_etat.ref_chunks_explo;
     game_screenshake := !game_screenshake +. screenshake_death;
     if !flashes then add_color := hdr_add !add_color (intensify {r = 1000. ; v = 0. ; b = 0. } flashes_death);
     !(!ref_etat.ref_ship).health <- ~-. 0.1;

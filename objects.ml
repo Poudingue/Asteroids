@@ -40,7 +40,6 @@ type objet_physique = {
   phys_ratio : float; (*ratio des dégats physiques réellement infligés*)
   phys_res : float; (*Réduction des dégats physiques, pour que les collisions à faible vitesse ne fassent pas de dégats*)
 
-  mutable last_position : (float*float);(*Sert à stocker l'emplacement précédent pour calcul correct du motion blur*)
   mutable position : (float*float);(*En pixels non entiers*)
   mutable velocity : (float*float);(*En pixels.s⁻¹*)
 
@@ -132,7 +131,6 @@ let spawn_ship () = {
     phys_ratio = ship_phys_ratio;
     phys_res = ship_phys_res;
 
-    last_position = (!phys_width /. 2., !phys_height /. 2.);
     position = (!phys_width /. 2., !phys_height /. 2.);
     velocity = (0.,0.);
 
@@ -168,7 +166,6 @@ let spawn_projectile position velocity proper_time = {
     phys_res = 0.;
     phys_ratio = 1.;
 
-    last_position = position;
     position = position;
     velocity = velocity;
 
@@ -214,7 +211,6 @@ let rec spawn_n_projectiles ship n =
       phys_res = 0.;
       phys_ratio = 1.;
 
-      last_position = position;
       position = position;
       velocity = velocity;
 
@@ -262,9 +258,7 @@ let spawn_explosion ref_projectile =
   phys_res = 0.;
   phys_ratio = 0.;
 
-  last_position = !ref_projectile.position;
   position = !ref_projectile.position;
-  (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
   orientation = 0.;
   moment = 0.;
@@ -300,7 +294,6 @@ let spawn_explosion_object ref_objet =
   phys_res = 0.;
   phys_ratio = 0.;
 
-  last_position = !ref_objet.position;
   position = !ref_objet.position;
   (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
@@ -342,7 +335,6 @@ let spawn_explosion_death ref_ship elapsed_time =
   phys_res = 0.;
   phys_ratio = 0.;
 
-  last_position = !ref_ship.position;
   position = !ref_ship.position;
   (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
@@ -379,7 +371,6 @@ let spawn_explosion_chunk ref_objet =
   phys_res = 0.;
   phys_ratio = 0.;
 
-  last_position = !ref_objet.position;
   position = !ref_objet.position;
   (*On donne à l'explosion une vitesse random, afin que la fumée qui en découle en hérite*)
   velocity = polar_to_affine (Random.float 2. *. pi) (Random.float smoke_max_speed);
@@ -414,7 +405,6 @@ let spawn_muzzle ref_projectile = ref {
   phys_res = 0.;
   phys_ratio = 0.;
 
-  last_position = !ref_projectile.position;
   position = !ref_projectile.position;
   velocity = multuple !ref_projectile.velocity muzzle_ratio_speed;
   orientation = 0.;
@@ -447,7 +437,6 @@ let spawn_fire ref_ship = ref {
   phys_res = 0.;
   phys_ratio = 0.;
 
-  last_position = !ref_ship.position;
   position = addtuple !ref_ship.position (polar_to_affine (!ref_ship.orientation +. pi) !ref_ship.hitbox.int_radius);
   velocity = addtuple !ref_ship.velocity (addtuple (polar_to_affine (!ref_ship.orientation +. pi) (fire_min_speed +. (Random.float (fire_max_speed -. fire_min_speed)))) (polar_to_affine (Random.float 2. *. pi) (Random.float fire_max_random)));
   orientation = 0.;
@@ -495,7 +484,6 @@ let spawn_asteroid (x, y) (dx, dy) radius =
   phys_res = asteroid_phys_res;
   phys_ratio = asteroid_phys_ratio;
 
-  last_position = (x,y);
   position = (x, y);
   velocity = (dx, dy);
   orientation = Random.float (2. *. pi);
@@ -521,3 +509,18 @@ let randpos = (Random.float !phys_width, Random.float !phys_height) in {
 
 let rec n_stars n =
  if n=0 then [] else (ref (spawn_random_star ()) :: n_stars (n-1));;
+
+ let checkspawn_objet ref_objet_unspawned =
+   let objet = !ref_objet_unspawned in
+   let (x, y) = objet.position in
+   let rad = objet.hitbox.ext_radius in
+  (x -. rad < !phys_width) && (x +. rad > 0.) && (y -. rad < !phys_height) && (y +. rad > 0.)
+ let checknotspawn_objet ref_objet_unspawned = not (checkspawn_objet ref_objet_unspawned)
+ let close_enough ref_objet = hypothenuse (soustuple !ref_objet.position (!phys_width /. 2., !phys_height /. 2.)) < max_dist
+ let too_far ref_objet = not (close_enough ref_objet)
+ let close_enough_bullet ref_objet = hypothenuse !ref_objet.position < max_dist
+ let too_small ref_objet = !ref_objet.hitbox.ext_radius < asteroid_min_size
+ let big_enough ref_objet = not (too_small ref_objet)
+ let positive_radius ref_objet = !ref_objet.visuals.radius > 0.
+ let ischunk ref_objet = !ref_objet.hitbox.int_radius < chunk_max_size
+ let notchunk ref_objet = !ref_objet.hitbox.int_radius >= chunk_max_size

@@ -37,18 +37,18 @@ let redirect_spectre col = {
 (*Même chose, mais redirige encore plus loin en cas de saturation extrème*)
 let redirect_spectre_wide col = {
 	r = if col.b > 510. then (
-		if col.v > 255. then col.r +. col.v +. col.b -. 765. else col.r +. col.b -. 510.
+			if col.v > 255. then col.r +. col.v +. col.b -. 510. -. 255. else col.r +. col.b -. 510.
 	    ) else (
-		if col.v > 255. then col.r +. col.v -. 255. else col.r
+			if col.v > 255. then col.r +. col.v -. 255. else col.r
 	    );
 	v = if col.b > 255. && col.r > 255. then col.v +. col.r +. col.b -. 510.
 	    else if col.r > 255. then col.v +. col.r -. 255.
 	    else if col.b > 255. then col.v +. col.b -. 255.
 	    else col.v;
 	b = if col.r > 510. then (
-		if col.v > 255. then col.r +. col.v +. col.b -. 765. else col.v +. col.b -. 510.
+			if col.v > 255. then col.r +. col.v +. col.b -. 510. -. 255. else col.r +. col.b -. 510.
 	    ) else (
-		if col.v > 255. then col.v +. col.b -. 255. else col.b
+			 if col.v > 255. then col.v +. col.b -. 255. else col.b
 	    );}
 
 
