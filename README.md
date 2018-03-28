@@ -37,7 +37,7 @@ Fixed :
 
 Problems :
 - Now that the collision algorithm is optimised, what takes up most of the time is the rendering. Disable chunks and smoke effects for huge performance improvements.
-- Momentum of objects still not taken into account for physics
+- Angular momentum of objects still not taken into account for physics
 - ???
 
 
