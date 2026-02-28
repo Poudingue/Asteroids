@@ -8,6 +8,8 @@ Even though i used oCaml, a language i'm not really a big fan of, it worked out 
 
 I work on it on my spare time, and make the source code available to everyone, for fun and learning.
 
+> **Branch `claude-experiments`** — This branch is used to experiment with Claude (Anthropic's AI assistant) capabilities on this codebase. Changes here may be exploratory and are not guaranteed to be stable.
+
 ## Compilation and Launch
 
 (You will need ocamlc)
