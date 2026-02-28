@@ -15,10 +15,12 @@ I work on it on my spare time, and make the source code available to everyone, f
 (You will need ocamlc)
 You can compile this game using the command line :
 
-ocamlc -o asteroids unix.cma graphics.cma parameters.ml functions.ml colors.ml objects.ml buttons.ml asteroids.ml
+ocamlc -I +unix -I $(ocamlfind query graphics) -o asteroids unix.cma graphics.cma parameters.ml functions.ml colors.ml objects.ml buttons.ml hud.ml asteroids.ml
 (for windows, it's asteroids.exe instead of asteroids)
 
 Run it with ./asteroids (.exe for windows)
+
+Default resolution is 1920x1080. You can change it in `parameters.ml` (`width` and `height`).
 
 (Works both on linux and windows via powershell. Not sure for mac tho)
 

@@ -71,8 +71,8 @@ let last_count = ref 0
 let current_count = ref 0
 
 (*Dimensions fenêtre graphique.*)
-let width = 1360
-let height = 760
+let width = 1920
+let height = 1080
 let game_surface = 30. (*Détermine la taille du terrain de jeu.*)
 let max_dist = 20000.
 (*Dimensions de l'espace physique dans lequel les objets évoluent.
