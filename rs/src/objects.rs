@@ -2,6 +2,8 @@ use crate::color::HdrColor;
 use crate::parameters::{
     ASTEROID_MAX_SPAWN_RADIUS, ASTEROID_MAX_VELOCITY, ASTEROID_MIN_SPAWN_RADIUS,
     ASTEROID_MIN_VELOCITY, ASTEROID_STAGE_VELOCITY,
+    FRAGMENT_MIN_SIZE, FRAGMENT_MAX_SIZE, FRAGMENT_MIN_VELOCITY, FRAGMENT_MAX_VELOCITY,
+    FRAGMENT_MIN_EXPOSURE, FRAGMENT_MAX_EXPOSURE,
 };
 use crate::math_utils::{
     addtuple, carre, hypothenuse, multuple, polar_to_affine, randfloat, soustuple, Vec2,
@@ -722,6 +724,74 @@ pub fn spawn_random_asteroid(stage: i32, phys_w: f64, phys_h: f64, rng: &mut imp
     );
     let vel = polar_to_affine(vel_angle, vel_magnitude);
     spawn_asteroid(pos, vel, radius, rng)
+}
+
+/// Create a single fragment from a parent asteroid
+pub fn frag_asteroid(parent: &Entity, rng: &mut impl Rng) -> Entity {
+    // Start with a fresh asteroid at parent's position/velocity/radius
+    let mut fragment = spawn_asteroid(
+        parent.position,
+        parent.velocity,
+        parent.hitbox.int_radius,
+        rng,
+    );
+
+    let orientation = rng.gen::<f64>() * 2.0 * PI;
+    let new_radius = randfloat(FRAGMENT_MIN_SIZE, FRAGMENT_MAX_SIZE, rng)
+        * fragment.hitbox.int_radius;
+
+    // Regenerate polygon for new size
+    let new_shape = polygon_asteroid(new_radius, rng);
+
+    // Offset position from parent center
+    fragment.position = addtuple(
+        fragment.position,
+        polar_to_affine(orientation, fragment.hitbox.int_radius - new_radius),
+    );
+
+    // Update visuals with parent color
+    fragment.visuals.radius = new_radius;
+    fragment.visuals.color = parent.visuals.color;
+    fragment.visuals.shapes = vec![(parent.visuals.color, new_shape.clone())];
+
+    // Update hitbox
+    fragment.hitbox.int_radius = new_radius;
+    fragment.hitbox.ext_radius = new_radius * ASTEROID_POLYGON_MAX;
+    fragment.hitbox.points = new_shape;
+
+    // Recalculate mass and health for new size
+    fragment.mass = PI * carre(new_radius) * ASTEROID_DENSITY;
+    fragment.health = ASTEROID_MASS_HEALTH * fragment.mass + ASTEROID_MIN_HEALTH;
+    fragment.max_health = fragment.health;
+
+    // Add random velocity scatter
+    fragment.velocity = addtuple(
+        fragment.velocity,
+        polar_to_affine(
+            orientation,
+            randfloat(FRAGMENT_MIN_VELOCITY, FRAGMENT_MAX_VELOCITY, rng),
+        ),
+    );
+
+    // Adjust HDR exposure randomly
+    fragment.hdr_exposure *= randfloat(FRAGMENT_MIN_EXPOSURE, FRAGMENT_MAX_EXPOSURE, rng);
+
+    fragment
+}
+
+/// Spawn fragment_number fragments for each dead entity in source, appending to dest.
+pub fn spawn_n_frags(
+    source: &[Entity],
+    dest: &mut Vec<Entity>,
+    fragment_number: i32,
+    rng: &mut impl Rng,
+) {
+    let dead: Vec<&Entity> = source.iter().filter(|e| e.health <= 0.0).collect();
+    for _ in 0..fragment_number {
+        for parent in &dead {
+            dest.push(frag_asteroid(parent, rng));
+        }
+    }
 }
 
 pub fn random_out_of_screen(radius: f64, phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Vec2 {
