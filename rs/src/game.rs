@@ -180,6 +180,77 @@ pub fn recenter_objets(entities: &mut [Entity], globals: &Globals) {
     }
 }
 
+
+// --- Entity predicates ---
+
+fn is_alive(entity: &Entity) -> bool {
+    entity.health > 0.0
+}
+
+fn is_dead(entity: &Entity) -> bool {
+    entity.health <= 0.0
+}
+
+fn ischunk(entity: &Entity) -> bool {
+    entity.hitbox.int_radius < CHUNK_MAX_SIZE
+}
+
+fn notchunk(entity: &Entity) -> bool {
+    !ischunk(entity)
+}
+
+fn big_enough(entity: &Entity) -> bool {
+    entity.hitbox.int_radius >= ASTEROID_MIN_SIZE
+}
+
+fn too_small(entity: &Entity) -> bool {
+    !big_enough(entity)
+}
+
+fn positive_radius(entity: &Entity) -> bool {
+    entity.visuals.radius > 0.0
+}
+
+/// Check if entity is within visible screen area (with radius margin)
+fn checkspawn_objet(entity: &Entity, globals: &Globals) -> bool {
+    let (x, y) = entity.position;
+    let rad = entity.hitbox.ext_radius;
+    (x - rad < globals.phys_width) && (x + rad > 0.0)
+        && (y - rad < globals.phys_height) && (y + rad > 0.0)
+}
+
+/// Transfer entities between on-screen and off-screen lists.
+fn transfer_oos(
+    onscreen: &mut Vec<Entity>,
+    oos: &mut Vec<Entity>,
+    globals: &Globals,
+) {
+    let mut going_out: Vec<Entity> = Vec::new();
+    let mut staying_in: Vec<Entity> = Vec::new();
+    for e in onscreen.drain(..) {
+        if checkspawn_objet(&e, globals) {
+            staying_in.push(e);
+        } else {
+            going_out.push(e);
+        }
+    }
+
+    let mut coming_in: Vec<Entity> = Vec::new();
+    let mut staying_out: Vec<Entity> = Vec::new();
+    for e in oos.drain(..) {
+        if checkspawn_objet(&e, globals) {
+            coming_in.push(e);
+        } else {
+            staying_out.push(e);
+        }
+    }
+
+    *onscreen = staying_in;
+    onscreen.extend(coming_in);
+    *oos = staying_out;
+    oos.extend(going_out);
+}
+
 /// Move a star by velocity scaled by its proximity (parallax)
 pub fn deplac_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
     star.last_pos = star.pos;
