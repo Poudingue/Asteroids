@@ -456,6 +456,39 @@ pub fn render_visuals(
     );
 }
 
+/// Render a chunk (small debris) — simpler than full entity rendering
+fn render_chunk(
+    entity: &Entity,
+    renderer: &mut Renderer2D,
+    globals: &Globals,
+    rng: &mut impl Rng,
+) {
+    let pos = multuple(
+        addtuple(entity.position, globals.game_screenshake_pos),
+        globals.ratio_rendu,
+    );
+    if globals.retro {
+        let (x, y) = dither_tuple(pos, DITHER_AA, globals.current_jitter_double);
+        renderer.fill_circle(
+            x as f64, y as f64,
+            (0.25 * globals.ratio_rendu * entity.visuals.radius).max(1.0),
+            [128, 128, 128, 255],
+        );
+    } else {
+        let intensity_chunk = 1.0;
+        let color = to_rgba(
+            intensify(hdr(entity.visuals.color), intensity_chunk * globals.game_exposure * entity.hdr_exposure),
+            globals,
+        );
+        let (x, y) = dither_tuple(pos, DITHER_AA, globals.current_jitter_double);
+        let r = dither_radius(
+            globals.ratio_rendu * entity.visuals.radius,
+            DITHER_AA, DITHER_POWER_RADIUS, rng,
+        );
+        renderer.fill_circle(x as f64, y as f64, r.max(1) as f64, color);
+    }
+}
+
 /// Render a star with motion trail
 pub fn render_star_trail(
     star: &Star,
@@ -696,7 +729,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     despawn(state);
 }
 
-/// Render a complete frame: background, stars, ship
+/// Render a complete frame: background, stars, chunks, asteroids, ship
 pub fn render_frame(state: &mut GameState, globals: &Globals, renderer: &mut Renderer2D) {
     let (w, h) = (renderer.width as i32, renderer.height as i32);
 
@@ -716,6 +749,22 @@ pub fn render_frame(state: &mut GameState, globals: &Globals, renderer: &mut Ren
         for star in &state.stars {
             render_star_trail(star, renderer, globals, &mut state.rng);
         }
+    }
+
+    // Chunks
+    for chunk in &state.chunks {
+        render_chunk(chunk, renderer, globals, &mut state.rng);
+    }
+
+    // Asteroids (objects + toosmall + fragments)
+    for entity in &state.objects {
+        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
+    }
+    for entity in &state.toosmall {
+        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
+    }
+    for entity in &state.fragments {
+        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
     }
 
     // Ship
