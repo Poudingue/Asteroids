@@ -549,6 +549,23 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
                 globals.game_screenshake,
             );
         }
+
+        // Color interpolation (dynamic color mode)
+        if globals.dyn_color {
+            let dt = t1 - t0;
+            globals.mul_color = {
+                let c = half_color(hdr(globals.mul_color), hdr(globals.mul_base), FILTER_HALF_LIFE, dt);
+                (c.r, c.v, c.b)
+            };
+            globals.space_color = {
+                let c = half_color(hdr(globals.space_color), hdr(globals.space_color_goal), SPACE_HALF_LIFE, dt);
+                (c.r, c.v, c.b)
+            };
+            globals.star_color = {
+                let c = half_color(hdr(globals.star_color), hdr(globals.star_color_goal), SPACE_HALF_LIFE, dt);
+                (c.r, c.v, c.b)
+            };
+        }
     }
 }
 
