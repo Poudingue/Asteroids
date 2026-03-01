@@ -251,6 +251,33 @@ fn transfer_oos(
     oos.extend(going_out);
 }
 
+/// Drain elements matching predicate, keeping order stable.
+/// Returns removed elements; modifies vec in-place to keep non-matching.
+fn drain_filter_stable<T>(vec: &mut Vec<T>, pred: impl Fn(&T) -> bool) -> Vec<T> {
+    let mut removed = Vec::new();
+    let mut i = 0;
+    while i < vec.len() {
+        if pred(&vec[i]) {
+            removed.push(vec.remove(i));
+        } else {
+            i += 1;
+        }
+    }
+    removed
+}
+
+/// Remove dead entities, chunks-in-wrong-list, and zero-radius debris
+fn despawn(state: &mut GameState) {
+    state.objects.retain(|e| is_alive(e) && notchunk(e));
+    state.objects_oos.retain(|e| is_alive(e) && notchunk(e));
+    state.toosmall.retain(|e| is_alive(e) && notchunk(e));
+    state.toosmall_oos.retain(|e| is_alive(e) && notchunk(e));
+    state.fragments.retain(|e| is_alive(e) && notchunk(e));
+    state.chunks.retain(|e| positive_radius(e));
+    state.chunks_oos.retain(|e| positive_radius(e));
+    state.chunks_explo.retain(|e| positive_radius(e));
+}
+
 /// Move a star by velocity scaled by its proximity (parallax)
 pub fn deplac_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
     star.last_pos = star.pos;
@@ -567,6 +594,106 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
             };
         }
     }
+}
+
+/// Main game update: movement, transfers, spawning, despawn.
+/// Called each frame when not paused.
+pub fn update_game(state: &mut GameState, globals: &mut Globals) {
+    // Update observer proper time (for time dilation)
+    globals.observer_proper_time = state.ship.proper_time;
+
+    // --- Inertia (position update) ---
+    inertie_objet(&mut state.ship, globals);
+    inertie_objets(&mut state.objects, globals);
+    inertie_objets(&mut state.objects_oos, globals);
+    inertie_objets(&mut state.toosmall, globals);
+    inertie_objets(&mut state.toosmall_oos, globals);
+    inertie_objets(&mut state.fragments, globals);
+    inertie_objets(&mut state.chunks, globals);
+    inertie_objets(&mut state.chunks_oos, globals);
+
+    // --- Rotation (moment update) ---
+    moment_objet(&mut state.ship, globals);
+    moment_objets(&mut state.objects, globals);
+    moment_objets(&mut state.objects_oos, globals);
+    moment_objets(&mut state.toosmall, globals);
+    moment_objets(&mut state.toosmall_oos, globals);
+    moment_objets(&mut state.fragments, globals);
+
+    // --- Size classification: move too-small asteroids ---
+    let small_objs = drain_filter_stable(&mut state.objects, |e| too_small(e));
+    state.toosmall.extend(small_objs);
+    let small_frags = drain_filter_stable(&mut state.fragments, |e| too_small(e));
+    state.toosmall.extend(small_frags);
+
+    // --- OOS transfers ---
+    transfer_oos(&mut state.objects, &mut state.objects_oos, globals);
+    transfer_oos(&mut state.toosmall, &mut state.toosmall_oos, globals);
+    transfer_oos(&mut state.chunks, &mut state.chunks_oos, globals);
+
+    // --- Fragmentation (spawn fragments from dead entities) ---
+    // (No collisions yet — entities won't die until Task 8, but code is ready)
+    spawn_n_frags(&state.objects.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
+    spawn_n_frags(&state.toosmall.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
+    spawn_n_frags(&state.fragments.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
+
+    // --- Move chunks out of fragments ---
+    let new_chunks = drain_filter_stable(&mut state.fragments, |e| ischunk(e));
+    state.chunks.extend(new_chunks);
+
+    // --- Recenter (wrap positions) ---
+    recenter_objets(&mut state.objects, globals);
+    recenter_objets(&mut state.toosmall, globals);
+    recenter_objets(&mut state.objects_oos, globals);
+    recenter_objets(&mut state.toosmall_oos, globals);
+    recenter_objets(&mut state.fragments, globals);
+
+    // --- Spawning ---
+    if globals.time_since_last_spawn > TIME_SPAWN_ASTEROID {
+        globals.time_since_last_spawn = 0.0;
+
+        let nb_asteroids_stage = ASTEROID_MIN_NB + ASTEROID_STAGE_NB * state.stage;
+        if globals.current_stage_asteroids >= nb_asteroids_stage {
+            // Advance to next stage
+            state.stage += 1;
+            globals.current_stage_asteroids = 0;
+
+            // Pick new random stage colors (matches OCaml)
+            let new_col = (
+                randfloat(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
+                randfloat(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
+                randfloat(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
+            );
+            let new_hdr = hdr(new_col);
+            globals.mul_base = {
+                let c = saturate(intensify(new_hdr, 1.0), FILTER_SATURATION);
+                (c.r, c.v, c.b)
+            };
+            globals.space_color_goal = {
+                let c = saturate(intensify(new_hdr, 10.0), SPACE_SATURATION);
+                (c.r, c.v, c.b)
+            };
+            globals.star_color_goal = {
+                let c = saturate(intensify(new_hdr, 100.0), STAR_SATURATION);
+                (c.r, c.v, c.b)
+            };
+        }
+
+        // Spawn one asteroid
+        state.objects_oos.push(spawn_random_asteroid(
+            state.stage,
+            globals.phys_width,
+            globals.phys_height,
+            &mut state.rng,
+        ));
+        globals.current_stage_asteroids += 1;
+    }
+
+    let elapsed = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
+    globals.time_since_last_spawn += elapsed;
+
+    // --- Despawn ---
+    despawn(state);
 }
 
 /// Render a complete frame: background, stars, ship
