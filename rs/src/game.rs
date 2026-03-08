@@ -629,6 +629,24 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
     }
 }
 
+/// Apply explosion/direct damage to an entity.
+fn damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
+    let actual = (entity.dam_ratio * amount - entity.dam_res).max(0.0);
+    entity.health -= actual;
+    globals.game_screenshake += actual * SCREENSHAKE_DAM_RATIO;
+    if globals.variable_exposure {
+        globals.game_exposure *= EXPOSURE_RATIO_DAMAGE;
+    }
+}
+
+/// Apply physical-collision damage to an entity.
+fn phys_damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
+    let actual = (entity.phys_ratio * amount - entity.phys_res).max(0.0);
+    entity.health -= actual;
+    globals.game_screenshake +=
+        actual * SCREENSHAKE_PHYS_RATIO * entity.mass / SCREENSHAKE_PHYS_MASS;
+}
+
 /// Main game update: movement, transfers, spawning, despawn.
 /// Called each frame when not paused.
 pub fn update_game(state: &mut GameState, globals: &mut Globals) {
