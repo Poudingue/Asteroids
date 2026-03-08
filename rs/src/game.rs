@@ -319,9 +319,9 @@ fn despawn(state: &mut GameState) {
     state.toosmall.retain(|e| is_alive(e) && notchunk(e));
     state.toosmall_oos.retain(|e| is_alive(e) && notchunk(e));
     state.fragments.retain(|e| is_alive(e) && notchunk(e));
-    state.chunks.retain(|e| positive_radius(e));
-    state.chunks_oos.retain(|e| positive_radius(e));
-    state.chunks_explo.retain(|e| positive_radius(e));
+    state.chunks.retain(positive_radius);
+    state.chunks_oos.retain(positive_radius);
+    state.chunks_explo.retain(positive_radius);
 }
 
 /// Move a star by velocity scaled by its proximity (parallax)
@@ -726,7 +726,7 @@ fn collision_entities(obj1: &Entity, obj2: &Entity, precis: bool, advanced_hitbo
     }
 }
 
-fn get_entity<'a>(state: &'a GameState, entry: GridEntry) -> &'a Entity {
+fn get_entity(state: &GameState, entry: GridEntry) -> &Entity {
     match entry {
         GridEntry::Object(i)      => &state.objects[i],
         GridEntry::ObjectOos(i)   => &state.objects_oos[i],
@@ -737,7 +737,7 @@ fn get_entity<'a>(state: &'a GameState, entry: GridEntry) -> &'a Entity {
     }
 }
 
-fn get_entity_mut<'a>(state: &'a mut GameState, entry: GridEntry) -> &'a mut Entity {
+fn get_entity_mut(state: &mut GameState, entry: GridEntry) -> &mut Entity {
     match entry {
         GridEntry::Object(i)      => &mut state.objects[i],
         GridEntry::ObjectOos(i)   => &mut state.objects_oos[i],
@@ -957,9 +957,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     moment_objets(&mut state.fragments, globals);
 
     // --- Size classification: move too-small asteroids ---
-    let small_objs = drain_filter_stable(&mut state.objects, |e| too_small(e));
+    let small_objs = drain_filter_stable(&mut state.objects, too_small);
     state.toosmall.extend(small_objs);
-    let small_frags = drain_filter_stable(&mut state.fragments, |e| too_small(e));
+    let small_frags = drain_filter_stable(&mut state.fragments, too_small);
     state.toosmall.extend(small_frags);
 
     // --- OOS transfers ---
@@ -1025,7 +1025,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     spawn_n_frags(&state.fragments.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
 
     // --- Move chunks out of fragments ---
-    let new_chunks = drain_filter_stable(&mut state.fragments, |e| ischunk(e));
+    let new_chunks = drain_filter_stable(&mut state.fragments, ischunk);
     state.chunks.extend(new_chunks);
 
     // --- Recenter (wrap positions) ---
