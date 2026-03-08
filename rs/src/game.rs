@@ -752,6 +752,65 @@ fn get_entity_mut<'a>(state: &'a mut GameState, entry: GridEntry) -> &'a mut Ent
     }
 }
 
+/// Apply physical collision consequences to two entities.
+/// Returns updated (e1, e2). Matches OCaml consequences_collision physical branch.
+fn consequences_collision(
+    mut e1: Entity,
+    mut e2: Entity,
+    globals: &mut Globals,
+) -> (Entity, Entity) {
+    let total_mass = e1.mass + e2.mass;
+    // Mass-weighted average velocity (accounts for proper time)
+    let moy_vel = moytuple(
+        multuple(e1.velocity, 1.0 / e1.proper_time),
+        multuple(e2.velocity, 1.0 / e2.proper_time),
+        e1.mass / total_mass,
+    );
+    let (angle1, _) = affine_to_polar(soustuple(e1.position, e2.position));
+    let (angle2, _) = affine_to_polar(soustuple(e2.position, e1.position));
+
+    let old_vel1 = e1.velocity;
+    let old_vel2 = e2.velocity;
+
+    // New velocities — elastic bounce scaled by proper time
+    e1.velocity = multuple(
+        addtuple(moy_vel, polar_to_affine(angle1, total_mass / e1.mass)),
+        e1.proper_time,
+    );
+    e2.velocity = multuple(
+        addtuple(moy_vel, polar_to_affine(angle2, total_mass / (e2.mass * e2.proper_time))),
+        e2.proper_time,
+    );
+
+    if !globals.pause {
+        let dt = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
+        // Positional repulsion to separate overlapping entities
+        e1.position = addtuple(e1.position, polar_to_affine(angle1, MIN_REPULSION * dt));
+        e2.position = addtuple(e2.position, polar_to_affine(angle2, MIN_REPULSION * dt));
+        // Velocity bounce impulse
+        e1.velocity = addtuple(e1.velocity, polar_to_affine(angle1, MIN_BOUNCE * dt));
+        e2.velocity = addtuple(e2.velocity, polar_to_affine(angle2, MIN_BOUNCE * dt));
+        // Physical damage proportional to velocity change²
+        let g1 = hypothenuse(soustuple(old_vel1, e1.velocity));
+        let g2 = hypothenuse(soustuple(old_vel2, e2.velocity));
+        phys_damage(&mut e1, globals.ratio_phys_deg * carre(g1), globals);
+        phys_damage(&mut e2, globals.ratio_phys_deg * carre(g2), globals);
+    }
+    (e1, e2)
+}
+
+/// Apply fragment-vs-fragment repulsion (no damage).
+fn consequences_collision_frags(mut f1: Entity, mut f2: Entity, globals: &Globals) -> (Entity, Entity) {
+    let (angle1, _) = affine_to_polar(soustuple(f1.position, f2.position));
+    let (angle2, _) = affine_to_polar(soustuple(f2.position, f1.position));
+    let dt = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
+    f1.position = addtuple(f1.position, polar_to_affine(angle1, dt * FRAGMENT_MIN_REPULSION));
+    f2.position = addtuple(f2.position, polar_to_affine(angle2, dt * FRAGMENT_MIN_REPULSION));
+    f1.velocity = addtuple(f1.velocity, polar_to_affine(angle1, dt * FRAGMENT_MIN_BOUNCE));
+    f2.velocity = addtuple(f2.velocity, polar_to_affine(angle2, dt * FRAGMENT_MIN_BOUNCE));
+    (f1, f2)
+}
+
 /// Main game update: movement, transfers, spawning, despawn.
 /// Called each frame when not paused.
 pub fn update_game(state: &mut GameState, globals: &mut Globals) {
