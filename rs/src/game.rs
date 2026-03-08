@@ -783,6 +783,8 @@ fn consequences_collision(
     );
 
     if !globals.pause {
+        // Note: unlike OCaml, we scale by game_speed so repulsion stays proportional
+        // to simulated time during slowdown events.
         let dt = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
         // Positional repulsion to separate overlapping entities
         e1.position = addtuple(e1.position, polar_to_affine(angle1, MIN_REPULSION * dt));
@@ -803,6 +805,8 @@ fn consequences_collision(
 fn consequences_collision_frags(mut f1: Entity, mut f2: Entity, globals: &Globals) -> (Entity, Entity) {
     let (angle1, _) = affine_to_polar(soustuple(f1.position, f2.position));
     let (angle2, _) = affine_to_polar(soustuple(f2.position, f1.position));
+    // Note: unlike OCaml, we scale by game_speed so repulsion stays proportional
+    // to simulated time during slowdown events.
     let dt = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
     f1.position = addtuple(f1.position, polar_to_affine(angle1, dt * FRAGMENT_MIN_REPULSION));
     f2.position = addtuple(f2.position, polar_to_affine(angle2, dt * FRAGMENT_MIN_REPULSION));
