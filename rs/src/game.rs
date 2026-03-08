@@ -894,6 +894,48 @@ fn calculate_collision_tables(
     apply_collision_pairs(&pairs, state, globals);
 }
 
+/// Repulse colliding fragment pairs.
+/// Fragments NOT involved in any collision this frame are promoted to state.objects.
+/// Matches OCaml: calculate_collisions_frags + promotion logic.
+fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
+    let n = state.fragments.len();
+    let mut involved = vec![false; n];
+
+    // Collect colliding pairs (by index)
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    for i in 0..n {
+        for j in (i + 1)..n {
+            if collision_entities(&state.fragments[i], &state.fragments[j], false, globals.advanced_hitbox) {
+                pairs.push((i, j));
+                involved[i] = true;
+                involved[j] = true;
+            }
+        }
+    }
+
+    // Apply repulsion to each pair
+    for (i, j) in pairs {
+        let f1 = state.fragments[i].clone();
+        let f2 = state.fragments[j].clone();
+        let (new_f1, new_f2) = consequences_collision_frags(f1, f2, globals);
+        state.fragments[i] = new_f1;
+        state.fragments[j] = new_f2;
+    }
+
+    // Promote non-colliding fragments to objects (they've "settled")
+    let mut settled: Vec<Entity> = Vec::new();
+    let mut still_colliding: Vec<Entity> = Vec::new();
+    for (i, frag) in state.fragments.drain(..).enumerate() {
+        if involved[i] {
+            still_colliding.push(frag);
+        } else {
+            settled.push(frag);
+        }
+    }
+    state.fragments = still_colliding;
+    state.objects.extend(settled);
+}
+
 /// Main game update: movement, transfers, spawning, despawn.
 /// Called each frame when not paused.
 pub fn update_game(state: &mut GameState, globals: &mut Globals) {
