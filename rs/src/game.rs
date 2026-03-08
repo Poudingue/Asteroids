@@ -9,6 +9,56 @@ use crate::parameters::*;
 use crate::renderer::Renderer2D;
 
 // ============================================================================
+// Collision grid
+// ============================================================================
+
+/// Identifies an entity by which list it lives in and its index.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum GridEntry {
+    Object(usize),
+    ObjectOos(usize),
+    TooSmall(usize),
+    TooSmallOos(usize),
+    Fragment(usize),
+    Ship,
+}
+
+type CollisionGrid = Vec<Vec<GridEntry>>;
+
+fn make_grid() -> CollisionGrid {
+    vec![Vec::new(); (WIDTH_COLLISION_TABLE * HEIGHT_COLLISION_TABLE) as usize]
+}
+
+fn clear_grid(grid: &mut CollisionGrid) {
+    for cell in grid.iter_mut() {
+        cell.clear();
+    }
+}
+
+/// Insert a slice of (entry, position) pairs into the collision grid.
+/// Matches OCaml rev_filtertable: each entity goes into one cell (its center).
+fn insert_into_grid(
+    entries: &[(GridEntry, Vec2)],
+    grid: &mut CollisionGrid,
+    globals: &Globals,
+) {
+    let gw = WIDTH_COLLISION_TABLE as f64;
+    let gh = HEIGHT_COLLISION_TABLE as f64;
+    let (jx, jy) = globals.current_jitter_coll_table;
+    for &(entry, (x, y)) in entries {
+        let x2 = jx + gw * (x + globals.phys_width) / (3.0 * globals.phys_width);
+        let y2 = jy + gh * (y + globals.phys_height) / (3.0 * globals.phys_height);
+        if x2 < 0.0 || y2 < 0.0 || x2 >= gw || y2 >= gh {
+            continue;
+        }
+        let xi = x2 as usize;
+        let yi = y2 as usize;
+        let idx = xi * HEIGHT_COLLISION_TABLE as usize + yi;
+        grid[idx].push(entry);
+    }
+}
+
+// ============================================================================
 // GameState
 // ============================================================================
 
@@ -677,6 +727,28 @@ fn collision_entities(obj1: &Entity, obj2: &Entity, precis: bool, advanced_hitbo
     } else {
         collision_poly(pos1, &h1.points.0, obj1.orientation, pos2, h2.int_radius)
             || collision_poly(pos2, &h2.points.0, obj2.orientation, pos1, h1.int_radius)
+    }
+}
+
+fn get_entity<'a>(state: &'a GameState, entry: GridEntry) -> &'a Entity {
+    match entry {
+        GridEntry::Object(i)      => &state.objects[i],
+        GridEntry::ObjectOos(i)   => &state.objects_oos[i],
+        GridEntry::TooSmall(i)    => &state.toosmall[i],
+        GridEntry::TooSmallOos(i) => &state.toosmall_oos[i],
+        GridEntry::Fragment(i)    => &state.fragments[i],
+        GridEntry::Ship           => &state.ship,
+    }
+}
+
+fn get_entity_mut<'a>(state: &'a mut GameState, entry: GridEntry) -> &'a mut Entity {
+    match entry {
+        GridEntry::Object(i)      => &mut state.objects[i],
+        GridEntry::ObjectOos(i)   => &mut state.objects_oos[i],
+        GridEntry::TooSmall(i)    => &mut state.toosmall[i],
+        GridEntry::TooSmallOos(i) => &mut state.toosmall_oos[i],
+        GridEntry::Fragment(i)    => &mut state.fragments[i],
+        GridEntry::Ship           => &mut state.ship,
     }
 }
 
