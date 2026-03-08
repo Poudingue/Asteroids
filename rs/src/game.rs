@@ -1267,7 +1267,7 @@ fn render_light_trail(
     );
     let pos2 = moytuple(last_pos, pos1, SHUTTER_SPEED);
     let dist = hypothenuse(soustuple(pos1, pos2));
-    let trail_lum = (radius / (radius + dist)).sqrt();
+    let trail_lum = 0.5 * (radius / (radius + dist)).sqrt();
     let color = to_rgba(intensify(hdr_color, trail_lum), globals);
     let (x1, y1) = dither_tuple(pos1, DITHER_AA, globals.current_jitter_double);
     let (x2, y2) = dither_tuple(pos2, DITHER_AA, globals.current_jitter_double);
@@ -1298,7 +1298,7 @@ pub fn decay_smoke(smoke: &mut Entity, globals: &Globals) {
     let half_c = SMOKE_HALF_COL * smoke.proper_time;
     // exp_decay: n * 2^(-(dt_game) / half_life)
     smoke.visuals.radius = smoke.visuals.radius * (2.0_f64).powf(-dt_game / half_r)
-        - SMOKE_RADIUS_DECAY * dt_game / smoke.proper_time;
+        - SMOKE_RADIUS_DECAY * dt_game * globals.observer_proper_time / smoke.proper_time;
     if smoke.hdr_exposure > 0.001 {
         smoke.hdr_exposure *= (2.0_f64).powf(-dt_game / half_c);
     }
