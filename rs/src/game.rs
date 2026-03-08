@@ -938,6 +938,119 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // Update observer proper time (for time dilation)
     globals.observer_proper_time = state.ship.proper_time;
 
+    // --- Smoke & chunk decay ---
+    for s in state.smoke.iter_mut() { decay_smoke(s, globals); }
+    for s in state.smoke_oos.iter_mut() { decay_smoke(s, globals); }
+
+    // --- Decay chunks (radius shrink) ---
+    for c in state.chunks.iter_mut() {
+        c.visuals.radius -= CHUNK_RADIUS_DECAY * globals.game_speed * globals.dt();
+    }
+    for c in state.chunks_oos.iter_mut() {
+        c.visuals.radius -= CHUNK_RADIUS_DECAY * globals.game_speed * globals.dt();
+    }
+    for c in state.chunks_explo.iter_mut() {
+        c.visuals.radius -= CHUNK_EXPLO_RADIUS_DECAY * globals.game_speed * globals.dt();
+    }
+
+    // Remove dead/negative-radius smoke
+    state.smoke.retain(|s| s.visuals.radius > 0.0 && s.hdr_exposure > 0.001);
+    state.smoke_oos.retain(|s| s.visuals.radius > 0.0 && s.hdr_exposure > 0.001);
+
+    // --- Spawn explosions from dead projectiles ---
+    // Previous explosions → smoke (before overwriting)
+    if globals.smoke_enabled {
+        state.smoke.append(&mut state.explosions);
+    } else {
+        state.explosions.clear();
+    }
+
+    // Spawn new explosions from dead projectiles (health < 0)
+    let dead_projectile_explosions: Vec<Entity> = state.projectiles.iter()
+        .filter(|p| p.health < 0.0)
+        .map(|p| spawn_explosion(p, &mut state.rng))
+        .collect();
+    state.explosions.extend(dead_projectile_explosions);
+
+    // Spawn explosions from dead asteroids/toosmall/fragments → add to smoke list
+    {
+        let dead_objects: Vec<Entity> = state.objects.iter().chain(state.objects_oos.iter())
+            .chain(state.toosmall.iter()).chain(state.toosmall_oos.iter())
+            .chain(state.fragments.iter())
+            .filter(|e| is_dead(e))
+            .cloned()
+            .collect();
+        for obj in &dead_objects {
+            let (explo, side_effects) = spawn_explosion_object(
+                obj,
+                globals.flashes_enabled,
+                globals.variable_exposure,
+                FLASHES_SATURATE,
+                FLASHES_EXPLOSION,
+                FLASHES_NORMAL_MASS,
+                &mut state.rng,
+            );
+            if let Some(ac) = side_effects.add_color {
+                globals.add_color = (
+                    globals.add_color.0 + ac.0,
+                    globals.add_color.1 + ac.1,
+                    globals.add_color.2 + ac.2,
+                );
+            }
+            if let Some(em) = side_effects.exposure_multiplier {
+                globals.game_exposure *= em;
+            }
+            state.smoke.push(explo);
+        }
+    }
+
+    // Chunk explosions (chunks_explo → explosions)
+    if !globals.pause {
+        let explo_chunks: Vec<Entity> = state.chunks_explo.iter()
+            .map(|c| {
+                let (explo, se) = spawn_explosion_chunk(
+                    c,
+                    globals.flashes_enabled,
+                    FLASHES_SATURATE,
+                    FLASHES_EXPLOSION,
+                    FLASHES_NORMAL_MASS,
+                    &mut state.rng,
+                );
+                let _ = se; // side effects handled if needed
+                explo
+            })
+            .collect();
+        state.explosions.extend(explo_chunks);
+    }
+
+    // game_speed slowdown per explosion
+    let nb_explo = state.explosions.len();
+    globals.game_speed *= RATIO_TIME_EXPLOSION.powi(nb_explo as i32);
+
+    // --- Projectile inertia ---
+    for p in state.projectiles.iter_mut() {
+        inertie_objet(p, globals);
+    }
+
+    // --- Explosion inertia (one frame entities) ---
+    for e in state.explosions.iter_mut() {
+        inertie_objet(e, globals);
+    }
+
+    // --- Filter dead or OOS projectiles (projectiles don't wrap, they despawn) ---
+    state.projectiles.retain(|p| {
+        p.health >= 0.0 && {
+            let (x, y) = p.position;
+            x >= -globals.phys_width && x <= 2.0 * globals.phys_width
+                && y >= -globals.phys_height && y <= 2.0 * globals.phys_height
+        }
+    });
+
+    // --- Cooldown tick ---
+    if state.cooldown > 0.0 {
+        state.cooldown -= globals.game_speed * globals.dt();
+    }
+
     // --- Inertia (position update) ---
     inertie_objet(&mut state.ship, globals);
     inertie_objets(&mut state.objects, globals);
@@ -983,6 +1096,10 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     entries_small.extend(state.toosmall_oos
         .iter().enumerate().map(|(i, e)| (GridEntry::TooSmallOos(i), e.position)));
 
+    // Note: explosions live exactly one frame; we include them in grid_other for collision
+    // but they're not tracked by GridEntry index (they can't be mutated via get_entity_mut).
+    // OCaml: other_ref = ship :: explosions @ projectiles — explosions damage via mass.
+    // We handle explosion→asteroid damage separately below after grid collision.
     let entries_other: Vec<(GridEntry, Vec2)> = vec![
         (GridEntry::Ship, state.ship.position),
     ];
@@ -1006,6 +1123,38 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     calculate_collision_tables(&grid_other.clone(), &grid_toosmall.clone(), true, state, globals);
     // Ship/other vs fragment (extend=true)
     calculate_collision_tables(&grid_other.clone(), &grid_frag.clone(), true, state, globals);
+
+    // === Explosion damage to asteroids ===
+    // Explosions are one-frame entities; we do a simple O(n*m) check here.
+    for explo in &state.explosions {
+        let explo_pos = explo.position;
+        let explo_rad = explo.hitbox.ext_radius;
+        let explo_mass = explo.mass;
+        for obj in state.objects.iter_mut().chain(state.objects_oos.iter_mut())
+            .chain(state.toosmall.iter_mut()).chain(state.toosmall_oos.iter_mut())
+        {
+            if collision_circles(explo_pos, explo_rad, obj.position, obj.hitbox.int_radius) {
+                damage(obj, explo_mass, globals);
+            }
+        }
+    }
+
+    // === Projectile damage to asteroids + self-kill on hit ===
+    for proj in state.projectiles.iter_mut() {
+        let proj_pos = proj.position;
+        let proj_rad = proj.hitbox.ext_radius;
+        let mut hit = false;
+        for obj in state.objects.iter_mut().chain(state.objects_oos.iter_mut())
+            .chain(state.toosmall.iter_mut()).chain(state.toosmall_oos.iter_mut())
+        {
+            if collision_circles(proj_pos, proj_rad, obj.position, obj.hitbox.int_radius) {
+                hit = true;
+            }
+        }
+        if hit {
+            proj.health = -1.0; // kill projectile
+        }
+    }
 
     // === Destroyed entity accounting (asteroids + fragments) ===
     let nb_destroyed = state.objects.iter().filter(|e| is_dead(e)).count()
@@ -1083,6 +1232,115 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     despawn(state);
 }
 
+// ============================================================================
+// Projectile / Explosion / Smoke rendering
+// ============================================================================
+
+/// Render a light trail (motion blur line) for a fast-moving entity.
+/// Used for projectiles. Ported from OCaml render_light_trail.
+fn render_light_trail(
+    radius: f64,
+    pos: Vec2,
+    velocity: Vec2,
+    hdr_color: HdrColor,
+    proper_time: f64,
+    renderer: &mut Renderer2D,
+    globals: &Globals,
+) {
+    let pos1 = multuple(addtuple(pos, globals.game_screenshake_pos), globals.ratio_rendu);
+    let dt_game = globals.game_speed
+        * (globals.time_current_frame - globals.time_last_frame)
+            .max(1.0 / FRAMERATE_RENDER);
+    let veloc = multuple(velocity, -(globals.observer_proper_time / proper_time) * dt_game);
+    let last_pos = multuple(
+        addtuple(soustuple(pos, veloc), globals.game_screenshake_previous_pos),
+        globals.ratio_rendu,
+    );
+    let pos2 = moytuple(last_pos, pos1, SHUTTER_SPEED);
+    let dist = hypothenuse(soustuple(pos1, pos2));
+    let trail_lum = (radius / (radius + dist)).sqrt();
+    let color = to_rgba(intensify(hdr_color, trail_lum), globals);
+    let (x1, y1) = dither_tuple(pos1, DITHER_AA, globals.current_jitter_double);
+    let (x2, y2) = dither_tuple(pos2, DITHER_AA, globals.current_jitter_double);
+    let line_width = dither_radius(2.0 * radius, DITHER_AA, DITHER_POWER_RADIUS, &mut rand::thread_rng());
+    renderer.draw_line(x1, y1, x2, y2, color, line_width.max(1) as f32);
+}
+
+/// Render a projectile as four concentric light trails. Ported from OCaml render_projectile.
+fn render_projectile(entity: &Entity, renderer: &mut Renderer2D, globals: &Globals, rng: &mut impl Rng) {
+    let rad = globals.ratio_rendu
+        * randfloat(0.5, 1.0, rng)
+        * entity.visuals.radius;
+    let pos = entity.position;
+    let vel = entity.velocity;
+    let col = intensify(hdr(entity.visuals.color), entity.hdr_exposure * globals.game_exposure);
+    let pt = entity.proper_time;
+    render_light_trail(rad,        pos, vel, intensify(col, 0.25), pt, renderer, globals);
+    render_light_trail(rad * 0.75, pos, vel, intensify(col, 0.5),  pt, renderer, globals);
+    render_light_trail(rad * 0.5,  pos, vel, col,                  pt, renderer, globals);
+    render_light_trail(rad * 0.25, pos, vel, intensify(col, 2.0),  pt, renderer, globals);
+}
+
+/// Decay smoke radius and exposure (game-time based half-life).
+/// Ported from OCaml decay_smoke.
+pub fn decay_smoke(smoke: &mut Entity, globals: &Globals) {
+    let dt_game = globals.game_speed * globals.dt();
+    let half_r = SMOKE_HALF_RADIUS * smoke.proper_time;
+    let half_c = SMOKE_HALF_COL * smoke.proper_time;
+    // exp_decay: n * 2^(-(dt_game) / half_life)
+    smoke.visuals.radius = smoke.visuals.radius * (2.0_f64).powf(-dt_game / half_r)
+        - SMOKE_RADIUS_DECAY * dt_game / smoke.proper_time;
+    if smoke.hdr_exposure > 0.001 {
+        smoke.hdr_exposure *= (2.0_f64).powf(-dt_game / half_c);
+    }
+}
+
+/// Fire projectiles (tir). Called when Space is held and cooldown allows.
+/// Ported from OCaml tir.
+pub fn tir(state: &mut GameState, globals: &mut Globals) {
+    while state.cooldown <= 0.0 {
+        // Flash effect
+        if globals.flashes_enabled {
+            let flash = intensify(hdr((100.0, 50.0, 25.0)), FLASHES_TIR);
+            globals.add_color = (
+                globals.add_color.0 + flash.r,
+                globals.add_color.1 + flash.v,
+                globals.add_color.2 + flash.b,
+            );
+        }
+        if globals.variable_exposure {
+            globals.game_exposure *= EXPOSURE_TIR;
+        }
+        globals.game_screenshake += SCREENSHAKE_TIR_RATIO;
+
+        // Spawn projectiles
+        let new_projectiles = spawn_n_projectiles(
+            &state.ship,
+            globals.projectile_number,
+            globals.projectile_min_speed,
+            globals.projectile_max_speed,
+            globals.projectile_deviation,
+            PROJECTILE_HERIT_SPEED,
+            &mut state.rng,
+        );
+
+        // Muzzle smoke
+        if globals.smoke_enabled {
+            for p in &new_projectiles {
+                let muzzle = spawn_muzzle(p, &mut state.rng);
+                state.smoke.push(muzzle);
+            }
+        }
+
+        state.projectiles.extend(new_projectiles);
+        state.cooldown += globals.projectile_cooldown;
+
+        // Recoil
+        let recoil = polar_to_affine(state.ship.orientation + PI, globals.projectile_recoil);
+        state.ship.velocity = addtuple(state.ship.velocity, recoil);
+    }
+}
+
 /// Render a complete frame: background, stars, chunks, asteroids, ship
 pub fn render_frame(state: &mut GameState, globals: &Globals, renderer: &mut Renderer2D) {
     let (w, h) = (renderer.width as i32, renderer.height as i32);
@@ -1123,4 +1381,19 @@ pub fn render_frame(state: &mut GameState, globals: &Globals, renderer: &mut Ren
 
     // Ship
     render_visuals(&state.ship, (0.0, 0.0), renderer, globals, &mut state.rng);
+
+    // Smoke (rendered as circles via render_visuals)
+    for s in &state.smoke {
+        render_visuals(s, (0.0, 0.0), renderer, globals, &mut state.rng);
+    }
+
+    // Explosions (rendered as circles)
+    for e in &state.explosions {
+        render_visuals(e, (0.0, 0.0), renderer, globals, &mut state.rng);
+    }
+
+    // Projectiles (light trails)
+    for p in &state.projectiles {
+        render_projectile(p, renderer, globals, &mut state.rng);
+    }
 }

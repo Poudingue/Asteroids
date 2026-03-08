@@ -167,6 +167,11 @@ fn main() {
                 game::strafe_right(&mut state.ship);
             }
 
+            // Space = fire
+            if keyboard.is_scancode_pressed(Scancode::Space) {
+                game::tir(&mut state, &mut globals);
+            }
+
             // Update game state (physics, wrapping, asteroids, etc.)
             game::update_game(&mut state, &mut globals);
         }
