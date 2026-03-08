@@ -647,6 +647,39 @@ fn phys_damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
         actual * SCREENSHAKE_PHYS_RATIO * entity.mass / SCREENSHAKE_PHYS_MASS;
 }
 
+fn collision_circles(pos0: Vec2, r0: f64, pos1: Vec2, r1: f64) -> bool {
+    distancecarre(pos0, pos1) < carre(r0 + r1)
+}
+
+fn collision_point(pos_point: Vec2, pos_circle: Vec2, radius: f64) -> bool {
+    distancecarre(pos_point, pos_circle) < carre(radius)
+}
+
+fn collisions_points(points: &[Vec2], pos_circle: Vec2, radius: f64) -> bool {
+    points.iter().any(|&p| collision_point(p, pos_circle, radius))
+}
+
+fn collision_poly(pos: Vec2, poly: &[Vec2], rotat: f64, circle_pos: Vec2, radius: f64) -> bool {
+    let pts = depl_affine_poly(&poly_to_affine(poly, rotat, 1.0), pos);
+    collisions_points(&pts, circle_pos, radius)
+}
+
+/// Test collision between two entities.
+/// `precis`: true = polygon check after circle broadphase; false = circle only.
+/// Matches OCaml: skips when both entities are identical (by pointer-like index check at call site).
+fn collision_entities(obj1: &Entity, obj2: &Entity, precis: bool, advanced_hitbox: bool) -> bool {
+    let (pos1, pos2) = (obj1.position, obj2.position);
+    let (h1, h2) = (&obj1.hitbox, &obj2.hitbox);
+    if !advanced_hitbox && !precis {
+        collision_circles(pos1, h1.int_radius, pos2, h2.int_radius)
+    } else if collision_circles(pos1, h1.int_radius, pos2, h2.int_radius) {
+        true
+    } else {
+        collision_poly(pos1, &h1.points.0, obj1.orientation, pos2, h2.int_radius)
+            || collision_poly(pos2, &h2.points.0, obj2.orientation, pos1, h1.int_radius)
+    }
+}
+
 /// Main game update: movement, transfers, spawning, despawn.
 /// Called each frame when not paused.
 pub fn update_game(state: &mut GameState, globals: &mut Globals) {
