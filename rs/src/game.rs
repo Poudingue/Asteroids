@@ -1016,7 +1016,16 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
                     FLASHES_NORMAL_MASS,
                     &mut state.rng,
                 );
-                let _ = se; // side effects handled if needed
+                if let Some(ac) = se.add_color {
+                    globals.add_color = (
+                        globals.add_color.0 + ac.0,
+                        globals.add_color.1 + ac.1,
+                        globals.add_color.2 + ac.2,
+                    );
+                }
+                if let Some(em) = se.exposure_multiplier {
+                    globals.game_exposure *= em;
+                }
                 explo
             })
             .collect();
