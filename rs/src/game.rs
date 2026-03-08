@@ -815,6 +815,85 @@ fn consequences_collision_frags(mut f1: Entity, mut f2: Entity, globals: &Global
     (f1, f2)
 }
 
+/// Collect all colliding (e1, e2) pairs from two grid cell lists.
+/// Matches OCaml: iterates list1 × list2; for same list (tab1==tab2) this gives both directions.
+fn collect_pairs_for_cell(
+    cell1: &[GridEntry],
+    cell2: &[GridEntry],
+    state: &GameState,
+    precis: bool,
+    globals: &Globals,
+    pairs: &mut Vec<(GridEntry, GridEntry)>,
+) {
+    for &e1 in cell1 {
+        for &e2 in cell2 {
+            if e1 == e2 {
+                continue; // same entity — matches OCaml's objet1 = objet2 check
+            }
+            let ent1 = get_entity(state, e1);
+            let ent2 = get_entity(state, e2);
+            if collision_entities(ent1, ent2, precis, globals.advanced_hitbox) {
+                pairs.push((e1, e2));
+            }
+        }
+    }
+}
+
+/// Apply physical collision consequences to all collected pairs.
+fn apply_collision_pairs(
+    pairs: &[(GridEntry, GridEntry)],
+    state: &mut GameState,
+    globals: &mut Globals,
+) {
+    for &(e1_ref, e2_ref) in pairs {
+        let e1 = get_entity(state, e1_ref).clone();
+        let e2 = get_entity(state, e2_ref).clone();
+        let (new_e1, new_e2) = consequences_collision(e1, e2, globals);
+        *get_entity_mut(state, e1_ref) = new_e1;
+        *get_entity_mut(state, e2_ref) = new_e2;
+    }
+}
+
+/// Run collision detection between two grids, applying consequences.
+/// `extend=true`: also check adjacent cells (right, down, diagonal).
+/// Matches OCaml calculate_collision_tables.
+fn calculate_collision_tables(
+    grid1: &CollisionGrid,
+    grid2: &CollisionGrid,
+    extend: bool,
+    state: &mut GameState,
+    globals: &mut Globals,
+) {
+    let w = WIDTH_COLLISION_TABLE as usize;
+    let h = HEIGHT_COLLISION_TABLE as usize;
+    let mut pairs: Vec<(GridEntry, GridEntry)> = Vec::new();
+
+    // Same-cell pairs (always)
+    for x in 0..w {
+        for y in 0..h {
+            let idx = x * h + y;
+            collect_pairs_for_cell(&grid1[idx], &grid2[idx], state, true, globals, &mut pairs);
+        }
+    }
+
+    // Adjacent-cell pairs (only when extend=true)
+    if extend {
+        for x in 0..w - 1 {
+            for y in 0..h - 1 {
+                let base = x * h + y;
+                let right = base + h;      // x+1, y
+                let down  = base + 1;      // x, y+1
+                let diag  = base + h + 1;  // x+1, y+1
+                collect_pairs_for_cell(&grid1[base], &grid2[down],  state, false, globals, &mut pairs);
+                collect_pairs_for_cell(&grid1[base], &grid2[right], state, false, globals, &mut pairs);
+                collect_pairs_for_cell(&grid1[base], &grid2[diag],  state, false, globals, &mut pairs);
+            }
+        }
+    }
+
+    apply_collision_pairs(&pairs, state, globals);
+}
+
 /// Main game update: movement, transfers, spawning, despawn.
 /// Called each frame when not paused.
 pub fn update_game(state: &mut GameState, globals: &mut Globals) {
