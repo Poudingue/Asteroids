@@ -29,11 +29,7 @@ fn make_grid() -> CollisionGrid {
     vec![Vec::new(); (WIDTH_COLLISION_TABLE * HEIGHT_COLLISION_TABLE) as usize]
 }
 
-fn clear_grid(grid: &mut CollisionGrid) {
-    for cell in grid.iter_mut() {
-        cell.clear();
-    }
-}
+
 
 /// Insert a slice of (entry, position) pairs into the collision grid.
 /// Matches OCaml rev_filtertable: each entity goes into one cell (its center).
@@ -1001,7 +997,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // === Collision detection ===
     // Asteroid vs asteroid (extend=true)
-    calculate_collision_tables(&grid_objects.clone(), &grid_objects.clone(), true, state, globals);
+    calculate_collision_tables(&grid_objects, &grid_objects, true, state, globals);
     // Asteroid vs toosmall (extend=false)
     calculate_collision_tables(&grid_objects.clone(), &grid_toosmall.clone(), false, state, globals);
     // Ship/other vs asteroid (extend=true)
@@ -1011,7 +1007,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // Ship/other vs fragment (extend=true)
     calculate_collision_tables(&grid_other.clone(), &grid_frag.clone(), true, state, globals);
 
-    // === Destroyed asteroid accounting ===
+    // === Destroyed entity accounting (asteroids + fragments) ===
     let nb_destroyed = state.objects.iter().filter(|e| is_dead(e)).count()
         + state.objects_oos.iter().filter(|e| is_dead(e)).count()
         + state.toosmall.iter().filter(|e| is_dead(e)).count()
