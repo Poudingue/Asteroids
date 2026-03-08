@@ -936,7 +936,7 @@ fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
     state.objects.extend(settled);
 }
 
-/// Main game update: movement, transfers, spawning, despawn.
+/// Main game update: movement, transfers, collisions, spawning, despawn.
 /// Called each frame when not paused.
 pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // Update observer proper time (for time dilation)
@@ -971,8 +971,59 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     transfer_oos(&mut state.toosmall, &mut state.toosmall_oos, globals);
     transfer_oos(&mut state.chunks, &mut state.chunks_oos, globals);
 
+    // === Collision grids ===
+    let mut grid_objects  = make_grid();
+    let mut grid_toosmall = make_grid();
+    let mut grid_other    = make_grid();
+    let mut grid_frag     = make_grid();
+
+    let mut entries_obj: Vec<(GridEntry, Vec2)> = state.objects
+        .iter().enumerate().map(|(i, e)| (GridEntry::Object(i), e.position)).collect();
+    entries_obj.extend(state.objects_oos
+        .iter().enumerate().map(|(i, e)| (GridEntry::ObjectOos(i), e.position)));
+
+    let mut entries_small: Vec<(GridEntry, Vec2)> = state.toosmall
+        .iter().enumerate().map(|(i, e)| (GridEntry::TooSmall(i), e.position)).collect();
+    entries_small.extend(state.toosmall_oos
+        .iter().enumerate().map(|(i, e)| (GridEntry::TooSmallOos(i), e.position)));
+
+    let entries_other: Vec<(GridEntry, Vec2)> = vec![
+        (GridEntry::Ship, state.ship.position),
+    ];
+
+    let entries_frag: Vec<(GridEntry, Vec2)> = state.fragments
+        .iter().enumerate().map(|(i, e)| (GridEntry::Fragment(i), e.position)).collect();
+
+    insert_into_grid(&entries_obj,   &mut grid_objects,  globals);
+    insert_into_grid(&entries_small, &mut grid_toosmall, globals);
+    insert_into_grid(&entries_other, &mut grid_other,    globals);
+    insert_into_grid(&entries_frag,  &mut grid_frag,     globals);
+
+    // === Collision detection ===
+    // Asteroid vs asteroid (extend=true)
+    calculate_collision_tables(&grid_objects.clone(), &grid_objects.clone(), true, state, globals);
+    // Asteroid vs toosmall (extend=false)
+    calculate_collision_tables(&grid_objects.clone(), &grid_toosmall.clone(), false, state, globals);
+    // Ship/other vs asteroid (extend=true)
+    calculate_collision_tables(&grid_other.clone(), &grid_objects.clone(), true, state, globals);
+    // Ship/other vs toosmall (extend=true)
+    calculate_collision_tables(&grid_other.clone(), &grid_toosmall.clone(), true, state, globals);
+    // Ship/other vs fragment (extend=true)
+    calculate_collision_tables(&grid_other.clone(), &grid_frag.clone(), true, state, globals);
+
+    // === Destroyed asteroid accounting ===
+    let nb_destroyed = state.objects.iter().filter(|e| is_dead(e)).count()
+        + state.objects_oos.iter().filter(|e| is_dead(e)).count()
+        + state.toosmall.iter().filter(|e| is_dead(e)).count()
+        + state.toosmall_oos.iter().filter(|e| is_dead(e)).count()
+        + state.fragments.iter().filter(|e| is_dead(e)).count();
+    globals.game_speed *= RATIO_TIME_DESTR_ASTEROID.powi(nb_destroyed as i32);
+    state.score += nb_destroyed as i32;
+
+    // === Fragment vs fragment repulsion + promotion ===
+    run_fragment_collisions(state, globals);
+
     // --- Fragmentation (spawn fragments from dead entities) ---
-    // (No collisions yet — entities won't die until Task 8, but code is ready)
     spawn_n_frags(&state.objects.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
     spawn_n_frags(&state.toosmall.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
     spawn_n_frags(&state.fragments.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
