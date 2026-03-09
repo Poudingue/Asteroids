@@ -1,0 +1,10 @@
+# Build artifacts
+rs/target/
+*.exe
+
+# SDL2 binaries
+rs/SDL2.dll
+
+# IDE / tool config
+.claude/
+.serena/
