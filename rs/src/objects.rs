@@ -1,4 +1,3 @@
-use crate::color::HdrColor;
 use crate::parameters::{
     ASTEROID_MAX_SPAWN_RADIUS, ASTEROID_MAX_VELOCITY, ASTEROID_MIN_SPAWN_RADIUS,
     ASTEROID_MIN_VELOCITY, ASTEROID_STAGE_VELOCITY,
@@ -406,7 +405,7 @@ pub fn spawn_explosion_object(
     obj: &Entity,
     flashes_enabled: bool,
     variable_exposure_enabled: bool,
-    flashes_saturate: f64,
+    _flashes_saturate: f64,
     flashes_explosion: f64,
     flashes_normal_mass: f64,
     rng: &mut impl Rng,
@@ -517,7 +516,7 @@ pub fn spawn_explosion_death(ship: &Entity, elapsed_time: f64, rng: &mut impl Rn
 pub fn spawn_explosion_chunk(
     obj: &Entity,
     flashes_enabled: bool,
-    flashes_saturate: f64,
+    _flashes_saturate: f64,
     flashes_explosion: f64,
     flashes_normal_mass: f64,
     rng: &mut impl Rng,

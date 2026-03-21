@@ -133,7 +133,7 @@ fn main() {
 
             // Mouse click = accelerate forward
             if mouse_state.left() {
-                game::acceleration(&mut state.ship, &globals);
+                game::acceleration(&mut state, &globals);
             }
 
             // Keyboard input (scancodes = physical key positions)
@@ -145,9 +145,9 @@ fn main() {
             // Forward: W (physical) = Z on AZERTY
             if keyboard.is_scancode_pressed(Scancode::W) {
                 if globals.ship_impulse_pos {
-                    game::boost_forward(&mut state.ship);
+                    game::boost_forward(&mut state, &globals);
                 } else {
-                    game::acceleration(&mut state.ship, &globals);
+                    game::acceleration(&mut state, &globals);
                 }
             }
             // Rotate left: A (physical) = Q on AZERTY
@@ -198,7 +198,7 @@ fn main() {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         renderer.begin_frame();
-        game::render_frame(&mut state, &globals, &mut renderer);
+        game::render_frame(&mut state, &mut globals, &mut renderer);
         renderer.end_frame(&device, &queue, &view, [0.0, 0.0, 0.0, 1.0]);
         output.present();
     }
