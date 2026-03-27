@@ -295,9 +295,9 @@ pub const MUZZLE_RATIO_SPEED: f64 = 0.05;
 // Constants (Fire/Thrust Parameters)
 // ============================================================================
 
-pub const FIRE_MAX_RANDOM: f64 = 250.0;
-pub const FIRE_MIN_SPEED: f64 = 800.0;
-pub const FIRE_MAX_SPEED: f64 = 1500.0;
+pub const FIRE_MAX_RANDOM: f64 = 300.0;
+pub const FIRE_MIN_SPEED: f64 = 1000.0;
+pub const FIRE_MAX_SPEED: f64 = 2000.0;
 pub const FIRE_RATIO_RADIUS: f64 = 1.4;
 
 // ============================================================================
@@ -343,7 +343,7 @@ pub const SCREENSHAKE_SMOOTH: bool = true; // Allows smoother, more realistic sc
 pub const SCREENSHAKE_SMOOTHNESS: f64 = 0.8; // 0 = no change, 0.5 = average, 1 = infinite smoothing, screen shake suppressed.
 pub const SCREENSHAKE_TIR_RATIO: f64 = 400.0;
 pub const SCREENSHAKE_DEATH: f64 = 6000.0;
-pub const SCREENSHAKE_DAM_RATIO: f64 = 0.005;
+pub const SCREENSHAKE_DAM_RATIO: f64 = 0.025; // bumped ×5 from OCaml's 0.005 for more impactful explosions
 pub const SCREENSHAKE_PHYS_RATIO: f64 = 0.005;
 pub const SCREENSHAKE_PHYS_MASS: f64 = 100000.0; // "Normal" screen shake mass. Lighter objects cause less, heavier objects cause more.
 pub const SCREENSHAKE_HALF_LIFE: f64 = 0.1;

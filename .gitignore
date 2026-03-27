@@ -1,9 +1,9 @@
 # Build artifacts
-rs/target/
+target/
 *.exe
 
 # SDL2 binaries
-rs/SDL2.dll
+SDL2.dll
 
 # IDE / tool config
 .claude/

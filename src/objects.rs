@@ -640,19 +640,21 @@ pub fn spawn_fire(ship: &Entity, rng: &mut impl Rng) -> Entity {
             ship.position,
             polar_to_affine(ship.orientation + PI, ship.hitbox.int_radius),
         ),
-        velocity: addtuple(
-            ship.velocity,
+        velocity: {
+            // Backward kick scales with ship speed so fire always ejects visually
+            let ship_speed = (ship.velocity.0 * ship.velocity.0 + ship.velocity.1 * ship.velocity.1).sqrt();
+            let kick = ship_speed + FIRE_MIN_SPEED + rng.gen::<f64>() * (FIRE_MAX_SPEED - FIRE_MIN_SPEED);
             addtuple(
-                polar_to_affine(
-                    ship.orientation + PI,
-                    FIRE_MIN_SPEED + rng.gen::<f64>() * (FIRE_MAX_SPEED - FIRE_MIN_SPEED),
+                ship.velocity,
+                addtuple(
+                    polar_to_affine(ship.orientation + PI, kick),
+                    polar_to_affine(
+                        rng.gen::<f64>() * 2.0 * PI,
+                        rng.gen::<f64>() * FIRE_MAX_RANDOM,
+                    ),
                 ),
-                polar_to_affine(
-                    rng.gen::<f64>() * 2.0 * PI,
-                    rng.gen::<f64>() * FIRE_MAX_RANDOM,
-                ),
-            ),
-        ),
+            )
+        },
         orientation: 0.0,
         moment: 0.0,
         proper_time: ship.proper_time,
