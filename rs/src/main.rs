@@ -101,9 +101,6 @@ fn main() {
         globals.time_last_frame = globals.time_current_frame;
         globals.time_current_frame = start_time.elapsed().as_secs_f64();
 
-        // Update per-frame globals (jitter, exposure, game speed, etc.)
-        game::update_frame(&mut globals, &mut state.rng);
-
         // Snapshot mouse position and button state before poll_iter
         let (mouse_x_snap, mouse_y_snap, mouse_left_snap) = {
             let ms = event_pump.mouse_state();
@@ -266,6 +263,10 @@ fn main() {
             // Update game state (physics, wrapping, asteroids, etc.)
             game::update_game(&mut state, &mut globals);
         }
+
+        // Update per-frame globals (screenshake pos, jitter, exposure, game speed, etc.)
+        // Must run AFTER update_game so screenshake from death/damage is sampled this frame
+        game::update_frame(&mut globals, &mut state.rng);
 
         // Render
         let output = match surface.get_current_texture() {

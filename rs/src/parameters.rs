@@ -295,9 +295,9 @@ pub const MUZZLE_RATIO_SPEED: f64 = 0.05;
 // Constants (Fire/Thrust Parameters)
 // ============================================================================
 
-pub const FIRE_MAX_RANDOM: f64 = 100.0;
-pub const FIRE_MIN_SPEED: f64 = 500.0;
-pub const FIRE_MAX_SPEED: f64 = 1000.0;
+pub const FIRE_MAX_RANDOM: f64 = 250.0;
+pub const FIRE_MIN_SPEED: f64 = 800.0;
+pub const FIRE_MAX_SPEED: f64 = 1500.0;
 pub const FIRE_RATIO_RADIUS: f64 = 1.4;
 
 // ============================================================================
