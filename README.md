@@ -1,48 +1,49 @@
-## Synopsis
+# Asteroids
 
-This project is based on an assignement, which goal was to imitate as closely as possible the classic arcade game Asteroids.
+A from-scratch Rust port of the classic arcade game, originally written in OCaml. Collision physics, advanced visual effects, and a solid gameplay loop.
 
-I ended up adding many features, including collision physics with energy conservation, advanced visual effects (considering the ocaml Graphics API), and an «ok» gameplay loop.
+## Stack
 
-Even though i used oCaml, a language i'm not really a big fan of, it worked out pretty good. I know the code is pretty clunky and repetitive sometimes, with some ugly workarounds, but it works !
+- **Rendering**: [wgpu](https://wgpu.rs/) (Vulkan backend) — immediate-mode 2D renderer with scanline polygon fill
+- **Windowing / input**: SDL2
+- **Other**: `rand`, custom HDR-ready linear color pipeline
 
-I work on it on my spare time, and make the source code available to everyone, for fun and learning.
+## Features
 
-> **Branch `claude-experiments`** — This branch is used to experiment with Claude (Anthropic's AI assistant) capabilities on this codebase. Changes here may be exploratory and are not guaranteed to be stable.
+- Fullscreen with 16:9 safe zone (F11 or Alt+Enter to toggle)
+- Screenshake on damage/explosions
+- Chunk explosion trails
+- Dynamic color effects (shield flash, damage pulse, engine fire)
+- Scancode-based input — layout-independent (AZERTY/QWERTY both work)
+- Pause menu with toggle buttons
+- Death phase: controllable burning wreck before respawn
+- Teleport (F key)
+- HUD bars (health, boost, etc.)
+- FPS counter
 
-## Compilation and Launch
+## Build & Run
 
-(You will need ocamlc)
-You can compile this game using the command line :
+Requires Rust + Cargo. SDL2 is bundled on Windows (`SDL2.dll` included).
 
-ocamlc -I +unix -I $(ocamlfind query graphics) -I ml -o asteroids unix.cma graphics.cma ml/parameters.ml ml/functions.ml ml/colors.ml ml/objects.ml ml/buttons.ml ml/hud.ml ml/asteroids.ml
-(for windows, it's asteroids.exe instead of asteroids)
+```bash
+cargo build
+cargo run
+```
 
-Run it with ./asteroids (.exe for windows)
+## Controls
 
-Default resolution is 1920x1080. You can change it in `ml/parameters.ml` (`width` and `height`).
+| Key | Action |
+|-----|--------|
+| W/Z or S | Thrust / brake |
+| A/Q or D | Rotate |
+| Space | Fire |
+| F | Teleport |
+| Esc / P | Pause |
+| F11 / Alt+Enter | Toggle fullscreen |
+| K | Quit |
 
-(Works both on linux and windows via powershell. Not sure for mac tho)
+Keys are scancode-based — physical position matters, not label. ZQSD (AZERTY) and WASD (QWERTY) both work out of the box.
 
-## Changelog
+## History
 
-v1.9 - Optimisation update WIP
-
-Features :
-- Runs a lot smoother, even with a lot of objects, thanks to an other way to optimise collisions calculation
-- Better camera behavior, still moves when paused, for style :)
-- Gameplay tweaks everywhere
-- Changed pause options
-
-Fixed :
-- Objects and fragments bouncing now time-based.
-- Proper time correctly taken into account for every object, for physics and rendering
-- Simplified code and objects
-
-Problems :
-- Now that the collision algorithm is optimised, what takes up most of the time is the rendering. Disable chunks and smoke effects for huge performance improvements.
-- Angular momentum of objects still not taken into account for physics
-- ???
-
-
-For all changelogs, see changelog.txt
+This started as an OCaml assignment. The original OCaml source is preserved in git history on the `master` and `claude-experiments` branches. The Rust port is a full rewrite targeting modern GPU rendering.
