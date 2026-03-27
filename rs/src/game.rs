@@ -806,7 +806,7 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
 fn damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
     let actual = (entity.dam_ratio * amount - entity.dam_res).max(0.0);
     entity.health -= actual;
-    globals.game_screenshake += actual * SCREENSHAKE_DAM_RATIO;
+    globals.game_screenshake += amount * SCREENSHAKE_DAM_RATIO;
     if globals.variable_exposure {
         globals.game_exposure *= EXPOSURE_RATIO_DAMAGE;
     }
@@ -2320,24 +2320,9 @@ pub fn applique_button(
     if globals.retro {
         // Retro mode: white fill if ON, black fill if OFF
         let fill_col = if on { [255u8, 255, 255, 255] } else { [0u8, 0, 0, 255] };
-        let text_col = if on { [0u8, 0, 0, 255] } else { [255u8, 255, 255, 255] };
         renderer.fill_poly(&rect_pts, fill_col);
         // White frame
         renderer.draw_poly(&rect_pts, [255, 255, 255, 255], 2.0 * rr as f32);
-        // Centered text (approximate: place at 10% from left, centered vertically)
-        let char_w = 0.5 * (x2 - x1) / (btn.text.len().max(1) as f64);
-        let char_h = 0.35 * (y2 - y1);
-        let text_x = x1 + 0.05 * (x2 - x1);
-        let text_y = y1 + 0.325 * (y2 - y1);
-        render_string(
-            btn.text,
-            (text_x, text_y),
-            char_w, char_h,
-            char_w * 0.1,
-            0.0,
-            text_col,
-            renderer, globals, rng,
-        );
     } else {
         // Normal mode
         let fill_col: [u8; 4] = if on { [0, 128, 0, 255] } else { [128, 0, 0, 255] };
@@ -2349,10 +2334,15 @@ pub fn applique_button(
     }
 
     // ---- Centered text (both modes) ----
-    let char_w = 0.5 * (x2 - x1) / (btn.text.len().max(1) as f64);
-    let char_h = 0.35 * (y2 - y1);
-    let text_x = x1 + 0.05 * (x2 - x1);
-    let text_y = y1 + 0.325 * (y2 - y1);
+    // Uniform character size based on safe zone (like HUD text), not button dimensions
+    let sh = globals.safe_phys_height;
+    let char_h = 0.02 * sh;
+    let char_w = char_h * 0.6;  // fixed aspect ratio
+    let char_sp = char_w * 0.15;
+    let text_total_w = btn.text.len() as f64 * (char_w + char_sp) - char_sp;
+    // Center text in button
+    let text_x = x1 + ((x2 - x1) - text_total_w) * 0.5;
+    let text_y = y1 + ((y2 - y1) - char_h) * 0.5;
     let text_col = if globals.retro {
         if on { [0u8, 0, 0, 255] } else { [255u8, 255, 255, 255] }
     } else {
@@ -2362,13 +2352,13 @@ pub fn applique_button(
         // Shadow: offset by -1 phys unit
         render_string(
             btn.text, (text_x - 1.0, text_y - 1.0),
-            char_w, char_h, char_w * 0.1, 0.0,
+            char_w, char_h, char_sp, 0.0,
             [0, 0, 0, 255], renderer, globals, rng,
         );
     }
     render_string(
         btn.text, (text_x, text_y),
-        char_w, char_h, char_w * 0.1, 0.0,
+        char_w, char_h, char_sp, 0.0,
         text_col, renderer, globals, rng,
     );
 
