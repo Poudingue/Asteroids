@@ -9,20 +9,25 @@ use std::time::Instant;
 
 use parameters::Globals;
 use renderer::Renderer2D;
+use sdl2::keyboard::Scancode;
 
 fn main() {
     // SDL2 init
     let sdl_context = sdl2::init().expect("Failed to init SDL2");
     let video_subsystem = sdl_context.video().expect("Failed to init video");
 
-    let width: u32 = parameters::WIDTH as u32;
-    let height: u32 = parameters::HEIGHT as u32;
-
-    let window = video_subsystem
-        .window("Asteroids", width, height)
-        .position_centered()
+    // Start borderless fullscreen at desktop resolution
+    let mut window = video_subsystem
+        .window("Asteroids", 0, 0)
+        .fullscreen_desktop()
         .build()
         .expect("Failed to create window");
+
+    // Ensure mouse cursor is visible (even in fullscreen)
+    sdl_context.mouse().show_cursor(true);
+
+    // Get the actual window dimensions after fullscreen
+    let (width, height) = window.size();
 
     // wgpu init
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -63,7 +68,7 @@ fn main() {
         .copied()
         .unwrap_or(surface_caps.formats[0]);
 
-    let config = wgpu::SurfaceConfiguration {
+    let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: surface_format,
         width,
@@ -79,6 +84,7 @@ fn main() {
 
     // Game state init
     let mut globals = Globals::new();
+    globals.recompute_for_resolution(width, height);
     let mut state = game::GameState::new(&globals);
     let start_time = Instant::now();
 
@@ -86,8 +92,11 @@ fn main() {
     let mut event_pump = sdl_context.event_pump().expect("Failed to get event pump");
     let mut running = true;
     let mut prev_w_pressed = false;
+    let mut is_fullscreen = true;
 
     while running {
+        let frame_start = Instant::now();
+
         // Update time
         globals.time_last_frame = globals.time_current_frame;
         globals.time_current_frame = start_time.elapsed().as_secs_f64();
@@ -95,28 +104,24 @@ fn main() {
         // Update per-frame globals (jitter, exposure, game speed, etc.)
         game::update_frame(&mut globals, &mut state.rng);
 
-        // Snapshot mouse position before poll_iter (which mutably borrows event_pump)
-        let (mouse_x_snap, mouse_y_snap) = {
+        // Snapshot mouse position and button state before poll_iter
+        let (mouse_x_snap, mouse_y_snap, mouse_left_snap) = {
             let ms = event_pump.mouse_state();
-            (ms.x() as f64, ms.y() as f64)
+            (ms.x() as f64, ms.y() as f64, ms.left())
         };
 
         // Poll events (discrete actions: quit, pause)
         for event in event_pump.poll_iter() {
-            use sdl2::event::Event;
+            use sdl2::event::{Event, WindowEvent};
             use sdl2::keyboard::Keycode;
             match event {
                 Event::Quit { .. } => running = false,
                 Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                }
-                | Event::KeyDown {
                     keycode: Some(Keycode::K),
                     ..
                 } => running = false,
                 Event::KeyDown {
-                    keycode: Some(Keycode::P),
+                    keycode: Some(Keycode::P) | Some(Keycode::Escape),
                     repeat: false,
                     ..
                 } => globals.pause = !globals.pause,
@@ -130,15 +135,83 @@ fn main() {
                     globals.pause = false;
                 }
                 Event::KeyDown {
-                    keycode: Some(Keycode::F),
+                    scancode: Some(Scancode::F),
                     repeat: false,
                     ..
                 } => {
                     game::teleport(&mut state, &mut globals, mouse_x_snap, mouse_y_snap);
                 }
+                // F11: toggle fullscreen
+                Event::KeyDown {
+                    keycode: Some(Keycode::F11),
+                    repeat: false,
+                    ..
+                } => {
+                    use sdl2::video::FullscreenType;
+                    if is_fullscreen {
+                        window
+                            .set_fullscreen(FullscreenType::Off)
+                            .unwrap_or_else(|e| eprintln!("Fullscreen toggle failed: {e}"));
+                        is_fullscreen = false;
+                    } else {
+                        window
+                            .set_fullscreen(FullscreenType::Desktop)
+                            .unwrap_or_else(|e| eprintln!("Fullscreen toggle failed: {e}"));
+                        is_fullscreen = true;
+                    }
+                }
+                // Alt+Enter: toggle fullscreen
+                Event::KeyDown {
+                    keycode: Some(Keycode::Return),
+                    keymod,
+                    repeat: false,
+                    ..
+                } if keymod.contains(sdl2::keyboard::Mod::LALTMOD)
+                  || keymod.contains(sdl2::keyboard::Mod::RALTMOD) =>
+                {
+                    use sdl2::video::FullscreenType;
+                    if is_fullscreen {
+                        window
+                            .set_fullscreen(FullscreenType::Off)
+                            .unwrap_or_else(|e| eprintln!("Fullscreen toggle failed: {e}"));
+                        is_fullscreen = false;
+                    } else {
+                        window
+                            .set_fullscreen(FullscreenType::Desktop)
+                            .unwrap_or_else(|e| eprintln!("Fullscreen toggle failed: {e}"));
+                        is_fullscreen = true;
+                    }
+                }
+                // Window resize: reconfigure wgpu surface, renderer, and physics dimensions
+                Event::Window {
+                    win_event: WindowEvent::Resized(w, h),
+                    ..
+                } => {
+                    let new_w = w.max(1) as u32;
+                    let new_h = h.max(1) as u32;
+                    config.width = new_w;
+                    config.height = new_h;
+                    surface.configure(&device, &config);
+                    renderer.resize(&queue, new_w, new_h);
+                    globals.recompute_for_resolution(new_w, new_h);
+                }
                 _ => {}
             }
         }
+
+        // Handle flags set by pause menu buttons
+        if globals.quit {
+            running = false;
+        }
+        if globals.restart {
+            globals.restart = false;
+            globals.pause = false;
+            state = game::GameState::new(&globals);
+            globals.game_exposure = 0.0;
+        }
+
+        // Track mouse button state in GameState
+        state.mouse_button_down = mouse_left_snap;
 
         if !globals.pause {
             // Mouse aim
@@ -216,8 +289,9 @@ fn main() {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         renderer.begin_frame();
-        game::render_frame(&mut state, &mut globals, &mut renderer);
+        game::render_frame(&mut state, &mut globals, &mut renderer, mouse_x_snap, mouse_y_snap, mouse_left_snap);
         renderer.end_frame(&device, &queue, &view, [0.0, 0.0, 0.0, 1.0]);
+        globals.frame_compute_secs = frame_start.elapsed().as_secs_f64();
         output.present();
     }
 

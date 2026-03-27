@@ -123,6 +123,17 @@ impl Renderer2D {
         }
     }
 
+    /// Update the screen size uniform buffer after a window resize.
+    pub fn resize(&mut self, queue: &wgpu::Queue, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
+        queue.write_buffer(
+            &self.screen_size_buffer,
+            0,
+            bytemuck::cast_slice(&[width as f32, height as f32]),
+        );
+    }
+
     pub fn begin_frame(&mut self) {
         self.vertices.clear();
     }

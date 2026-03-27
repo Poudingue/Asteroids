@@ -84,6 +84,31 @@ pub struct GameState {
     pub sparks: Vec<Entity>,
     pub stars: Vec<Star>,
     pub rng: ThreadRng,
+    /// Pause menu interactive buttons.
+    pub buttons: Vec<ButtonBoolean>,
+    /// Left mouse button state — used for rising-edge click detection.
+    pub mouse_button_down: bool,
+}
+
+// ============================================================================
+// Pause menu button system
+// ============================================================================
+
+/// An interactive toggle button for the pause screen.
+/// Matches OCaml `button_bool` record.
+pub struct ButtonBoolean {
+    /// Bottom-left corner in physical coordinates.
+    pub pos1: (f64, f64),
+    /// Top-right corner in physical coordinates.
+    pub pos2: (f64, f64),
+    /// Label rendered inside the button.
+    pub text: &'static str,
+    /// Tooltip rendered near the mouse when hovering.
+    pub text_over: &'static str,
+    /// Which `Globals` boolean field this button controls.
+    pub field: GlobalToggle,
+    /// Left-mouse state from the previous frame (for rising-edge detection).
+    pub last_mouse_state: bool,
 }
 
 impl GameState {
@@ -122,6 +147,8 @@ impl GameState {
                 &mut rng,
             ),
             rng,
+            buttons: make_buttons(globals),
+            mouse_button_down: false,
         }
     }
 }
@@ -378,7 +405,7 @@ pub fn aim_at_mouse(ship: &mut Entity, mouse_x: i32, mouse_y: i32, globals: &Glo
         // Flip SDL2 Y-down to renderer Y-up coordinates
     let mouse_phys = (
         mouse_x as f64 / globals.ratio_rendu,
-        (HEIGHT as f64 - mouse_y as f64) / globals.ratio_rendu,
+        (globals.phys_height * globals.ratio_rendu - mouse_y as f64) / globals.ratio_rendu,
     );
     let (theta, _) = affine_to_polar(soustuple(mouse_phys, ship.position));
     ship.orientation = theta;
@@ -1292,6 +1319,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     inertie_objets(&mut state.fragments, globals);
     inertie_objets(&mut state.chunks, globals);
     inertie_objets(&mut state.chunks_oos, globals);
+    inertie_objets(&mut state.chunks_explo, globals);
 
     // --- Rotation (moment update) ---
     moment_objet(&mut state.ship, globals);
@@ -1728,17 +1756,17 @@ fn shape_char(c: char) -> Vec<(f64, f64)> {
         'I' => vec![(0.125,0.),(0.875,0.),(0.875,0.2),(0.625,0.2),(0.625,0.8),(0.875,0.8),(0.875,1.),(0.125,1.),(0.125,0.8),(0.375,0.8),(0.375,0.2),(0.125,0.2)],
         'J' => vec![(0.25,1.),(0.5,1.),(0.75,0.8),(0.75,0.2),(1.,0.2),(1.,0.),(0.,0.),(0.,0.2),(0.25,0.2),(0.25,0.8),(0.,0.8)],
         'K' => vec![(0.,1.),(0.25,1.),(0.25,0.6),(0.75,1.),(1.,1.),(0.375,0.5),(1.,0.),(0.75,0.),(0.25,0.4),(0.25,0.),(0.,0.)],
-        'L' => vec![(0.,0.),(0.,1.),(0.25,1.),(0.25,0.8),(1.,0.8),(0.75,1.),(1.,1.)],
+        'L' => vec![(0.,0.),(0.,1.),(0.25,1.),(0.25,0.2),(1.,0.2),(1.,0.)],
         'M' => vec![(0.,1.),(0.25,1.),(0.5,0.6),(0.75,1.),(1.,1.),(1.,0.),(0.75,0.),(0.75,0.6),(0.5,0.2),(0.25,0.6),(0.25,0.),(0.,0.)],
         'N' => vec![(0.,1.),(0.25,1.),(0.75,0.4),(0.75,1.),(1.,1.),(1.,0.),(0.75,0.),(0.25,0.6),(0.25,0.),(0.,0.)],
         'O' => vec![(0.25,0.),(0.75,0.),(1.,0.2),(1.,0.8),(0.75,1.),(0.25,1.),(0.,0.8),(0.,0.2),(0.25,0.2),(0.25,0.8),(0.75,0.8),(0.75,0.2),(0.,0.2)],
-        'P' => vec![(0.,1.),(0.25,1.),(0.25,0.6),(0.75,0.6),(0.75,0.4),(0.25,0.4),(0.25,0.),(0.,0.),(0.,0.4),(0.75,0.4),(1.,0.2),(1.,0.),(0.75,0.),(0.25,0.2)],
+        'P' => vec![(0.,0.),(0.25,0.),(0.25,0.5),(0.75,0.5),(1.,0.6),(1.,0.8),(0.75,1.),(0.25,1.),(0.,1.)],
         'Q' => vec![(0.25,1.),(0.75,1.),(1.,0.8),(1.,0.2),(0.75,0.),(0.25,0.),(0.,0.2),(0.,0.8),(0.25,0.8),(0.25,0.2),(0.75,0.2),(0.75,0.8),(0.,0.8),(0.5,0.6),(1.,1.)],
         'R' => vec![(0.,0.),(0.25,0.),(0.25,0.8),(0.75,0.8),(0.75,0.6),(0.25,0.6),(0.25,0.4),(0.75,0.),(1.,0.),(0.5,0.4),(0.75,0.4),(1.,0.6),(1.,0.8),(0.75,1.),(0.,1.)],
         'S' => vec![(0.25,0.),(0.75,0.),(1.,0.2),(1.,0.4),(0.75,0.6),(0.25,0.6),(0.25,0.8),(1.,0.8),(0.75,1.),(0.25,1.),(0.,0.8),(0.,0.6),(0.25,0.4),(0.75,0.4),(0.75,0.2),(0.,0.2)],
         'T' => vec![(0.385,0.),(0.625,0.),(0.625,0.8),(1.,0.8),(1.,1.),(0.,1.),(0.,0.8),(0.385,0.8)],
-        'U' => vec![(0.,0.),(0.,0.8),(0.25,1.),(0.75,1.),(1.,0.8),(1.,0.),(0.75,0.),(0.75,0.8),(0.25,0.8),(0.25,0.)],
-        'V' => vec![(0.,0.),(0.2,1.),(0.5,0.8),(0.8,1.),(1.,0.),(0.6,0.6),(0.5,0.4),(0.4,0.6)],
+        'U' => vec![(0.,1.),(0.25,1.),(0.25,0.2),(0.75,0.2),(0.75,1.),(1.,1.),(1.,0.),(0.75,0.),(0.25,0.),(0.,0.)],
+        'V' => vec![(0.,1.),(0.25,1.),(0.5,0.2),(0.75,1.),(1.,1.),(0.6,0.),(0.4,0.)],
         'W' => vec![(0.,1.),(0.2,0.),(0.4,0.),(0.5,0.2),(0.6,0.),(0.8,0.),(1.,1.),(0.6,0.4),(0.6,0.6),(0.4,0.6),(0.4,0.4),(0.2,1.)],
         'X' => vec![(0.,1.),(0.25,1.),(0.5,0.6),(0.75,1.),(1.,1.),(0.625,0.5),(1.,0.),(0.75,0.),(0.5,0.4),(0.25,0.),(0.,0.),(0.375,0.5)],
         'Y' => vec![(0.,0.),(0.25,0.),(0.5,0.4),(0.75,0.),(1.,0.),(0.625,0.6),(0.625,1.),(0.375,1.),(0.375,0.6)],
@@ -1941,16 +1969,20 @@ fn draw_heart(
 
 /// Render `n` hearts for the lives display. Matches OCaml `draw_n_hearts`.
 fn draw_n_hearts(n: i32, color: [u8; 4], renderer: &mut Renderer2D, globals: &Globals) {
-    let mut lastx = 0.95 * globals.phys_width;
+    let sx = globals.safe_offset_x;
+    let sy = globals.safe_offset_y;
+    let sw = globals.safe_phys_width;
+    let sh = globals.safe_phys_height;
+    let mut lastx = sx + 0.95 * sw;
     for _ in 0..n {
         draw_heart(
-            (lastx - 0.03 * globals.phys_width, 0.75 * globals.phys_height),
-            (lastx,                              0.80 * globals.phys_height),
+            (lastx - 0.03 * sw, sy + 0.75 * sh),
+            (lastx,              sy + 0.80 * sh),
             color,
             renderer,
             globals.ratio_rendu,
         );
-        lastx -= 0.05 * globals.phys_width;
+        lastx -= 0.05 * sw;
     }
 }
 
@@ -1996,12 +2028,28 @@ pub fn render_hud(
     let frame_color: [u8; 4] = [64, 64, 64, 255];
     let frame_width: f32 = 10.0 * globals.ratio_rendu as f32;
 
+    // ----- Safe zone for HUD placement -----
+    let sx = globals.safe_offset_x;
+    let sy = globals.safe_offset_y;
+    let sw = globals.safe_phys_width;
+    let sh = globals.safe_phys_height;
+    let pw = globals.phys_width;
+    let ph = globals.phys_height;
+
+    // Helper: convert safe-zone-relative fraction to full-screen fraction for affiche_barre
+    // affiche_barre quads use fractions of phys_width/phys_height
+    let fx = |frac: f64| -> f64 { (sx + frac * sw) / pw };
+    let fy = |frac: f64| -> f64 { (sy + frac * sh) / ph };
+
     // ----- Hearts (lives) -----
     draw_n_hearts(state.lives, red, renderer, globals);
 
     // ----- Health bar -----
     // last_health tracks delayed (smooth) health
-    let health_quad: [(f64, f64); 4] = [(0.95,0.9),(0.95,0.85),(0.6,0.85),(0.55,0.9)];
+    let health_quad: [(f64, f64); 4] = [
+        (fx(0.95), fy(0.9)),  (fx(0.95), fy(0.85)),
+        (fx(0.6),  fy(0.85)), (fx(0.55), fy(0.9)),
+    ];
     affiche_barre(1.0, &health_quad, dark_red,  renderer, globals);
     affiche_barre(
         (state.last_health / SHIP_MAX_HEALTH).min(1.0).max(0.0),
@@ -2014,7 +2062,10 @@ pub fn render_hud(
     draw_bar_frame(&health_quad, frame_color, frame_width, renderer, globals);
 
     // ----- Teleport cooldown bar -----
-    let tp_quad: [(f64, f64); 4] = [(0.95,0.7),(0.95,0.65),(0.8,0.65),(0.75,0.7)];
+    let tp_quad: [(f64, f64); 4] = [
+        (fx(0.95), fy(0.7)),  (fx(0.95), fy(0.65)),
+        (fx(0.8),  fy(0.65)), (fx(0.75), fy(0.7)),
+    ];
     let tp_ratio = ((COOLDOWN_TP - state.cooldown_tp.max(0.0)) / COOLDOWN_TP).min(1.0).max(0.0);
     affiche_barre(1.0, &tp_quad, dark_blue, renderer, globals);
     affiche_barre(tp_ratio, &tp_quad, cyan, renderer, globals);
@@ -2023,16 +2074,19 @@ pub fn render_hud(
     // Render 'F' indicator when teleport ready
     if state.cooldown_tp <= 0.0 {
         let encadrement: [(f64, f64); 4] = [
-            (0.7  * globals.phys_width, 0.65 * globals.phys_height),
-            (0.72 * globals.phys_width, 0.65 * globals.phys_height),
-            (0.72 * globals.phys_width, 0.7  * globals.phys_height),
-            (0.7  * globals.phys_width, 0.7  * globals.phys_height),
+            (sx + 0.7  * sw, sy + 0.65 * sh),
+            (sx + 0.72 * sw, sy + 0.65 * sh),
+            (sx + 0.72 * sw, sy + 0.7  * sh),
+            (sx + 0.7  * sw, sy + 0.7  * sh),
         ];
         render_char(&encadrement, 'F', cyan, renderer, globals.ratio_rendu);
     }
 
     // ----- Weapon cooldown bar -----
-    let weapon_quad: [(f64, f64); 4] = [(0.95,0.6),(0.95,0.55),(0.9,0.55),(0.85,0.6)];
+    let weapon_quad: [(f64, f64); 4] = [
+        (fx(0.95), fy(0.6)),  (fx(0.95), fy(0.55)),
+        (fx(0.9),  fy(0.55)), (fx(0.85), fy(0.6)),
+    ];
     let weapon_ratio = ((globals.projectile_cooldown - state.cooldown.max(0.0)) / globals.projectile_cooldown)
         .min(1.0)
         .max(0.0);
@@ -2051,13 +2105,13 @@ pub fn render_hud(
     );
     let score_str = format!("SCORE {}", state.score);
     let shake = globals.shake_score * 7.0;
-    let base_l_char = (1.0 + 0.05 * globals.shake_score) * 0.03 * globals.phys_width;
-    let base_h_char = (1.0 + 0.05 * globals.shake_score) * 0.08 * globals.phys_height;
-    let base_l_space = (1.0 + 0.05 * globals.shake_score) * 0.01 * globals.phys_width;
-    let score_y = 0.82 * globals.phys_height * (1.0 - 0.05 * globals.shake_score * 0.08);
+    let base_l_char = (1.0 + 0.05 * globals.shake_score) * 0.03 * sw;
+    let base_h_char = (1.0 + 0.05 * globals.shake_score) * 0.08 * sh;
+    let base_l_space = (1.0 + 0.05 * globals.shake_score) * 0.01 * sw;
+    let score_y = sy + 0.82 * sh * (1.0 - 0.05 * globals.shake_score * 0.08);
     render_string(
         &score_str,
-        (0.02 * globals.phys_width, score_y),
+        (sx + 0.02 * sw, score_y),
         base_l_char,
         base_h_char,
         base_l_space,
@@ -2072,10 +2126,10 @@ pub fn render_hud(
     let stage_str = format!("STAGE {}", state.stage);
     render_string(
         &stage_str,
-        (0.02 * globals.phys_width, 0.7 * globals.phys_height),
-        0.02 * globals.phys_width,
-        0.05 * globals.phys_height,
-        0.01 * globals.phys_width,
+        (sx + 0.02 * sw, sy + 0.7 * sh),
+        0.02 * sw,
+        0.05 * sh,
+        0.01 * sw,
         0.0,
         white,
         renderer,
@@ -2094,10 +2148,10 @@ pub fn render_hud(
                 let count_str = format!("{}", (time_until_explo + 1.0) as i32);
                 render_string(
                     &count_str,
-                    (0.42 * globals.phys_width, 0.3 * globals.phys_height),
-                    0.16 * globals.phys_width,
-                    0.4  * globals.phys_height,
-                    0.01 * globals.phys_width,
+                    (sx + 0.42 * sw, sy + 0.3 * sh),
+                    0.16 * sw,
+                    0.4  * sh,
+                    0.01 * sw,
                     0.0,
                     white,
                     renderer,
@@ -2108,12 +2162,11 @@ pub fn render_hud(
         }
     }
 
-    // ----- Debug stats -----
-    // Only shown when not retro (already guarded above)
-    let debug_x = 0.01  * globals.phys_width;
-    let debug_l = 0.012 * globals.phys_width;
-    let debug_h = 0.025 * globals.phys_height;
-    let debug_sp = 0.003 * globals.phys_width;
+    // ----- Debug stats (half size) -----
+    let debug_x = sx + 0.01 * sw;
+    let debug_l = 0.006 * sw;
+    let debug_h = 0.0125 * sh;
+    let debug_sp = 0.0015 * sw;
     let debug_color = white;
 
     let nb_objets   = state.objects.len()   + state.objects_oos.len();
@@ -2131,8 +2184,15 @@ pub fn render_hud(
         0
     };
 
+    let peak_fps = if globals.frame_compute_secs > 0.0 {
+        (1.0 / globals.frame_compute_secs).round() as i32
+    } else {
+        0
+    };
+
     let debug_lines = [
         format!("FPS        : {}", fps),
+        format!("Peak FPS   : {}", peak_fps),
         format!("Objets     : {}", nb_objets),
         format!("TooSmall   : {}", nb_toosmall),
         format!("Frags      : {}", nb_frags),
@@ -2160,40 +2220,288 @@ pub fn render_hud(
     }
 }
 
-/// Render the pause screen title "ASTEROIDS".
-/// Matches OCaml `affiche_hud` pause block.
-pub fn render_pause_title(
-    globals: &Globals,
+// ============================================================================
+// Pause button helpers
+// ============================================================================
+
+/// Build the full list of pause-screen buttons.
+/// Positions are computed as fractions of the 16:9 safe zone on a 16×24 grid.
+fn make_buttons(globals: &Globals) -> Vec<ButtonBoolean> {
+    let sx = globals.safe_offset_x;
+    let sy = globals.safe_offset_y;
+    let w = globals.safe_phys_width;
+    let h = globals.safe_phys_height;
+    // Macro-style helper: build one ButtonBoolean from grid fractions
+    macro_rules! btn {
+        ($text:expr, $text_over:expr,
+         $c1:expr, $r1:expr, $c2:expr, $r2:expr,
+         $field:expr) => {
+            ButtonBoolean {
+                pos1: (sx + $c1 / 16.0 * w, sy + $r1 / 24.0 * h),
+                pos2: (sx + $c2 / 16.0 * w, sy + $r2 / 24.0 * h),
+                text: $text,
+                text_over: $text_over,
+                field: $field,
+                last_mouse_state: false,
+            }
+        };
+    }
+    vec![
+        btn!("quit",             "Quit the game and go outside",
+             10.0, 20.0, 12.0, 22.0, GlobalToggle::Quit),
+        btn!("resume",           "Resume current game",
+             7.0,  20.0,  9.0, 22.0, GlobalToggle::Pause),
+        btn!("New Game",         "Start a new game with current parameters",
+             4.0,  20.0,  6.0, 22.0, GlobalToggle::Restart),
+        btn!("scanlines",        "Imitates the look of old CRT monitors.\nLowers luminosity.",
+             10.0, 12.0, 12.0, 14.0, GlobalToggle::Scanlines),
+        btn!("retro visuals",    "White vectors on black background design",
+             7.0,  12.0,  9.0, 14.0, GlobalToggle::Retro),
+        btn!("Advanced hitbox",  "A more precise hitbox.",
+             10.0,  9.0, 12.0, 11.0, GlobalToggle::AdvancedHitbox),
+        btn!("smoke particles",  "Allows smoke. Disable for better performance.",
+             7.0,   6.0,  9.0,  8.0, GlobalToggle::Smoke),
+        btn!("screenshake",      "Feel the impacts and explosions.",
+             4.0,   6.0,  6.0,  8.0, GlobalToggle::Screenshake),
+        btn!("Light Flashes",    "Activates light flashes for events",
+             10.0,  6.0, 12.0,  8.0, GlobalToggle::Flashes),
+        btn!("chunk particles",  "Allows chunks. Disable for better performance.",
+             7.0,   3.0,  9.0,  5.0, GlobalToggle::Chunks),
+        btn!("Color Effects",    "Color changes and correction",
+             10.0,  3.0, 12.0,  5.0, GlobalToggle::DynColor),
+    ]
+}
+
+/// Convert screen Y (SDL2, Y-down) to physical Y (Y-up).
+#[inline]
+fn screen_to_phys_y(screen_y: f64, globals: &Globals) -> f64 {
+    globals.phys_height - screen_y / globals.ratio_rendu
+}
+
+/// Render and process one pause-screen button.
+/// `mouse_sx`, `mouse_sy`: raw SDL2 screen coordinates (Y-down).
+/// `mouse_down`: is the left mouse button currently pressed?
+///
+/// Returns `true` if the button was just clicked (rising edge).
+pub fn applique_button(
+    btn: &mut ButtonBoolean,
+    globals: &mut Globals,
     renderer: &mut Renderer2D,
     rng: &mut impl Rng,
+    mouse_sx: f64,
+    mouse_sy: f64,
+    mouse_down: bool,
 ) {
+    let rr = globals.ratio_rendu;
+
+    // Physical mouse position (Y-flipped)
+    let mx = mouse_sx / rr;
+    let my = screen_to_phys_y(mouse_sy, globals);
+
+    // Button bounds in physical coords
+    let (x1, y1) = btn.pos1;
+    let (x2, y2) = btn.pos2;
+
+    let hovered = mx >= x1 && mx <= x2 && my >= y1 && my <= y2;
+
+    // Current toggle value
+    let on = globals.get_toggle(&btn.field);
+
+    // ---- Rendering ----
+    // Pixel coords in Y-up space (matching the vertex shader and fill_poly)
+    let px1 = (x1 * rr).round() as i32;
+    let px2 = (x2 * rr).round() as i32;
+    let py1 = (y1 * rr).round() as i32;  // bottom in Y-up
+    let py2 = (y2 * rr).round() as i32;  // top in Y-up
+
+    // fill_poly rect: bottom-left, bottom-right, top-right, top-left
+    let rect_pts = vec![(px1, py1), (px2, py1), (px2, py2), (px1, py2)];
+
+    if globals.retro {
+        // Retro mode: white fill if ON, black fill if OFF
+        let fill_col = if on { [255u8, 255, 255, 255] } else { [0u8, 0, 0, 255] };
+        let text_col = if on { [0u8, 0, 0, 255] } else { [255u8, 255, 255, 255] };
+        renderer.fill_poly(&rect_pts, fill_col);
+        // White frame
+        renderer.draw_poly(&rect_pts, [255, 255, 255, 255], 2.0 * rr as f32);
+        // Centered text (approximate: place at 10% from left, centered vertically)
+        let char_w = 0.5 * (x2 - x1) / (btn.text.len().max(1) as f64);
+        let char_h = 0.35 * (y2 - y1);
+        let text_x = x1 + 0.05 * (x2 - x1);
+        let text_y = y1 + 0.325 * (y2 - y1);
+        render_string(
+            btn.text,
+            (text_x, text_y),
+            char_w, char_h,
+            char_w * 0.1,
+            0.0,
+            text_col,
+            renderer, globals, rng,
+        );
+    } else {
+        // Normal mode
+        let fill_col: [u8; 4] = if on { [0, 128, 0, 255] } else { [128, 0, 0, 255] };
+        renderer.fill_poly(&rect_pts, fill_col);
+
+        // Border: dark grey, 10 * ratio_rendu px wide
+        let border_w = 10.0 * rr as f32;
+        renderer.draw_poly(&rect_pts, [64, 64, 64, 255], border_w);
+    }
+
+    // ---- Centered text (both modes) ----
+    let char_w = 0.5 * (x2 - x1) / (btn.text.len().max(1) as f64);
+    let char_h = 0.35 * (y2 - y1);
+    let text_x = x1 + 0.05 * (x2 - x1);
+    let text_y = y1 + 0.325 * (y2 - y1);
+    let text_col = if globals.retro {
+        if on { [0u8, 0, 0, 255] } else { [255u8, 255, 255, 255] }
+    } else {
+        [255, 255, 255, 255]
+    };
+    if !globals.retro {
+        // Shadow: offset by -1 phys unit
+        render_string(
+            btn.text, (text_x - 1.0, text_y - 1.0),
+            char_w, char_h, char_w * 0.1, 0.0,
+            [0, 0, 0, 255], renderer, globals, rng,
+        );
+    }
+    render_string(
+        btn.text, (text_x, text_y),
+        char_w, char_h, char_w * 0.1, 0.0,
+        text_col, renderer, globals, rng,
+    );
+
+    // ---- Click detection (rising edge) ----
+    if mouse_down && !btn.last_mouse_state && hovered {
+        let new_val = !globals.get_toggle(&btn.field);
+        globals.set_toggle(&btn.field, new_val);
+    }
+    btn.last_mouse_state = mouse_down;
+}
+
+/// Render only the hover tooltip for a button (second-pass, always on top).
+pub fn render_button_tooltip(
+    btn: &ButtonBoolean,
+    globals: &mut Globals,
+    renderer: &mut Renderer2D,
+    rng: &mut impl Rng,
+    mouse_sx: f64,
+    mouse_sy: f64,
+) {
+    let rr = globals.ratio_rendu;
+    let mx = mouse_sx / rr;
+    let my = screen_to_phys_y(mouse_sy, globals);
+
+    let (x1, y1) = btn.pos1;
+    let (x2, y2) = btn.pos2;
+    let hovered = mx >= x1 && mx <= x2 && my >= y1 && my <= y2;
+
+    if hovered {
+        let sw = globals.safe_phys_width;
+        let sh = globals.safe_phys_height;
+        let tip_x = mx + 0.5;
+        let tip_y = my + 0.5;
+        let tip_char_w = 0.009 * sw;
+        let tip_char_h = 0.018 * sh;
+        let tip_sp     = 0.002 * sw;
+        render_string(
+            btn.text_over, (tip_x - 1.0, tip_y - 1.0),
+            tip_char_w, tip_char_h, tip_sp, 0.0,
+            [0, 0, 0, 255], renderer, globals, rng,
+        );
+        render_string(
+            btn.text_over, (tip_x, tip_y),
+            tip_char_w, tip_char_h, tip_sp, 0.0,
+            [255, 255, 255, 255], renderer, globals, rng,
+        );
+    }
+}
+
+/// Render the pause screen title "ASTEROIDS" and process all pause buttons.
+/// Matches OCaml `affiche_hud` pause block.
+/// `mouse_sx`, `mouse_sy`: raw SDL2 screen coordinates (Y-down).
+/// `mouse_down`: left mouse button state.
+pub fn render_pause_title(
+    state: &mut GameState,
+    globals: &mut Globals,
+    renderer: &mut Renderer2D,
+    mouse_sx: f64,
+    mouse_sy: f64,
+    mouse_down: bool,
+) {
+    // Safe zone for pause menu positioning
+    let sx = globals.safe_offset_x;
+    let sy = globals.safe_offset_y;
+    let sw = globals.safe_phys_width;
+    let sh = globals.safe_phys_height;
+
     // Shadow (black, slightly offset)
     let shadow_col = [0u8, 0, 0, 255];
-    render_string(
-        "ASTEROIDS",
-        ((2.1/16.0) * globals.phys_width, (14.7/24.0) * globals.phys_height),
-        (1.0/16.0) * globals.phys_width,
-        (4.0/24.0) * globals.phys_height,
-        (1.0/40.0) * globals.phys_width,
-        0.0,
-        shadow_col,
-        renderer,
-        globals,
-        rng,
-    );
-    // White text
-    render_string(
-        "ASTEROIDS",
-        ((2.0/16.0) * globals.phys_width, (15.0/24.0) * globals.phys_height),
-        (1.0/16.0) * globals.phys_width,
-        (4.0/24.0) * globals.phys_height,
-        (1.0/40.0) * globals.phys_width,
-        0.0,
-        [255, 255, 255, 255],
-        renderer,
-        globals,
-        rng,
-    );
+    // We need to split borrow: rng from state, but buttons also in state.
+    // Render title shadow first (no buttons yet).
+    {
+        let rng = &mut state.rng as *mut _;
+        render_string(
+            "ASTEROIDS",
+            (sx + (2.1/16.0) * sw, sy + (14.7/24.0) * sh),
+            (1.0/16.0) * sw,
+            (4.0/24.0) * sh,
+            (1.0/40.0) * sw,
+            0.0,
+            shadow_col,
+            renderer,
+            globals,
+            unsafe { &mut *rng },
+        );
+    }
+
+    // Phase 1: render all button backgrounds + text + click detection
+    let btn_count = state.buttons.len();
+    for i in 0..btn_count {
+        let rng = &mut state.rng as *mut _;
+        let btn = &mut state.buttons[i] as *mut ButtonBoolean;
+        applique_button(
+            unsafe { &mut *btn },
+            globals,
+            renderer,
+            unsafe { &mut *rng },
+            mouse_sx,
+            mouse_sy,
+            mouse_down,
+        );
+    }
+
+    // Phase 2: render tooltips on top of all buttons
+    for i in 0..btn_count {
+        let rng = &mut state.rng as *mut _;
+        let btn = &state.buttons[i] as *const ButtonBoolean;
+        render_button_tooltip(
+            unsafe { &*btn },
+            globals,
+            renderer,
+            unsafe { &mut *rng },
+            mouse_sx,
+            mouse_sy,
+        );
+    }
+
+    // White title on top of everything
+    {
+        let rng = &mut state.rng as *mut _;
+        render_string(
+            "ASTEROIDS",
+            (sx + (2.0/16.0) * sw, sy + (15.0/24.0) * sh),
+            (1.0/16.0) * sw,
+            (4.0/24.0) * sh,
+            (1.0/40.0) * sw,
+            0.0,
+            [255, 255, 255, 255],
+            renderer,
+            globals,
+            unsafe { &mut *rng },
+        );
+    }
 }
 
 /// Render scanlines effect: draw horizontal black lines every SCANLINES_PERIOD pixels
@@ -2209,7 +2517,14 @@ fn render_scanlines(offset: i32, height: i32, renderer: &mut Renderer2D) {
 }
 
 /// Render a complete frame: background, stars, chunks, asteroids, ship
-pub fn render_frame(state: &mut GameState, globals: &mut Globals, renderer: &mut Renderer2D) {
+pub fn render_frame(
+    state: &mut GameState,
+    globals: &mut Globals,
+    renderer: &mut Renderer2D,
+    mouse_sx: f64,
+    mouse_sy: f64,
+    mouse_down: bool,
+) {
     let (w, h) = (renderer.width as i32, renderer.height as i32);
 
     // Background
@@ -2275,9 +2590,9 @@ pub fn render_frame(state: &mut GameState, globals: &mut Globals, renderer: &mut
         render_hud(state, globals, renderer, unsafe { &mut *rng });
     }
 
-    // Pause title overlay
+    // Pause title overlay + interactive buttons
     if globals.pause {
-        render_pause_title(globals, renderer, &mut state.rng);
+        render_pause_title(state, globals, renderer, mouse_sx, mouse_sy, mouse_down);
     }
 
     // Scanlines effect (rendered last, on top of everything)

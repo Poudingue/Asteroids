@@ -430,6 +430,12 @@ pub struct Globals {
     pub ratio_rendu: f64,
     pub phys_width: f64,
     pub phys_height: f64,
+    /// 16:9 safe zone in physics coords (always fully visible)
+    pub safe_phys_width: f64,
+    pub safe_phys_height: f64,
+    /// Offset from edge to safe zone in physics coords
+    pub safe_offset_x: f64,
+    pub safe_offset_y: f64,
     pub current_jitter_double: (f64, f64),
     pub current_jitter_coll_table: (f64, f64),
 
@@ -440,6 +446,7 @@ pub struct Globals {
     pub shake_score: f64,
 
     // Framerate fields
+    pub frame_compute_secs: f64,  // frame computation time excluding vsync
     pub locked_framerate: bool,
     pub time_last_count: f64,
     pub time_current_count: f64,
@@ -521,6 +528,10 @@ impl Globals {
             ratio_rendu,
             phys_width,
             phys_height,
+            safe_phys_width: phys_width,   // updated by recompute_for_resolution
+            safe_phys_height: phys_height,
+            safe_offset_x: 0.0,
+            safe_offset_y: 0.0,
             current_jitter_double: (0.0, 0.0),
             current_jitter_coll_table: (0.0, 0.0),
 
@@ -531,6 +542,7 @@ impl Globals {
             shake_score: 0.0,
 
             // Framerate fields
+            frame_compute_secs: 1.0 / 60.0,
             locked_framerate: false,
             time_last_count: 0.0,
             time_current_count: 10.0,
@@ -559,8 +571,87 @@ impl Globals {
         }
     }
 
+    /// Recompute rendering scale and physics dimensions for a given screen resolution.
+    ///
+    /// Uses a 16:9 safe zone inscribed in the actual screen, preserving GAME_SURFACE density.
+    /// On wider-than-16:9 screens, extra world is visible on the sides.
+    /// On taller-than-16:9 screens, extra world is visible above/below.
+    pub fn recompute_for_resolution(&mut self, screen_w: u32, screen_h: u32) {
+        let sw = screen_w as f64;
+        let sh = screen_h as f64;
+        let safe_aspect = 16.0 / 9.0;
+        let screen_aspect = sw / sh;
+
+        let (safe_w, safe_h) = if screen_aspect >= safe_aspect {
+            // Wider than 16:9 — height-constrained
+            (sh * safe_aspect, sh)
+        } else {
+            // Taller than 16:9 — width-constrained
+            (sw, sw / safe_aspect)
+        };
+
+        self.ratio_rendu = (safe_w * safe_h / (GAME_SURFACE * 1_000_000.0)).sqrt();
+        self.phys_width  = sw / self.ratio_rendu;
+        self.phys_height = sh / self.ratio_rendu;
+        self.safe_phys_width  = safe_w / self.ratio_rendu;
+        self.safe_phys_height = safe_h / self.ratio_rendu;
+        self.safe_offset_x = (self.phys_width  - self.safe_phys_width)  / 2.0;
+        self.safe_offset_y = (self.phys_height - self.safe_phys_height) / 2.0;
+    }
+
     /// Get the delta time since the last frame.
     pub fn dt(&self) -> f64 {
         self.time_current_frame - self.time_last_frame
     }
+
+    /// Get the value of a boolean global by toggle enum.
+    pub fn get_toggle(&self, t: &GlobalToggle) -> bool {
+        match t {
+            GlobalToggle::Quit           => self.quit,
+            GlobalToggle::Pause          => self.pause,
+            GlobalToggle::Restart        => self.restart,
+            GlobalToggle::Scanlines      => self.scanlines,
+            GlobalToggle::Retro          => self.retro,
+            GlobalToggle::AdvancedHitbox => self.advanced_hitbox,
+            GlobalToggle::Smoke          => self.smoke_enabled,
+            GlobalToggle::Screenshake    => self.screenshake_enabled,
+            GlobalToggle::Flashes        => self.flashes_enabled,
+            GlobalToggle::Chunks         => self.chunks_enabled,
+            GlobalToggle::DynColor       => self.dyn_color,
+        }
+    }
+
+    /// Set the value of a boolean global by toggle enum.
+    pub fn set_toggle(&mut self, t: &GlobalToggle, val: bool) {
+        match t {
+            GlobalToggle::Quit           => self.quit            = val,
+            GlobalToggle::Pause          => self.pause           = val,
+            GlobalToggle::Restart        => self.restart         = val,
+            GlobalToggle::Scanlines      => self.scanlines       = val,
+            GlobalToggle::Retro          => self.retro           = val,
+            GlobalToggle::AdvancedHitbox => self.advanced_hitbox = val,
+            GlobalToggle::Smoke          => self.smoke_enabled   = val,
+            GlobalToggle::Screenshake    => self.screenshake_enabled = val,
+            GlobalToggle::Flashes        => self.flashes_enabled = val,
+            GlobalToggle::Chunks         => self.chunks_enabled  = val,
+            GlobalToggle::DynColor       => self.dyn_color       = val,
+        }
+    }
+}
+
+/// Identifies which boolean field of `Globals` a pause button toggles.
+/// Used to avoid storing mutable references in `ButtonBoolean`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum GlobalToggle {
+    Quit,
+    Pause,
+    Restart,
+    Scanlines,
+    Retro,
+    AdvancedHitbox,
+    Smoke,
+    Screenshake,
+    Flashes,
+    Chunks,
+    DynColor,
 }
