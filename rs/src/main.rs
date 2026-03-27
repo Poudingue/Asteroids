@@ -85,6 +85,7 @@ fn main() {
     // Event loop
     let mut event_pump = sdl_context.event_pump().expect("Failed to get event pump");
     let mut running = true;
+    let mut prev_w_pressed = false;
 
     while running {
         // Update time
@@ -93,6 +94,12 @@ fn main() {
 
         // Update per-frame globals (jitter, exposure, game speed, etc.)
         game::update_frame(&mut globals, &mut state.rng);
+
+        // Snapshot mouse position before poll_iter (which mutably borrows event_pump)
+        let (mouse_x_snap, mouse_y_snap) = {
+            let ms = event_pump.mouse_state();
+            (ms.x() as f64, ms.y() as f64)
+        };
 
         // Poll events (discrete actions: quit, pause)
         for event in event_pump.poll_iter() {
@@ -122,6 +129,13 @@ fn main() {
                     globals.game_exposure = 0.0;
                     globals.pause = false;
                 }
+                Event::KeyDown {
+                    keycode: Some(Keycode::F),
+                    repeat: false,
+                    ..
+                } => {
+                    game::teleport(&mut state, &mut globals, mouse_x_snap, mouse_y_snap);
+                }
                 _ => {}
             }
         }
@@ -143,13 +157,17 @@ fn main() {
             use sdl2::keyboard::Scancode;
 
             // Forward: W (physical) = Z on AZERTY
-            if keyboard.is_scancode_pressed(Scancode::W) {
-                if globals.ship_impulse_pos {
+            // Impulse mode: fire boost only on key-down transition (edge-triggered, matches OCaml)
+            // Continuous mode: call acceleration every frame while held
+            let w_pressed = keyboard.is_scancode_pressed(Scancode::W);
+            if globals.ship_impulse_pos {
+                if w_pressed && !prev_w_pressed {
                     game::boost_forward(&mut state, &globals);
-                } else {
-                    game::acceleration(&mut state, &globals);
                 }
+            } else if w_pressed {
+                game::acceleration(&mut state, &globals);
             }
+            prev_w_pressed = w_pressed;
             // Rotate left: A (physical) = Q on AZERTY
             if keyboard.is_scancode_pressed(Scancode::A) {
                 game::handle_left(&mut state.ship, &globals);

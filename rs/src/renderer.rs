@@ -31,19 +31,6 @@ pub struct Renderer2D {
     pub height: u32,
 }
 
-fn point_in_triangle(
-    px: f64, py: f64,
-    ax: f64, ay: f64,
-    bx: f64, by: f64,
-    cx: f64, cy: f64,
-) -> bool {
-    let d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
-    let d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
-    let d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
-    let has_neg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
-    let has_pos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
-    !(has_neg && has_pos)
-}
 
 impl Renderer2D {
     pub fn new(
@@ -203,72 +190,54 @@ impl Renderer2D {
     pub fn fill_poly(&mut self, points: &[(i32, i32)], color: [u8; 4]) {
         if points.len() < 3 { return; }
 
-        // For triangles, just draw directly
-        if points.len() == 3 {
-            for p in points {
-                self.push_vertex(p.0 as f32, p.1 as f32, color);
-            }
-            return;
+        // Find bounding box
+        let mut min_y = i32::MAX;
+        let mut max_y = i32::MIN;
+        for p in points {
+            min_y = min_y.min(p.1);
+            max_y = max_y.max(p.1);
         }
 
-        // Ear-clipping triangulation for arbitrary polygons
-        let mut indices: Vec<usize> = (0..points.len()).collect();
-
-        // Determine winding order (signed area)
-        let mut area = 0.0f64;
         let n = points.len();
-        for i in 0..n {
-            let j = (i + 1) % n;
-            area += points[i].0 as f64 * points[j].1 as f64;
-            area -= points[j].0 as f64 * points[i].1 as f64;
-        }
-        let ccw = area > 0.0;
 
-        let mut count = indices.len();
-        let mut i = 0;
-        let mut iterations = 0;
-        let max_iterations = count * count; // safety limit
+        // Scanline fill with even-odd rule — correct for self-intersecting polygons
+        for y in min_y..=max_y {
+            let scan_y = y as f32 + 0.5; // center of pixel row
+            let mut intersections: Vec<f32> = Vec::new();
 
-        while count > 2 && iterations < max_iterations {
-            iterations += 1;
-            let prev = indices[if i == 0 { count - 1 } else { i - 1 }];
-            let curr = indices[i % count];
-            let next = indices[(i + 1) % count];
+            for i in 0..n {
+                let j = (i + 1) % n;
+                let (x0, y0) = (points[i].0 as f32, points[i].1 as f32);
+                let (x1, y1) = (points[j].0 as f32, points[j].1 as f32);
 
-            let (ax, ay) = (points[prev].0 as f64, points[prev].1 as f64);
-            let (bx, by) = (points[curr].0 as f64, points[curr].1 as f64);
-            let (cx, cy) = (points[next].0 as f64, points[next].1 as f64);
+                // Check if edge crosses this scanline
+                if (y0 <= scan_y && y1 > scan_y) || (y1 <= scan_y && y0 > scan_y) {
+                    // Compute X intersection
+                    let t = (scan_y - y0) / (y1 - y0);
+                    intersections.push(x0 + t * (x1 - x0));
+                }
+            }
 
-            // Cross product to determine if this is a convex vertex (an "ear")
-            let cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-            let is_convex = if ccw { cross > 0.0 } else { cross < 0.0 };
+            intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            if is_convex {
-                // Check no other vertex is inside this triangle
-                let mut ear = true;
-                for j in 0..count {
-                    let idx = indices[j];
-                    if idx == prev || idx == curr || idx == next { continue; }
-                    let (px, py) = (points[idx].0 as f64, points[idx].1 as f64);
-                    if point_in_triangle(px, py, ax, ay, bx, by, cx, cy) {
-                        ear = false;
-                        break;
+            // Fill between pairs (even-odd rule)
+            for pair in intersections.chunks(2) {
+                if pair.len() == 2 {
+                    let x_left = pair[0];
+                    let x_right = pair[1];
+                    if x_right > x_left {
+                        // Draw a horizontal span as two triangles
+                        let y_top = y as f32;
+                        let y_bot = (y + 1) as f32;
+                        self.push_vertex(x_left,  y_top, color);
+                        self.push_vertex(x_right, y_top, color);
+                        self.push_vertex(x_right, y_bot, color);
+                        self.push_vertex(x_left,  y_top, color);
+                        self.push_vertex(x_right, y_bot, color);
+                        self.push_vertex(x_left,  y_bot, color);
                     }
                 }
-                if ear {
-                    // Emit triangle
-                    self.push_vertex(ax as f32, ay as f32, color);
-                    self.push_vertex(bx as f32, by as f32, color);
-                    self.push_vertex(cx as f32, cy as f32, color);
-                    // Remove the ear vertex
-                    indices.remove(i % count);
-                    count -= 1;
-                    if i >= count && count > 0 { i = 0; }
-                    iterations = 0; // reset after successful ear removal
-                    continue;
-                }
             }
-            i = (i + 1) % count;
         }
     }
 

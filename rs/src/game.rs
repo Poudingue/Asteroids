@@ -412,6 +412,37 @@ pub fn boost_forward(state: &mut GameState, globals: &Globals) {
     }
 }
 
+/// Teleport ship to mouse position (F key). Edge-triggered; respects cooldown.
+/// Matches OCaml `teleport`: sets position/velocity, spawns explosion chunks, adjusts exposure/game_speed.
+pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mouse_y: f64) {
+    if state.cooldown_tp <= 0.0 {
+        // Teleport to mouse position in physics space
+        let new_pos = (mouse_x / globals.ratio_rendu, mouse_y / globals.ratio_rendu);
+        state.ship.position = new_pos;
+        state.ship.velocity = (0.0, 0.0);
+
+        // Visual flash + slow-mo (matches OCaml: add_color intensify, game_exposure *= tp, game_speed *= ratio_time_tp)
+        if globals.flashes_enabled {
+            let flash = intensify(HdrColor { r: 0.0, v: 4.0, b: 40.0 }, 1.0);
+            globals.add_color = (
+                globals.add_color.0 + flash.r,
+                globals.add_color.1 + flash.v,
+                globals.add_color.2 + flash.b,
+            );
+        }
+        globals.game_exposure *= GAME_EXPOSURE_TP;
+        globals.game_speed *= RATIO_TIME_TP;
+
+        // Spawn teleport explosion chunks
+        let tp_color = (0.0, 1000.0, 10000.0);
+        let new_chunks = spawn_n_chunks(&state.ship, NB_CHUNKS_EXPLO, tp_color, &mut state.rng);
+        state.chunks_explo.extend(new_chunks);
+
+        // Reset cooldown
+        state.cooldown_tp += COOLDOWN_TP;
+    }
+}
+
 /// Rotate left — impulse or continuous depending on globals
 pub fn handle_left(ship: &mut Entity, globals: &Globals) {
     if globals.ship_impulse_pos {
@@ -732,6 +763,15 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
                 (c.r, c.v, c.b)
             };
         }
+    }
+
+    // --- FPS counter (matches OCaml end-of-frame block) ---
+    globals.time_current_count = globals.time_current_frame;
+    globals.current_count += 1;
+    if globals.time_current_count - globals.time_last_count > 1.0 {
+        globals.last_count = globals.current_count;
+        globals.current_count = 0;
+        globals.time_last_count = globals.time_current_count;
     }
 }
 
@@ -1239,6 +1279,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     if state.cooldown > 0.0 {
         state.cooldown -= globals.game_speed * globals.dt();
     }
+    if state.cooldown_tp > 0.0 {
+        state.cooldown_tp -= globals.game_speed * globals.dt();
+    }
 
     // --- Inertia (position update) ---
     inertie_objet(&mut state.ship, globals);
@@ -1443,8 +1486,10 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     }
 
     // --- Ship death handling ---
-    // Mirrors OCaml boucle_interaction: when ship.health < 0, trigger death effects and respawn.
-    if state.ship.health < 0.0 {
+    // Step 1: Detect death entry (first time health < 0, not already in mort() phase)
+    if state.ship.health < 0.0 && !state.is_dead {
+        state.is_dead = true;
+        globals.time_of_death = globals.time_current_frame;
         state.lives -= 1;
 
         // Chunk explosion at death
@@ -1473,18 +1518,63 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         globals.game_speed_target = GAME_SPEED_TARGET_DEATH;
         globals.game_exposure_target = GAME_EXPOSURE_TARGET_DEATH;
 
-        if state.lives <= 0 {
-            // Game over: reset and pause
-            *state = GameState::new(globals);
-            globals.pause = true;
-            globals.game_speed_target = GAME_SPEED_TARGET_BOUCLE;
-            globals.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
-        } else {
-            // Respawn: clamp health so death fires only once, then replace ship
-            state.ship.health = -0.1;
-            state.ship = spawn_ship();
-            globals.game_speed_target = GAME_SPEED_TARGET_BOUCLE;
-            globals.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
+        // Clamp health so death entry does not re-trigger
+        state.ship.health = -0.1;
+    }
+
+    // Step 2: Per-frame death fire — spawn burning explosion while in mort() phase
+    if state.is_dead {
+        let elapsed = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
+        let death_explo = spawn_explosion_death(&state.ship, elapsed, &mut state.rng);
+        state.explosions.push(death_explo);
+    }
+
+    // Step 3: End the death phase when timer expires or early-exit condition met
+    if state.is_dead {
+        let t = globals.time_current_frame;
+        let tod = globals.time_of_death;
+        let timer_expired = t > tod + TIME_STAY_DEAD_MAX;
+        let early_exit = t > tod + TIME_STAY_DEAD_MIN && state.ship.health < -100.0;
+
+        if timer_expired || early_exit {
+            state.is_dead = false;
+
+            if state.lives <= 0 {
+                // Game over: reset and pause
+                *state = GameState::new(globals);
+                globals.pause = true;
+                globals.game_speed_target = GAME_SPEED_TARGET_BOUCLE;
+                globals.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
+            } else {
+                // Second chunk burst
+                if globals.chunks_enabled {
+                    let death_color = (1500.0, 400.0, 200.0);
+                    let new_chunks = spawn_n_chunks(
+                        &state.ship,
+                        NB_CHUNKS_EXPLO,
+                        death_color,
+                        &mut state.rng,
+                    );
+                    state.chunks_explo.extend(new_chunks);
+                }
+
+                // Second screenshake + red flash
+                globals.game_screenshake += SCREENSHAKE_DEATH;
+                if globals.flashes_enabled {
+                    let death_flash = intensify(HdrColor::new(1000.0, 0.0, 0.0), FLASHES_DEATH);
+                    globals.add_color = (
+                        globals.add_color.0 + death_flash.r,
+                        globals.add_color.1 + death_flash.v,
+                        globals.add_color.2 + death_flash.b,
+                    );
+                }
+                globals.game_speed *= RATIO_TIME_DEATH;
+
+                // Respawn ship and restore normal targets
+                state.ship = spawn_ship();
+                globals.game_speed_target = GAME_SPEED_TARGET_BOUCLE;
+                globals.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
+            }
         }
     }
 
@@ -1634,29 +1724,29 @@ fn shape_char(c: char) -> Vec<(f64, f64)> {
         'E' => vec![(0.,0.),(0.75,0.),(1.,0.2),(0.25,0.2),(0.25,0.4),(0.5,0.4),(0.5,0.6),(0.25,0.6),(0.25,0.8),(1.,0.8),(0.75,1.),(0.,1.)],
         'F' => vec![(0.,0.),(0.25,0.),(0.25,0.4),(0.5,0.4),(0.75,0.6),(0.25,0.6),(0.25,0.8),(1.,0.8),(1.,1.),(0.,1.)],
         'G' => vec![(0.25,0.),(0.75,0.),(1.,0.2),(1.,0.6),(0.5,0.6),(0.5,0.4),(0.75,0.4),(0.75,0.2),(0.25,0.2),(0.25,0.8),(1.,0.8),(0.75,1.),(0.25,1.),(0.,0.8),(0.,0.2)],
-        'H' => vec![(0.,0.),(0.25,0.),(0.25,0.4),(0.75,0.4),(0.75,0.),(1.,0.),(1.,1.),(0.75,1.),(0.75,0.6),(0.25,0.6),(0.25,1.),(0.,1.)],
+        'H' => vec![(0.,1.),(0.25,1.),(0.25,0.6),(0.75,0.6),(0.75,1.),(1.,1.),(1.,0.),(0.75,0.),(0.75,0.4),(0.25,0.4),(0.25,0.),(0.,0.)],
         'I' => vec![(0.125,0.),(0.875,0.),(0.875,0.2),(0.625,0.2),(0.625,0.8),(0.875,0.8),(0.875,1.),(0.125,1.),(0.125,0.8),(0.375,0.8),(0.375,0.2),(0.125,0.2)],
-        'J' => vec![(0.25,0.),(0.5,0.),(0.75,0.2),(0.75,0.8),(1.,0.8),(1.,1.),(0.,1.),(0.,0.8),(0.25,0.8),(0.25,0.2),(0.,0.2)],
-        'K' => vec![(0.,0.),(0.25,0.),(0.25,0.4),(0.75,0.),(1.,0.),(0.375,0.5),(1.,1.),(0.75,1.),(0.25,0.6),(0.25,1.),(0.,1.)],
-        'L' => vec![(0.,1.),(0.,0.),(0.25,0.),(0.25,0.2),(1.,0.2),(0.75,0.),(1.,0.)],
-        'M' => vec![(0.,0.),(0.25,0.),(0.5,0.4),(0.75,0.),(1.,0.),(1.,1.),(0.75,1.),(0.75,0.4),(0.5,0.8),(0.25,0.4),(0.25,1.),(0.,1.)],
-        'N' => vec![(0.,0.),(0.25,0.),(0.75,0.6),(0.75,0.),(1.,0.),(1.,1.),(0.75,1.),(0.25,0.4),(0.25,1.),(0.,1.)],
+        'J' => vec![(0.25,1.),(0.5,1.),(0.75,0.8),(0.75,0.2),(1.,0.2),(1.,0.),(0.,0.),(0.,0.2),(0.25,0.2),(0.25,0.8),(0.,0.8)],
+        'K' => vec![(0.,1.),(0.25,1.),(0.25,0.6),(0.75,1.),(1.,1.),(0.375,0.5),(1.,0.),(0.75,0.),(0.25,0.4),(0.25,0.),(0.,0.)],
+        'L' => vec![(0.,0.),(0.,1.),(0.25,1.),(0.25,0.8),(1.,0.8),(0.75,1.),(1.,1.)],
+        'M' => vec![(0.,1.),(0.25,1.),(0.5,0.6),(0.75,1.),(1.,1.),(1.,0.),(0.75,0.),(0.75,0.6),(0.5,0.2),(0.25,0.6),(0.25,0.),(0.,0.)],
+        'N' => vec![(0.,1.),(0.25,1.),(0.75,0.4),(0.75,1.),(1.,1.),(1.,0.),(0.75,0.),(0.25,0.6),(0.25,0.),(0.,0.)],
         'O' => vec![(0.25,0.),(0.75,0.),(1.,0.2),(1.,0.8),(0.75,1.),(0.25,1.),(0.,0.8),(0.,0.2),(0.25,0.2),(0.25,0.8),(0.75,0.8),(0.75,0.2),(0.,0.2)],
-        'P' => vec![(0.,0.),(0.25,0.),(0.25,0.4),(0.75,0.4),(0.75,0.6),(0.25,0.6),(0.25,1.),(0.,1.),(0.,0.6),(0.75,0.6),(1.,0.8),(1.,1.),(0.75,1.),(0.25,0.8)],
-        'Q' => vec![(0.25,0.),(0.75,0.),(1.,0.2),(1.,0.8),(0.75,1.),(0.25,1.),(0.,0.8),(0.,0.2),(0.25,0.2),(0.25,0.8),(0.75,0.8),(0.75,0.2),(0.,0.2),(0.5,0.4),(1.,0.)],
+        'P' => vec![(0.,1.),(0.25,1.),(0.25,0.6),(0.75,0.6),(0.75,0.4),(0.25,0.4),(0.25,0.),(0.,0.),(0.,0.4),(0.75,0.4),(1.,0.2),(1.,0.),(0.75,0.),(0.25,0.2)],
+        'Q' => vec![(0.25,1.),(0.75,1.),(1.,0.8),(1.,0.2),(0.75,0.),(0.25,0.),(0.,0.2),(0.,0.8),(0.25,0.8),(0.25,0.2),(0.75,0.2),(0.75,0.8),(0.,0.8),(0.5,0.6),(1.,1.)],
         'R' => vec![(0.,0.),(0.25,0.),(0.25,0.8),(0.75,0.8),(0.75,0.6),(0.25,0.6),(0.25,0.4),(0.75,0.),(1.,0.),(0.5,0.4),(0.75,0.4),(1.,0.6),(1.,0.8),(0.75,1.),(0.,1.)],
         'S' => vec![(0.25,0.),(0.75,0.),(1.,0.2),(1.,0.4),(0.75,0.6),(0.25,0.6),(0.25,0.8),(1.,0.8),(0.75,1.),(0.25,1.),(0.,0.8),(0.,0.6),(0.25,0.4),(0.75,0.4),(0.75,0.2),(0.,0.2)],
         'T' => vec![(0.385,0.),(0.625,0.),(0.625,0.8),(1.,0.8),(1.,1.),(0.,1.),(0.,0.8),(0.385,0.8)],
-        'U' => vec![(0.,1.),(0.,0.2),(0.25,0.),(0.75,0.),(1.,0.2),(1.,1.),(0.75,1.),(0.75,0.2),(0.25,0.2),(0.25,1.)],
-        'V' => vec![(0.,1.),(0.2,0.),(0.5,0.2),(0.8,0.),(1.,1.),(0.6,0.4),(0.5,0.6),(0.4,0.4)],
+        'U' => vec![(0.,0.),(0.,0.8),(0.25,1.),(0.75,1.),(1.,0.8),(1.,0.),(0.75,0.),(0.75,0.8),(0.25,0.8),(0.25,0.)],
+        'V' => vec![(0.,0.),(0.2,1.),(0.5,0.8),(0.8,1.),(1.,0.),(0.6,0.6),(0.5,0.4),(0.4,0.6)],
         'W' => vec![(0.,1.),(0.2,0.),(0.4,0.),(0.5,0.2),(0.6,0.),(0.8,0.),(1.,1.),(0.6,0.4),(0.6,0.6),(0.4,0.6),(0.4,0.4),(0.2,1.)],
-        'X' => vec![(0.,0.),(0.25,0.),(0.5,0.4),(0.75,0.),(1.,0.),(0.625,0.5),(1.,1.),(0.75,1.),(0.5,0.6),(0.25,1.),(0.,1.),(0.375,0.5)],
-        'Y' => vec![(0.,1.),(0.25,1.),(0.5,0.6),(0.75,1.),(1.,1.),(0.625,0.4),(0.625,0.),(0.375,0.),(0.375,0.4)],
-        'Z' => vec![(0.,0.),(1.,0.),(1.,0.2),(0.25,0.8),(1.,0.8),(0.75,1.),(0.,1.),(0.,0.8),(0.75,0.2),(0.,0.2)],
-        ':' => vec![(0.3,0.2),(0.7,0.2),(0.7,0.4),(0.3,0.4),(0.3,0.6),(0.7,0.6),(0.7,0.8),(0.3,0.8),(0.3,0.6),(0.7,0.6)],
-        '-' => vec![(0.1,0.4),(0.9,0.4),(0.9,0.6),(0.1,0.6)],
-        '.' => vec![(0.3,0.),(0.7,0.),(0.7,0.2),(0.3,0.2)],
-        '!' => vec![(0.35,0.),(0.65,0.),(0.65,0.2),(0.35,0.2),(0.35,0.35),(0.65,0.35),(0.65,1.),(0.35,1.)],
+        'X' => vec![(0.,1.),(0.25,1.),(0.5,0.6),(0.75,1.),(1.,1.),(0.625,0.5),(1.,0.),(0.75,0.),(0.5,0.4),(0.25,0.),(0.,0.),(0.375,0.5)],
+        'Y' => vec![(0.,0.),(0.25,0.),(0.5,0.4),(0.75,0.),(1.,0.),(0.625,0.6),(0.625,1.),(0.375,1.),(0.375,0.6)],
+        'Z' => vec![(0.,1.),(1.,1.),(1.,0.8),(0.25,0.2),(1.,0.2),(0.75,0.),(0.,0.),(0.,0.2),(0.75,0.8),(0.,0.8)],
+        ':' => vec![(0.3,0.8),(0.7,0.8),(0.7,0.6),(0.3,0.6),(0.3,0.4),(0.7,0.4),(0.7,0.2),(0.3,0.2),(0.3,0.4),(0.7,0.4)],
+        '-' => vec![(0.1,0.6),(0.9,0.6),(0.9,0.4),(0.1,0.4)],
+        '.' => vec![(0.3,1.),(0.7,1.),(0.7,0.8),(0.3,0.8)],
+        '!' => vec![(0.35,1.),(0.65,1.),(0.65,0.8),(0.35,0.8),(0.35,0.65),(0.65,0.65),(0.65,0.),(0.35,0.)],
         _ => vec![(0.,0.),(1.,0.),(1.,1.),(0.,1.)],
     }
 }
@@ -1743,6 +1833,7 @@ fn render_string(
     let mut x0 = pos.0;
     let y0 = pos.1;
     for c in s.chars() {
+        let c = c.to_ascii_uppercase();
         let sx0 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
         let sy0 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
         let sx1 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
@@ -1786,15 +1877,16 @@ fn affiche_barre(
     let p3_full = (quad[3].0 * globals.phys_width * globals.ratio_rendu,
                    quad[3].1 * globals.phys_height * globals.ratio_rendu);
 
-    // moytuple a b ratio => a + ratio*(b-a), but OCaml uses moytuple p2 p1 ratio
-    // which is p2 + ratio*(p1 - p2) = p2*(1-ratio) + p1*ratio
+    // OCaml: moytuple p2 p1 ratio = p2*ratio + p1*(1-ratio)
+    // ratio=1 → p2_full (full side) → full bar
+    // ratio=0 → p1/p0 (zero side) → empty bar
     let p2 = (
-        p2_full.0 + ratio * (p1.0 - p2_full.0),
-        p2_full.1 + ratio * (p1.1 - p2_full.1),
+        p2_full.0 * ratio + p1.0 * (1.0 - ratio),
+        p2_full.1 * ratio + p1.1 * (1.0 - ratio),
     );
     let p3 = (
-        p3_full.0 + ratio * (p0.0 - p3_full.0),
-        p3_full.1 + ratio * (p0.1 - p3_full.1),
+        p3_full.0 * ratio + p0.0 * (1.0 - ratio),
+        p3_full.1 * ratio + p0.1 * (1.0 - ratio),
     );
 
     let pts: Vec<(i32, i32)> = vec![
