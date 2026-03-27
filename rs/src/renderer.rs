@@ -31,6 +31,20 @@ pub struct Renderer2D {
     pub height: u32,
 }
 
+fn point_in_triangle(
+    px: f64, py: f64,
+    ax: f64, ay: f64,
+    bx: f64, by: f64,
+    cx: f64, cy: f64,
+) -> bool {
+    let d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+    let d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+    let d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+    let has_neg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
+    let has_pos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
+    !(has_neg && has_pos)
+}
+
 impl Renderer2D {
     pub fn new(
         device: &wgpu::Device,
@@ -185,16 +199,76 @@ impl Renderer2D {
     }
 
     /// Fill a polygon from a list of (i32, i32) points.
-    /// Uses fan triangulation from first vertex — works for convex polygons.
+    /// Uses ear-clipping triangulation — works for concave and convex polygons.
     pub fn fill_poly(&mut self, points: &[(i32, i32)], color: [u8; 4]) {
-        if points.len() < 3 {
+        if points.len() < 3 { return; }
+
+        // For triangles, just draw directly
+        if points.len() == 3 {
+            for p in points {
+                self.push_vertex(p.0 as f32, p.1 as f32, color);
+            }
             return;
         }
-        let (x0, y0) = (points[0].0 as f32, points[0].1 as f32);
-        for i in 1..points.len() - 1 {
-            self.push_vertex(x0, y0, color);
-            self.push_vertex(points[i].0 as f32, points[i].1 as f32, color);
-            self.push_vertex(points[i + 1].0 as f32, points[i + 1].1 as f32, color);
+
+        // Ear-clipping triangulation for arbitrary polygons
+        let mut indices: Vec<usize> = (0..points.len()).collect();
+
+        // Determine winding order (signed area)
+        let mut area = 0.0f64;
+        let n = points.len();
+        for i in 0..n {
+            let j = (i + 1) % n;
+            area += points[i].0 as f64 * points[j].1 as f64;
+            area -= points[j].0 as f64 * points[i].1 as f64;
+        }
+        let ccw = area > 0.0;
+
+        let mut count = indices.len();
+        let mut i = 0;
+        let mut iterations = 0;
+        let max_iterations = count * count; // safety limit
+
+        while count > 2 && iterations < max_iterations {
+            iterations += 1;
+            let prev = indices[if i == 0 { count - 1 } else { i - 1 }];
+            let curr = indices[i % count];
+            let next = indices[(i + 1) % count];
+
+            let (ax, ay) = (points[prev].0 as f64, points[prev].1 as f64);
+            let (bx, by) = (points[curr].0 as f64, points[curr].1 as f64);
+            let (cx, cy) = (points[next].0 as f64, points[next].1 as f64);
+
+            // Cross product to determine if this is a convex vertex (an "ear")
+            let cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+            let is_convex = if ccw { cross > 0.0 } else { cross < 0.0 };
+
+            if is_convex {
+                // Check no other vertex is inside this triangle
+                let mut ear = true;
+                for j in 0..count {
+                    let idx = indices[j];
+                    if idx == prev || idx == curr || idx == next { continue; }
+                    let (px, py) = (points[idx].0 as f64, points[idx].1 as f64);
+                    if point_in_triangle(px, py, ax, ay, bx, by, cx, cy) {
+                        ear = false;
+                        break;
+                    }
+                }
+                if ear {
+                    // Emit triangle
+                    self.push_vertex(ax as f32, ay as f32, color);
+                    self.push_vertex(bx as f32, by as f32, color);
+                    self.push_vertex(cx as f32, cy as f32, color);
+                    // Remove the ear vertex
+                    indices.remove(i % count);
+                    count -= 1;
+                    if i >= count && count > 0 { i = 0; }
+                    iterations = 0; // reset after successful ear removal
+                    continue;
+                }
+            }
+            i = (i + 1) % count;
         }
     }
 

@@ -743,6 +743,14 @@ fn damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
     if globals.variable_exposure {
         globals.game_exposure *= EXPOSURE_RATIO_DAMAGE;
     }
+    if globals.flashes_enabled {
+        let flash = intensify(HdrColor { r: 1.0, v: 0.7, b: 0.5 }, amount * FLASHES_DAMAGE);
+        globals.add_color = (
+            globals.add_color.0 + flash.r,
+            globals.add_color.1 + flash.v,
+            globals.add_color.2 + flash.b,
+        );
+    }
 }
 
 /// Apply physical-collision damage to an entity.
@@ -990,6 +998,112 @@ fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
     }
     state.fragments = still_colliding;
     state.objects.extend(settled);
+}
+
+// ============================================================================
+// Camera system
+// ============================================================================
+
+/// Compute the weighted average pull of all asteroids, used for camera offset.
+///
+/// Mirrors OCaml `center_of_attention`: each asteroid contributes
+/// `(asteroid_pos - screen_center) * mass / (10 + dist²_from_ship)`.
+/// The resulting vector is in world-space and can be scaled by `CAMERA_RATIO_OBJECTS`.
+fn center_of_attention(objects: &[Entity], ship_pos: Vec2, globals: &Globals) -> Vec2 {
+    let screen_center = (globals.phys_width / 2.0, globals.phys_height / 2.0);
+    objects.iter().fold((0.0, 0.0), |acc, obj| {
+        let rel_pos = soustuple(obj.position, ship_pos);
+        let dist2 = distancecarre(rel_pos, (0.0, 0.0));
+        let weight = obj.mass / (10.0 + dist2);
+        let pull = multuple(soustuple(obj.position, screen_center), weight);
+        addtuple(acc, pull)
+    })
+}
+
+/// Apply camera movement each frame: translate all entities so the ship stays centred.
+///
+/// Mirrors OCaml `affiche_etat` lines 900-948 (the camera block before rendering).
+/// Must be called after physics but before rendering.
+pub fn update_camera(state: &mut GameState, globals: &Globals) {
+    let ship = &state.ship;
+
+    // 1. Compute camera target (next_x, next_y)
+    let facing_offset = polar_to_affine(
+        ship.orientation,
+        globals.phys_width * CAMERA_RATIO_VISION,
+    );
+
+    let (next_x, next_y) = if globals.pause {
+        // Paused: just keep ship in view with facing offset, no velocity lookahead
+        addtuple(ship.position, facing_offset)
+    } else {
+        // Active: ship pos + velocity lookahead + asteroid pull + facing offset
+        let velocity_lookahead = multuple(ship.velocity, CAMERA_PREDICTION);
+        let mut combined: Vec<Entity> = state.objects.clone();
+        combined.extend(state.objects_oos.clone());
+        let asteroid_pull = multuple(
+            center_of_attention(&combined, ship.position, globals),
+            CAMERA_RATIO_OBJECTS,
+        );
+        addtuple(
+            facing_offset,
+            addtuple(
+                addtuple(ship.position, velocity_lookahead),
+                asteroid_pull,
+            ),
+        )
+    };
+
+    // 2. Compute raw camera displacement via exponential decay
+    //    move_camera = (center - next) - abso_exp_decay(center - next, CAMERA_HALF_DEPL)
+    let t0 = globals.time_last_frame;
+    let t1 = globals.time_current_frame;
+    let cx = globals.phys_width / 2.0;
+    let cy = globals.phys_height / 2.0;
+    let dx = cx - next_x;
+    let dy = cy - next_y;
+    let mut movex = dx - abso_exp_decay(dx, CAMERA_HALF_DEPL, t0, t1);
+    let mut movey = dy - abso_exp_decay(dy, CAMERA_HALF_DEPL, t0, t1);
+
+    // 3. Boundary clamping: if ship would go past CAMERA_START_BOUND, push it back
+    //    elapsed_time = game_speed * (time_last - time_current)  [OCaml sign convention: t_last - t_current > 0]
+    let elapsed_time = globals.game_speed * (t0 - t1);
+    let (sx, sy) = state.ship.position;
+    let bound_lo_x = CAMERA_START_BOUND * globals.phys_width;
+    let bound_hi_x = (1.0 - CAMERA_START_BOUND) * globals.phys_width;
+    let bound_lo_y = CAMERA_START_BOUND * globals.phys_height;
+    let bound_hi_y = (1.0 - CAMERA_START_BOUND) * globals.phys_height;
+
+    if sx + movex < bound_lo_x {
+        movex -= CAMERA_MAX_FORCE * elapsed_time * (-sx - movex + bound_lo_x);
+    } else if sx + movex > bound_hi_x {
+        movex -= CAMERA_MAX_FORCE * elapsed_time * (-sx - movex + bound_hi_x);
+    }
+    if sy + movey < bound_lo_y {
+        movey -= CAMERA_MAX_FORCE * elapsed_time * (-sy - movey + bound_lo_y);
+    } else if sy + movey > bound_hi_y {
+        movey -= CAMERA_MAX_FORCE * elapsed_time * (-sy - movey + bound_hi_y);
+    }
+
+    let move_camera = (movex, movey);
+
+    // 4. Apply displacement to all entities
+    deplac_objet_abso(&mut state.ship, move_camera);
+    for e in state.objects.iter_mut()      { deplac_objet_abso(e, move_camera); }
+    for e in state.objects_oos.iter_mut()  { deplac_objet_abso(e, move_camera); }
+    for e in state.toosmall.iter_mut()     { deplac_objet_abso(e, move_camera); }
+    for e in state.toosmall_oos.iter_mut() { deplac_objet_abso(e, move_camera); }
+    for e in state.fragments.iter_mut()    { deplac_objet_abso(e, move_camera); }
+    for e in state.chunks.iter_mut()       { deplac_objet_abso(e, move_camera); }
+    for e in state.chunks_oos.iter_mut()   { deplac_objet_abso(e, move_camera); }
+    for e in state.chunks_explo.iter_mut() { deplac_objet_abso(e, move_camera); }
+    for e in state.projectiles.iter_mut()  { deplac_objet_abso(e, move_camera); }
+    for e in state.explosions.iter_mut()   { deplac_objet_abso(e, move_camera); }
+    for e in state.smoke.iter_mut()        { deplac_objet_abso(e, move_camera); }
+    for e in state.smoke_oos.iter_mut()    { deplac_objet_abso(e, move_camera); }
+    for e in state.sparks.iter_mut()       { deplac_objet_abso(e, move_camera); }
+    // Stars get parallax treatment (proximity-scaled displacement)
+    for star in state.stars.iter_mut()     { deplac_star(star, move_camera, globals); }
 }
 
 /// Main game update: movement, transfers, collisions, spawning, despawn.
@@ -1313,6 +1427,21 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         state.ship.health = state.ship.health.min(SHIP_MAX_HEALTH);
     }
 
+    // --- Lagged health (orange bar) ---
+    // Exponential lag: last_health chases ship.health (matches OCaml affiche_hud line 769)
+    {
+        let target = state.ship.health.max(0.0);
+        state.last_health = target + exp_decay(
+            state.last_health - target,
+            0.5,
+            globals.observer_proper_time,
+            globals.game_speed,
+            globals.time_last_frame,
+            globals.time_current_frame,
+            state.ship.proper_time,
+        );
+    }
+
     // --- Ship death handling ---
     // Mirrors OCaml boucle_interaction: when ship.health < 0, trigger death effects and respawn.
     if state.ship.health < 0.0 {
@@ -1358,6 +1487,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             globals.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
         }
     }
+
+    // --- Camera update: translate all entities to keep ship centred ---
+    update_camera(state, globals);
 }
 
 // ============================================================================
@@ -1533,6 +1665,11 @@ fn shape_char(c: char) -> Vec<(f64, f64)> {
 /// Matches OCaml `displacement`: bilinear interpolation across the 4 bounding points,
 /// then multiply by ratio_rendu.
 /// Points: [p0=bottom-left, p1=bottom-right, p2=top-right, p3=top-left] (physical coords)
+///
+/// OCaml formula: moytuple a b ratio = a*ratio + b*(1-ratio)
+/// top = moytuple(p2, p1, rely) = p2*rely + p1*(1-rely)
+/// bot = moytuple(p3, p0, rely) = p3*rely + p0*(1-rely)
+/// result = moytuple(top, bot, relx) = top*relx + bot*(1-relx)
 fn displacement(
     encadrement: &[(f64, f64); 4],
     rel: (f64, f64),
@@ -1540,19 +1677,18 @@ fn displacement(
 ) -> (f64, f64) {
     let (relx, rely) = rel;
     let [p0, p1, p2, p3] = encadrement;
-    // moytuple (moytuple p2 p1 rely) (moytuple p3 p0 rely) relx
-    // moytuple a b ratio = a + ratio*(b-a)
+    // moytuple a b ratio = a*ratio + b*(1-ratio)
     let top = (
-        p2.0 + relx * (p1.0 - p2.0),
-        p2.1 + relx * (p1.1 - p2.1),
+        p2.0 * rely + p1.0 * (1.0 - rely),
+        p2.1 * rely + p1.1 * (1.0 - rely),
     );
     let bot = (
-        p3.0 + relx * (p0.0 - p3.0),
-        p3.1 + relx * (p0.1 - p3.1),
+        p3.0 * rely + p0.0 * (1.0 - rely),
+        p3.1 * rely + p0.1 * (1.0 - rely),
     );
     let interp = (
-        top.0 + rely * (bot.0 - top.0),
-        top.1 + rely * (bot.1 - top.1),
+        top.0 * relx + bot.0 * (1.0 - relx),
+        top.1 * relx + bot.1 * (1.0 - relx),
     );
     (interp.0 * ratio_rendu, interp.1 * ratio_rendu)
 }
@@ -2002,38 +2138,49 @@ pub fn render_frame(state: &mut GameState, globals: &mut Globals, renderer: &mut
         }
     }
 
+    // Smoke — before ship (OCaml order)
+    for s in &state.smoke {
+        render_visuals(s, (0.0, 0.0), renderer, globals, &mut state.rng);
+    }
+
     // Chunks
     for chunk in &state.chunks {
         render_chunk(chunk, renderer, globals, &mut state.rng);
     }
 
-    // Asteroids (objects + toosmall + fragments)
-    for entity in &state.objects {
-        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
-    }
-    for entity in &state.toosmall {
-        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
-    }
-    for entity in &state.fragments {
-        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
+    // Projectiles — before ship (OCaml order)
+    for p in &state.projectiles {
+        render_projectile(p, renderer, globals, &mut state.rng);
     }
 
     // Ship
     render_visuals(&state.ship, (0.0, 0.0), renderer, globals, &mut state.rng);
 
-    // Smoke (rendered as circles via render_visuals)
-    for s in &state.smoke {
-        render_visuals(s, (0.0, 0.0), renderer, globals, &mut state.rng);
+    // Fragments — after ship (OCaml order)
+    for entity in &state.fragments {
+        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
     }
 
-    // Explosions (rendered as circles)
+    // Toosmall — after ship (OCaml order)
+    for entity in &state.toosmall {
+        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
+    }
+
+    // Asteroids — after ship (OCaml order)
+    for entity in &state.objects {
+        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
+    }
+
+    // Explosions — after asteroids (OCaml order)
     for e in &state.explosions {
         render_visuals(e, (0.0, 0.0), renderer, globals, &mut state.rng);
     }
 
-    // Projectiles (light trails)
-    for p in &state.projectiles {
-        render_projectile(p, renderer, globals, &mut state.rng);
+    // HUD overlay — skip when paused (matches OCaml behavior)
+    if !globals.pause {
+        // Extract rng to avoid simultaneous borrow of state fields
+        let rng = &mut state.rng as *mut _;
+        render_hud(state, globals, renderer, unsafe { &mut *rng });
     }
 
     // Pause title overlay
