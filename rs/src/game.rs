@@ -695,6 +695,10 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
         // Screenshake decay
         globals.game_screenshake =
             abso_exp_decay(globals.game_screenshake, SCREENSHAKE_HALF_LIFE, t0, t1);
+
+        // Score shake decay
+        globals.shake_score =
+            abso_exp_decay(globals.shake_score, SHAKE_SCORE_HALF_LIFE, t0, t1);
         globals.game_screenshake_previous_pos = globals.game_screenshake_pos;
         if globals.screenshake_enabled {
             globals.game_screenshake_pos = multuple(
@@ -1235,6 +1239,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         + state.fragments.iter().filter(|e| is_dead(e)).count();
     globals.game_speed *= RATIO_TIME_DESTR_ASTEROID.powi(nb_destroyed as i32);
     state.score += nb_destroyed as i32;
+    globals.shake_score += nb_destroyed as f64;
 
     // === Fragment vs fragment repulsion + promotion ===
     run_fragment_collisions(state, globals);
@@ -1301,6 +1306,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // --- Despawn ---
     despawn(state, globals);
+
+    // --- Ship auto-regeneration ---
+    if AUTOREGEN && state.ship.health > 0.0 && state.ship.health < SHIP_MAX_HEALTH {
+        state.ship.health += AUTOREGEN_HEALTH * globals.game_speed * globals.dt();
+        state.ship.health = state.ship.health.min(SHIP_MAX_HEALTH);
+    }
 
     // --- Ship death handling ---
     // Mirrors OCaml boucle_interaction: when ship.health < 0, trigger death effects and respawn.
@@ -2023,6 +2034,11 @@ pub fn render_frame(state: &mut GameState, globals: &mut Globals, renderer: &mut
     // Projectiles (light trails)
     for p in &state.projectiles {
         render_projectile(p, renderer, globals, &mut state.rng);
+    }
+
+    // Pause title overlay
+    if globals.pause {
+        render_pause_title(globals, renderer, &mut state.rng);
     }
 
     // Scanlines effect (rendered last, on top of everything)
