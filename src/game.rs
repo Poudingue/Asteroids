@@ -828,11 +828,11 @@ fn phys_damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
         actual * SCREENSHAKE_PHYS_RATIO * entity.mass / SCREENSHAKE_PHYS_MASS;
 }
 
-fn collision_circles(pos0: Vec2, r0: f64, pos1: Vec2, r1: f64) -> bool {
+pub fn collision_circles(pos0: Vec2, r0: f64, pos1: Vec2, r1: f64) -> bool {
     distancecarre(pos0, pos1) < carre(r0 + r1)
 }
 
-fn collision_point(pos_point: Vec2, pos_circle: Vec2, radius: f64) -> bool {
+pub fn collision_point(pos_point: Vec2, pos_circle: Vec2, radius: f64) -> bool {
     distancecarre(pos_point, pos_circle) < carre(radius)
 }
 
