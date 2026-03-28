@@ -207,3 +207,46 @@ pub fn saturate(hdr_in: HdrColor, i: f64) -> HdrColor {
         b: i * hdr_in.b + (1. - i) * value,
     }
 }
+
+impl std::ops::Add for HdrColor {
+    type Output = HdrColor;
+    fn add(self, rhs: HdrColor) -> HdrColor {
+        HdrColor { r: self.r + rhs.r, g: self.g + rhs.g, b: self.b + rhs.b }
+    }
+}
+
+impl std::ops::Sub for HdrColor {
+    type Output = HdrColor;
+    fn sub(self, rhs: HdrColor) -> HdrColor {
+        HdrColor { r: self.r - rhs.r, g: self.g - rhs.g, b: self.b - rhs.b }
+    }
+}
+
+impl std::ops::Mul for HdrColor {
+    type Output = HdrColor;
+    fn mul(self, rhs: HdrColor) -> HdrColor {
+        HdrColor { r: self.r * rhs.r, g: self.g * rhs.g, b: self.b * rhs.b }
+    }
+}
+
+impl std::ops::Mul<f64> for HdrColor {
+    type Output = HdrColor;
+    fn mul(self, rhs: f64) -> HdrColor {
+        HdrColor { r: self.r * rhs, g: self.g * rhs, b: self.b * rhs }
+    }
+}
+
+impl std::ops::Mul<HdrColor> for f64 {
+    type Output = HdrColor;
+    fn mul(self, rhs: HdrColor) -> HdrColor {
+        HdrColor { r: self * rhs.r, g: self * rhs.g, b: self * rhs.b }
+    }
+}
+
+impl std::ops::AddAssign for HdrColor {
+    fn add_assign(&mut self, rhs: HdrColor) {
+        self.r += rhs.r;
+        self.g += rhs.g;
+        self.b += rhs.b;
+    }
+}
