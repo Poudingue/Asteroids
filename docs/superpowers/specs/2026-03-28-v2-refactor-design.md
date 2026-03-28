@@ -109,8 +109,8 @@ Visible only when HDR is active. Three adjustable values:
 | Parameter | Meaning |
 |---|---|
 | `MAX_BRIGHTNESS` | Peak nits (HDR headroom above SDR white) |
-| `PAPER_BRIGHTNESS` | Current "255" equivalent — the SDR white point |
-| `INTERFACE_BRIGHTNESS` | HUD and text brightness (currently anchored to "255") |
+| `PAPER_BRIGHTNESS` | SDR white point in nits — what sRGB 255 maps to on the display |
+| `INTERFACE_BRIGHTNESS` | HUD/text brightness in nits |
 
 ### 2.3 Tonemapping
 
@@ -133,8 +133,8 @@ final_color = postprocess(vertex_color * entity.hdr_exposure, game_exposure, add
 ```rust
 HDR_ENABLED: bool          // = false — runtime-mutable user preference in RenderConfig
 HDR_MAX_BRIGHTNESS: f64
-HDR_PAPER_BRIGHTNESS: f64
-HDR_INTERFACE_BRIGHTNESS: f64
+HDR_PAPER_BRIGHTNESS: f64    // = 150.0 — SDR white point in nits (what sRGB 255 maps to)
+HDR_INTERFACE_BRIGHTNESS: f64  // = 150.0 — HUD/text brightness in nits
 ```
 
 `HDR_ENABLED` can be toggled from the pause menu's HDR calibration submenu. The calibration menu is always accessible but grayed out when HDR is disabled.
@@ -552,8 +552,8 @@ All constants below belong in `config.rs` under focused sub-structs.
 ```rust
 HDR_ENABLED: bool                    // = false  (runtime-toggleable from pause menu)
 HDR_MAX_BRIGHTNESS: f64              // = 1000.0
-HDR_PAPER_BRIGHTNESS: f64            // = 255.0
-HDR_INTERFACE_BRIGHTNESS: f64        // = 255.0
+HDR_PAPER_BRIGHTNESS: f64            // = 150.0
+HDR_INTERFACE_BRIGHTNESS: f64        // = 150.0
 ZOOM_AFFECTS_HUD: bool               // = true
 ```
 
