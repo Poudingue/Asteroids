@@ -46,4 +46,4 @@ Keys are scancode-based — physical position matters, not label. ZQSD (AZERTY) 
 
 ## History
 
-This started as an OCaml assignment. The original OCaml source is preserved in git history on the `master` and `claude-experiments` branches. The Rust port is a full rewrite targeting modern GPU rendering.
+This started as an OCaml assignment. The original OCaml version is preserved on the [`ocaml`](../../tree/ocaml) branch. This branch (`master`) is the Rust rewrite targeting modern GPU rendering.
