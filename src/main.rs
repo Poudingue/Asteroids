@@ -1,9 +1,4 @@
-mod color;
-mod game;
-mod math_utils;
-mod objects;
-mod parameters;
-mod renderer;
+use asteroids::*;
 
 use std::time::Instant;
 
