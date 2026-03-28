@@ -1,44 +1,49 @@
+## Historical OCaml Version
+
+> **Note**: This branch (`ocaml`) preserves the original OCaml implementation of the game. It is no longer actively developed.
+> Active development continues on the **`master`** branch, which is a full rewrite in **Rust + wgpu + SDL2** with many new features and visual effects.
+
 ## Synopsis
 
-This project is based on an assignement, which goal was to imitate as closely as possible the classic arcade game Asteroids.
+This project started as a university assignment to recreate the classic arcade game Asteroids as closely as possible.
 
-I ended up adding many features, including collision physics with energy conservation, advanced visual effects (considering the ocaml Graphics API), and an «ok» gameplay loop.
+It grew beyond that — collision physics with energy conservation, advanced visual effects (within the limits of the OCaml Graphics API), and a reasonably fun gameplay loop.
 
-Even though i used oCaml, a language i'm not really a big fan of, it worked out pretty good. I know the code is pretty clunky and repetitive sometimes, with some ugly workarounds, but it works !
-
-I work on it on my spare time, and make the source code available to everyone, for fun and learning.
+Even though OCaml isn't my favourite language, it worked out well. The code is sometimes clunky or repetitive with ugly workarounds, but it works!
 
 ## Compilation and Launch
 
-(You will need ocamlc)
-You can compile this game using the command line :
+You will need `ocamlc`.
 
+Compile with:
+
+```
 ocamlc -o asteroids unix.cma graphics.cma parameters.ml functions.ml colors.ml objects.ml buttons.ml asteroids.ml
-(for windows, it's asteroids.exe instead of asteroids)
+```
 
-Run it with ./asteroids (.exe for windows)
+(On Windows, the output binary is `asteroids.exe`.)
 
-(Works both on linux and windows via powershell. Not sure for mac tho)
+Run with `./asteroids` (or `./asteroids.exe` on Windows).
+
+Tested on Linux and Windows (PowerShell). macOS support is uncertain.
 
 ## Changelog
 
 v1.9 - Optimisation update WIP
 
-Features :
-- Runs a lot smoother, even with a lot of objects, thanks to an other way to optimise collisions calculation
-- Better camera behavior, still moves when paused, for style :)
-- Gameplay tweaks everywhere
+Features:
+- Runs a lot smoother even with many objects, thanks to an improved collision optimisation algorithm
+- Better camera behaviour — still moves when paused, for style
+- Gameplay tweaks throughout
 - Changed pause options
 
-Fixed :
-- Objects and fragments bouncing now time-based.
-- Proper time correctly taken into account for every object, for physics and rendering
+Fixed:
+- Object and fragment bouncing is now time-based
+- Proper time correctly taken into account for every object (physics and rendering)
 - Simplified code and objects
 
-Problems :
-- Now that the collision algorithm is optimised, what takes up most of the time is the rendering. Disable chunks and smoke effects for huge performance improvements.
-- Angular momentum of objects still not taken into account for physics
-- ???
+Known issues:
+- Rendering is now the main bottleneck. Disable chunks and smoke effects for large performance improvements.
+- Angular momentum of objects not yet taken into account for physics
 
-
-For all changelogs, see changelog.txt
+For full changelog history, see `changelog.txt`.
