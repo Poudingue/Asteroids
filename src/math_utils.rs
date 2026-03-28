@@ -1,6 +1,6 @@
 use rand::Rng;
 
-pub type Vec2 = (f64, f64);
+pub use crate::math::Vec2;
 
 /// Generate a random float between min and max
 pub fn randfloat(min: f64, max: f64, rng: &mut impl Rng) -> f64 {
@@ -55,22 +55,22 @@ pub fn abso_exp_decay(
 
 /// Calculate the hypotenuse (magnitude) of a 2D vector
 pub fn hypothenuse(v: Vec2) -> f64 {
-    (carre(v.0) + carre(v.1)).sqrt()
+    (carre(v.x) + carre(v.y)).sqrt()
 }
 
 /// Add two 2D vectors
 pub fn addtuple(v1: Vec2, v2: Vec2) -> Vec2 {
-    (v1.0 + v2.0, v1.1 + v2.1)
+    Vec2::new(v1.x + v2.x, v1.y + v2.y)
 }
 
 /// Subtract two 2D vectors
 pub fn soustuple(v1: Vec2, v2: Vec2) -> Vec2 {
-    (v1.0 - v2.0, v1.1 - v2.1)
+    Vec2::new(v1.x - v2.x, v1.y - v2.y)
 }
 
 /// Multiply a 2D vector by a scalar
 pub fn multuple(v: Vec2, ratio: f64) -> Vec2 {
-    (v.0 * ratio, v.1 * ratio)
+    Vec2::new(v.x * ratio, v.y * ratio)
 }
 
 /// Linear interpolation between two floats
@@ -90,27 +90,30 @@ pub fn moyfloat(val1: f64, val2: f64, ratio: f64) -> f64 {
 /// * `tuple2` - Second vector
 /// * `ratio` - Blend ratio (1.0 = tuple1, 0.0 = tuple2)
 pub fn moytuple(tuple1: Vec2, tuple2: Vec2, ratio: f64) -> Vec2 {
-    addtuple(multuple(tuple1, ratio), multuple(tuple2, 1.0 - ratio))
+    Vec2::new(
+        tuple1.x * ratio + tuple2.x * (1.0 - ratio),
+        tuple1.y * ratio + tuple2.y * (1.0 - ratio),
+    )
 }
 
 /// Element-wise multiplication of two 2D vectors
 pub fn multuple_parallel(v1: Vec2, v2: Vec2) -> Vec2 {
-    (v1.0 * v2.0, v1.1 * v2.1)
+    Vec2::new(v1.x * v2.x, v1.y * v2.y)
 }
 
 /// Check if a point is between two other points (axis-aligned bounding box check)
 pub fn entretuple(p: Vec2, min: Vec2, max: Vec2) -> bool {
-    p.0 > min.0 && p.0 < max.0 && p.1 > min.1 && p.1 < max.1
+    p.x > min.x && p.x < max.x && p.y > min.y && p.y < max.y
 }
 
 /// Convert a 2D vector of floats to a 2D vector of ints
 pub fn inttuple(v: Vec2) -> (i32, i32) {
-    (v.0 as i32, v.1 as i32)
+    (v.x as i32, v.y as i32)
 }
 
 /// Convert a 2D vector of ints to a 2D vector of floats
 pub fn floattuple(v: (i32, i32)) -> Vec2 {
-    (v.0 as f64, v.1 as f64)
+    Vec2::new(v.0 as f64, v.1 as f64)
 }
 
 /// Apply dithering to a float value before converting to int
@@ -172,7 +175,7 @@ pub fn proj(tuple1: Vec2, tuple2: Vec2, ratio: f64) -> Vec2 {
 
 /// Convert polar coordinates (angle, magnitude) to Cartesian coordinates (x, y)
 pub fn polar_to_affine(angle: f64, valeur: f64) -> Vec2 {
-    (valeur * angle.cos(), valeur * angle.sin())
+    Vec2::new(valeur * angle.cos(), valeur * angle.sin())
 }
 
 /// Convert polar coordinates tuple to Cartesian coordinates
@@ -180,20 +183,21 @@ pub fn polar_to_affine_tuple(polar: (f64, f64)) -> Vec2 {
     polar_to_affine(polar.0, polar.1)
 }
 
+
 /// Convert Cartesian coordinates (x, y) to polar coordinates (angle, magnitude)
 pub fn affine_to_polar(v: Vec2) -> Vec2 {
     let r = hypothenuse(v);
     if r == 0.0 {
-        (0.0, 0.0)
+        Vec2::ZERO
     } else {
-        (2.0 * (v.1 / (v.0 + r)).atan(), r)
+        Vec2::new(2.0 * (v.y / (v.x + r)).atan(), r)
     }
 }
 
 /// Calculate squared distance between two points
 /// More efficient than distance since it avoids the square root
 pub fn distancecarre(p1: Vec2, p2: Vec2) -> f64 {
-    carre(p2.0 - p1.0) + carre(p2.1 - p1.1)
+    carre(p2.x - p1.x) + carre(p2.y - p1.y)
 }
 
 /// Modulo operation for floats (wrapping)
@@ -214,9 +218,9 @@ pub fn modulo_float(value: f64, modulo: f64) -> f64 {
 /// * `phys_width` - Physical width of game space
 /// * `phys_height` - Physical height of game space
 pub fn modulo_reso(v: Vec2, phys_width: f64, phys_height: f64) -> Vec2 {
-    (
-        modulo_float(v.0, phys_width),
-        modulo_float(v.1, phys_height),
+    Vec2::new(
+        modulo_float(v.x, phys_width),
+        modulo_float(v.y, phys_height),
     )
 }
 
@@ -228,9 +232,9 @@ pub fn modulo_reso(v: Vec2, phys_width: f64, phys_height: f64) -> Vec2 {
 /// * `phys_width` - Physical width of game space
 /// * `phys_height` - Physical height of game space
 pub fn modulo_3reso(v: Vec2, phys_width: f64, phys_height: f64) -> Vec2 {
-    (
-        modulo_float(v.0 + phys_width, phys_width * 3.0) - phys_width,
-        modulo_float(v.1 + phys_height, phys_height * 3.0) - phys_height,
+    Vec2::new(
+        modulo_float(v.x + phys_width, phys_width * 3.0) - phys_width,
+        modulo_float(v.y + phys_height, phys_height * 3.0) - phys_height,
     )
 }
 

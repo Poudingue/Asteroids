@@ -233,8 +233,8 @@ pub fn spawn_ship() -> Entity {
         dam_res: SHIP_DAM_RES,
         phys_ratio: SHIP_PHYS_RATIO,
         phys_res: SHIP_PHYS_RES,
-        position: (0.0, 0.0), // Will be set by caller
-        velocity: (0.0, 0.0),
+        position: Vec2::ZERO, // Will be set by caller
+        velocity: Vec2::ZERO,
         orientation: PI / 2.0,
         moment: 0.0,
         proper_time: 1.0,
@@ -642,7 +642,7 @@ pub fn spawn_fire(ship: &Entity, rng: &mut impl Rng) -> Entity {
         ),
         velocity: {
             // Backward kick scales with ship speed so fire always ejects visually
-            let ship_speed = (ship.velocity.0 * ship.velocity.0 + ship.velocity.1 * ship.velocity.1).sqrt();
+            let ship_speed = (ship.velocity.x * ship.velocity.x + ship.velocity.y * ship.velocity.y).sqrt();
             let kick = ship_speed + FIRE_MIN_SPEED + rng.gen::<f64>() * (FIRE_MAX_SPEED - FIRE_MIN_SPEED);
             addtuple(
                 ship.velocity,
@@ -801,13 +801,13 @@ pub fn random_out_of_screen(radius: f64, phys_w: f64, phys_h: f64, rng: &mut imp
         let y = rng.gen::<f64>() * 3.0 * phys_h - phys_h;
 
         if !(y + radius > 0.0 && y - radius < phys_h && x + radius > 0.0 && x - radius < phys_w) {
-            return (x, y);
+            return Vec2::new(x, y);
         }
     }
 }
 
 pub fn spawn_random_star(phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Star {
-    let randpos = (rng.gen::<f64>() * phys_w, rng.gen::<f64>() * phys_h);
+    let randpos = Vec2::new(rng.gen::<f64>() * phys_w, rng.gen::<f64>() * phys_h);
     Star {
         last_pos: randpos,
         pos: randpos,
@@ -857,7 +857,7 @@ pub fn big_enough(e: &Entity) -> bool {
 }
 
 pub fn close_enough(e: &Entity, phys_w: f64, phys_h: f64) -> bool {
-    let center = (phys_w / 2.0, phys_h / 2.0);
+    let center = Vec2::new(phys_w / 2.0, phys_h / 2.0);
     hypothenuse(soustuple(e.position, center)) < MAX_DIST
 }
 
@@ -866,7 +866,8 @@ pub fn too_far(e: &Entity, phys_w: f64, phys_h: f64) -> bool {
 }
 
 pub fn check_spawn(e: &Entity, phys_w: f64, phys_h: f64) -> bool {
-    let (x, y) = e.position;
+    let x = e.position.x;
+    let y = e.position.y;
     let rad = e.hitbox.ext_radius;
     (x - rad < phys_w) && (x + rad > 0.0) && (y - rad < phys_h) && (y + rad > 0.0)
 }

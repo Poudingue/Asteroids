@@ -40,10 +40,11 @@ fn insert_into_grid(
 ) {
     let gw = WIDTH_COLLISION_TABLE as f64;
     let gh = HEIGHT_COLLISION_TABLE as f64;
-    let (jx, jy) = globals.current_jitter_coll_table;
-    for &(entry, (x, y)) in entries {
-        let x2 = jx + gw * (x + globals.phys_width) / (3.0 * globals.phys_width);
-        let y2 = jy + gh * (y + globals.phys_height) / (3.0 * globals.phys_height);
+    let jx = globals.current_jitter_coll_table.x;
+    let jy = globals.current_jitter_coll_table.y;
+    for &(entry, pos) in entries {
+        let x2 = jx + gw * (pos.x + globals.phys_width) / (3.0 * globals.phys_width);
+        let y2 = jy + gh * (pos.y + globals.phys_height) / (3.0 * globals.phys_height);
         if x2 < 0.0 || y2 < 0.0 || x2 >= gw || y2 >= gh {
             continue;
         }
@@ -115,7 +116,7 @@ impl GameState {
     pub fn new(globals: &Globals) -> Self {
         let mut rng = thread_rng();
         let mut ship = spawn_ship();
-        ship.position = (globals.phys_width / 2.0, globals.phys_height / 2.0);
+        ship.position = Vec2::new(globals.phys_width / 2.0, globals.phys_height / 2.0);
 
         Self {
             score: 0,
@@ -291,7 +292,8 @@ fn positive_radius(entity: &Entity) -> bool {
 
 /// Check if entity is within visible screen area (with radius margin)
 fn checkspawn_objet(entity: &Entity, globals: &Globals) -> bool {
-    let (x, y) = entity.position;
+    let x = entity.position.x;
+    let y = entity.position.y;
     let rad = entity.hitbox.ext_radius;
     (x - rad < globals.phys_width) && (x + rad > 0.0)
         && (y - rad < globals.phys_height) && (y + rad > 0.0)
@@ -391,7 +393,7 @@ pub fn deplac_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
     let next = addtuple(star.pos, multuple(velocity, star.proximity));
     star.pos = modulo_reso(next, globals.phys_width, globals.phys_height);
     // Avoid incorrect motion blur from screen-edge teleport
-    if next.0 > globals.phys_width || next.0 < 0.0 || next.1 > globals.phys_height || next.1 < 0.0 {
+    if next.x > globals.phys_width || next.x < 0.0 || next.y > globals.phys_height || next.y < 0.0 {
         star.last_pos = star.pos;
     }
 }
@@ -403,11 +405,12 @@ pub fn deplac_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
 /// Aim the ship at the mouse position (screen coords → phys coords → atan2)
 pub fn aim_at_mouse(ship: &mut Entity, mouse_x: i32, mouse_y: i32, globals: &Globals) {
         // Flip SDL2 Y-down to renderer Y-up coordinates
-    let mouse_phys = (
+    let mouse_phys = Vec2::new(
         mouse_x as f64 / globals.ratio_rendu,
         (globals.phys_height * globals.ratio_rendu - mouse_y as f64) / globals.ratio_rendu,
     );
-    let (theta, _) = affine_to_polar(soustuple(mouse_phys, ship.position));
+    let polar = affine_to_polar(soustuple(mouse_phys, ship.position));
+    let theta = polar.x;
     ship.orientation = theta;
 }
 
@@ -444,9 +447,9 @@ pub fn boost_forward(state: &mut GameState, globals: &Globals) {
 pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mouse_y: f64) {
     if state.cooldown_tp <= 0.0 {
         // Teleport to mouse position in physics space
-        let new_pos = (mouse_x / globals.ratio_rendu, mouse_y / globals.ratio_rendu);
+        let new_pos = Vec2::new(mouse_x / globals.ratio_rendu, mouse_y / globals.ratio_rendu);
         state.ship.position = new_pos;
-        state.ship.velocity = (0.0, 0.0);
+        state.ship.velocity = Vec2::ZERO;
 
         // Visual flash + slow-mo (matches OCaml: add_color intensify, game_exposure *= tp, game_speed *= ratio_time_tp)
         if globals.flashes_enabled {
@@ -517,14 +520,14 @@ pub fn strafe_right(ship: &mut Entity) {
 // ============================================================================
 
 /// Convert a polar polygon to affine (cartesian) coordinates with rotation and scale
-fn poly_to_affine(poly: &[(f64, f64)], rotat: f64, scale: f64) -> Vec<(f64, f64)> {
+fn poly_to_affine(poly: &[(f64, f64)], rotat: f64, scale: f64) -> Vec<Vec2> {
     poly.iter()
         .map(|&(theta, radius)| polar_to_affine(theta + rotat, radius * scale))
         .collect()
 }
 
 /// Displace all points in an affine polygon by a position offset
-fn depl_affine_poly(poly: &[(f64, f64)], pos: Vec2) -> Vec<Vec2> {
+fn depl_affine_poly(poly: &[Vec2], pos: Vec2) -> Vec<Vec2> {
     poly.iter().map(|&p| addtuple(p, pos)).collect()
 }
 
@@ -715,7 +718,7 @@ pub fn render_star_trail(
 /// Update per-frame globals: jitter, game speed interpolation, exposure
 pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
     // Jitter for dithering
-    globals.current_jitter_double = (
+    globals.current_jitter_double = Vec2::new(
         rng.gen::<f64>() * DITHER_POWER,
         rng.gen::<f64>() * DITHER_POWER,
     );
@@ -760,7 +763,7 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
         globals.game_screenshake_previous_pos = globals.game_screenshake_pos;
         if globals.screenshake_enabled {
             globals.game_screenshake_pos = multuple(
-                (rng.gen::<f64>() * 2.0 - 1.0, rng.gen::<f64>() * 2.0 - 1.0),
+                Vec2::new(rng.gen::<f64>() * 2.0 - 1.0, rng.gen::<f64>() * 2.0 - 1.0),
                 globals.game_screenshake,
             );
             // Smooth screenshake: blend toward previous position for a low-pass effect.
@@ -840,7 +843,7 @@ fn collisions_points(points: &[Vec2], pos_circle: Vec2, radius: f64) -> bool {
     points.iter().any(|&p| collision_point(p, pos_circle, radius))
 }
 
-fn collision_poly(pos: Vec2, poly: &[Vec2], rotat: f64, circle_pos: Vec2, radius: f64) -> bool {
+fn collision_poly(pos: Vec2, poly: &[(f64, f64)], rotat: f64, circle_pos: Vec2, radius: f64) -> bool {
     let pts = depl_affine_poly(&poly_to_affine(poly, rotat, 1.0), pos);
     collisions_points(&pts, circle_pos, radius)
 }
@@ -897,8 +900,8 @@ fn consequences_collision(
         multuple(e2.velocity, 1.0 / e2.proper_time),
         e1.mass / total_mass,
     );
-    let (angle1, _) = affine_to_polar(soustuple(e1.position, e2.position));
-    let (angle2, _) = affine_to_polar(soustuple(e2.position, e1.position));
+        let angle1 = affine_to_polar(soustuple(e1.position, e2.position)).x;
+    let angle2 = affine_to_polar(soustuple(e2.position, e1.position)).x;
 
     let old_vel1 = e1.velocity;
     let old_vel2 = e2.velocity;
@@ -934,8 +937,8 @@ fn consequences_collision(
 
 /// Apply fragment-vs-fragment repulsion (no damage).
 fn consequences_collision_frags(mut f1: Entity, mut f2: Entity, globals: &Globals) -> (Entity, Entity) {
-    let (angle1, _) = affine_to_polar(soustuple(f1.position, f2.position));
-    let (angle2, _) = affine_to_polar(soustuple(f2.position, f1.position));
+        let angle1 = affine_to_polar(soustuple(f1.position, f2.position)).x;
+    let angle2 = affine_to_polar(soustuple(f2.position, f1.position)).x;
     // Note: unlike OCaml, we scale by game_speed so repulsion stays proportional
     // to simulated time during slowdown events.
     let dt = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
@@ -1077,10 +1080,10 @@ fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
 /// `(asteroid_pos - screen_center) * mass / (10 + dist²_from_ship)`.
 /// The resulting vector is in world-space and can be scaled by `CAMERA_RATIO_OBJECTS`.
 fn center_of_attention(objects: &[Entity], ship_pos: Vec2, globals: &Globals) -> Vec2 {
-    let screen_center = (globals.phys_width / 2.0, globals.phys_height / 2.0);
-    objects.iter().fold((0.0, 0.0), |acc, obj| {
+    let screen_center = Vec2::new(globals.phys_width / 2.0, globals.phys_height / 2.0);
+    objects.iter().fold(Vec2::ZERO, |acc, obj| {
         let rel_pos = soustuple(obj.position, ship_pos);
-        let dist2 = distancecarre(rel_pos, (0.0, 0.0));
+        let dist2 = distancecarre(rel_pos, Vec2::ZERO);
         let weight = obj.mass / (10.0 + dist2);
         let pull = multuple(soustuple(obj.position, screen_center), weight);
         addtuple(acc, pull)
@@ -1100,7 +1103,7 @@ pub fn update_camera(state: &mut GameState, globals: &Globals) {
         globals.phys_width * CAMERA_RATIO_VISION,
     );
 
-    let (next_x, next_y) = if globals.pause {
+    let next = if globals.pause {
         // Paused: just keep ship in view with facing offset, no velocity lookahead
         addtuple(ship.position, facing_offset)
     } else {
@@ -1127,15 +1130,16 @@ pub fn update_camera(state: &mut GameState, globals: &Globals) {
     let t1 = globals.time_current_frame;
     let cx = globals.phys_width / 2.0;
     let cy = globals.phys_height / 2.0;
-    let dx = cx - next_x;
-    let dy = cy - next_y;
+    let dx = cx - next.x;
+    let dy = cy - next.y;
     let mut movex = dx - abso_exp_decay(dx, CAMERA_HALF_DEPL, t0, t1);
     let mut movey = dy - abso_exp_decay(dy, CAMERA_HALF_DEPL, t0, t1);
 
     // 3. Boundary clamping: if ship would go past CAMERA_START_BOUND, push it back
     //    elapsed_time = game_speed * (time_last - time_current)  [OCaml sign convention: t_last - t_current > 0]
     let elapsed_time = globals.game_speed * (t0 - t1);
-    let (sx, sy) = state.ship.position;
+    let sx = state.ship.position.x;
+    let sy = state.ship.position.y;
     let bound_lo_x = CAMERA_START_BOUND * globals.phys_width;
     let bound_hi_x = (1.0 - CAMERA_START_BOUND) * globals.phys_width;
     let bound_lo_y = CAMERA_START_BOUND * globals.phys_height;
@@ -1152,7 +1156,7 @@ pub fn update_camera(state: &mut GameState, globals: &Globals) {
         movey -= CAMERA_MAX_FORCE * elapsed_time * (-sy - movey + bound_hi_y);
     }
 
-    let move_camera = (movex, movey);
+    let move_camera = Vec2::new(movex, movey);
 
     // 4. Apply displacement to all entities
     deplac_objet_abso(&mut state.ship, move_camera);
@@ -1296,7 +1300,8 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // --- Filter dead or OOS projectiles (projectiles don't wrap, they despawn) ---
     state.projectiles.retain(|p| {
         p.health >= 0.0 && {
-            let (x, y) = p.position;
+            let x = p.position.x;
+            let y = p.position.y;
             x >= -globals.phys_width && x <= 2.0 * globals.phys_width
                 && y >= -globals.phys_height && y <= 2.0 * globals.phys_height
         }
@@ -2537,7 +2542,7 @@ pub fn render_frame(
 
     // Smoke — before ship (OCaml order)
     for s in &state.smoke {
-        render_visuals(s, (0.0, 0.0), renderer, globals, &mut state.rng);
+        render_visuals(s, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
 
     // Chunks
@@ -2551,26 +2556,26 @@ pub fn render_frame(
     }
 
     // Ship
-    render_visuals(&state.ship, (0.0, 0.0), renderer, globals, &mut state.rng);
+    render_visuals(&state.ship, Vec2::ZERO, renderer, globals, &mut state.rng);
 
     // Fragments — after ship (OCaml order)
     for entity in &state.fragments {
-        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
+        render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
 
     // Toosmall — after ship (OCaml order)
     for entity in &state.toosmall {
-        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
+        render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
 
     // Asteroids — after ship (OCaml order)
     for entity in &state.objects {
-        render_visuals(entity, (0.0, 0.0), renderer, globals, &mut state.rng);
+        render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
 
     // Explosions — after asteroids (OCaml order)
     for e in &state.explosions {
-        render_visuals(e, (0.0, 0.0), renderer, globals, &mut state.rng);
+        render_visuals(e, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
 
     // HUD overlay — skip when paused (matches OCaml behavior)

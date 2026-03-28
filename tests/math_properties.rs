@@ -15,7 +15,7 @@ fn approx_eq(a: f64, b: f64, eps: f64) -> bool {
 }
 
 fn vec2_approx_eq(a: Vec2, b: Vec2, eps: f64) -> bool {
-    approx_eq(a.0, b.0, eps) && approx_eq(a.1, b.1, eps)
+    approx_eq(a.x, b.x, eps) && approx_eq(a.y, b.y, eps)
 }
 
 // ─── carre ──────────────────────────────────────────────────────────────────
@@ -76,16 +76,16 @@ fn carre_small_values() {
 
 #[test]
 fn addtuple_commutativity() {
-    let a = (3.0, 4.0);
-    let b = (1.0, -2.0);
+    let a = Vec2::new(3.0, 4.0);
+    let b = Vec2::new(1.0, -2.0);
     assert!(vec2_approx_eq(addtuple(a, b), addtuple(b, a), EPS));
 }
 
 #[test]
 fn addtuple_associativity() {
-    let a = (1.0, 2.0);
-    let b = (3.0, 4.0);
-    let c = (5.0, 6.0);
+    let a = Vec2::new(1.0, 2.0);
+    let b = Vec2::new(3.0, 4.0);
+    let c = Vec2::new(5.0, 6.0);
     let lhs = addtuple(addtuple(a, b), c);
     let rhs = addtuple(a, addtuple(b, c));
     assert!(vec2_approx_eq(lhs, rhs, EPS));
@@ -93,71 +93,71 @@ fn addtuple_associativity() {
 
 #[test]
 fn addtuple_identity() {
-    let a = (7.0, -3.0);
-    let zero = (0.0, 0.0);
+    let a = Vec2::new(7.0, -3.0);
+    let zero = Vec2::new(0.0, 0.0);
     assert!(vec2_approx_eq(addtuple(a, zero), a, EPS));
     assert!(vec2_approx_eq(addtuple(zero, a), a, EPS));
 }
 
 #[test]
 fn addtuple_inverse() {
-    let a = (5.0, -8.0);
-    let neg_a = (-5.0, 8.0);
+    let a = Vec2::new(5.0, -8.0);
+    let neg_a = Vec2::new(-5.0, 8.0);
     let result = addtuple(a, neg_a);
-    assert!(vec2_approx_eq(result, (0.0, 0.0), EPS));
+    assert!(vec2_approx_eq(result, Vec2::new(0.0, 0.0), EPS));
 }
 
 #[test]
 fn addtuple_known_values() {
-    assert!(vec2_approx_eq(addtuple((1.0, 2.0), (3.0, 4.0)), (4.0, 6.0), EPS));
-    assert!(vec2_approx_eq(addtuple((-1.0, -2.0), (1.0, 2.0)), (0.0, 0.0), EPS));
+    assert!(vec2_approx_eq(addtuple(Vec2::new(1.0, 2.0), Vec2::new(3.0, 4.0)), Vec2::new(4.0, 6.0), EPS));
+    assert!(vec2_approx_eq(addtuple(Vec2::new(-1.0, -2.0), Vec2::new(1.0, 2.0)), Vec2::new(0.0, 0.0), EPS));
 }
 
 #[test]
 fn addtuple_large_values() {
-    let a = (1e15, 1e15);
-    let b = (1e15, 1e15);
+    let a = Vec2::new(1e15, 1e15);
+    let b = Vec2::new(1e15, 1e15);
     let r = addtuple(a, b);
-    assert!(approx_eq(r.0, 2e15, 1e5));
-    assert!(approx_eq(r.1, 2e15, 1e5));
+    assert!(approx_eq(r.x, 2e15, 1e5));
+    assert!(approx_eq(r.y, 2e15, 1e5));
 }
 
 // ─── soustuple ───────────────────────────────────────────────────────────────
 
 #[test]
 fn soustuple_self_is_zero() {
-    let a = (4.0, -7.0);
-    assert!(vec2_approx_eq(soustuple(a, a), (0.0, 0.0), EPS));
+    let a = Vec2::new(4.0, -7.0);
+    assert!(vec2_approx_eq(soustuple(a, a), Vec2::ZERO, EPS));
 }
 
 #[test]
 fn soustuple_zero_right() {
-    let a = (4.0, -7.0);
-    let zero = (0.0, 0.0);
+    let a = Vec2::new(4.0, -7.0);
+    let zero = Vec2::new(0.0, 0.0);
     assert!(vec2_approx_eq(soustuple(a, zero), a, EPS));
 }
 
 #[test]
 fn soustuple_anti_commutativity() {
-    let a = (3.0, 5.0);
-    let b = (1.0, 2.0);
+    let a = Vec2::new(3.0, 5.0);
+    let b = Vec2::new(1.0, 2.0);
     let ab = soustuple(a, b);
     let ba = soustuple(b, a);
     // a - b = -(b - a)
-    assert!(vec2_approx_eq(ab, (-ba.0, -ba.1), EPS));
+    assert!(vec2_approx_eq(ab, Vec2::new(-ba.x, -ba.y), EPS));
 }
 
 #[test]
 fn soustuple_known_values() {
-    assert!(vec2_approx_eq(soustuple((5.0, 3.0), (2.0, 1.0)), (3.0, 2.0), EPS));
-    assert!(vec2_approx_eq(soustuple((0.0, 0.0), (1.0, 1.0)), (-1.0, -1.0), EPS));
+    assert!(vec2_approx_eq(soustuple(Vec2::new(5.0, 3.0), Vec2::new(2.0, 1.0)), Vec2::new(3.0, 2.0), EPS));
+    assert!(vec2_approx_eq(soustuple(Vec2::new(0.0, 0.0), Vec2::new(1.0, 1.0)), Vec2::new(-1.0, -1.0), EPS));
 }
 
 #[test]
 fn soustuple_recovers_via_add() {
     // (a + b) - b == a
-    let a = (3.0, -4.0);
-    let b = (1.0, 2.0);
+    let a = Vec2::new(3.0, -4.0);
+    let b = Vec2::new(1.0, 2.0);
     let sum = addtuple(a, b);
     assert!(vec2_approx_eq(soustuple(sum, b), a, EPS));
 }
@@ -166,27 +166,27 @@ fn soustuple_recovers_via_add() {
 
 #[test]
 fn multuple_identity() {
-    let v = (3.0, -4.0);
+    let v = Vec2::new(3.0, -4.0);
     assert!(vec2_approx_eq(multuple(v, 1.0), v, EPS));
 }
 
 #[test]
 fn multuple_zero_scalar() {
-    let v = (3.0, -4.0);
-    assert!(vec2_approx_eq(multuple(v, 0.0), (0.0, 0.0), EPS));
+    let v = Vec2::new(3.0, -4.0);
+    assert!(vec2_approx_eq(multuple(v, 0.0), Vec2::ZERO, EPS));
 }
 
 #[test]
 fn multuple_zero_vector() {
-    let zero = (0.0, 0.0);
-    assert!(vec2_approx_eq(multuple(zero, 5.0), (0.0, 0.0), EPS));
+    let zero = Vec2::new(0.0, 0.0);
+    assert!(vec2_approx_eq(multuple(zero, 5.0), Vec2::ZERO, EPS));
 }
 
 #[test]
 fn multuple_distributivity_add() {
     // (a + b) * s == a*s + b*s
-    let a = (1.0, 2.0);
-    let b = (3.0, 4.0);
+    let a = Vec2::new(1.0, 2.0);
+    let b = Vec2::new(3.0, 4.0);
     let s = 2.5;
     let lhs = multuple(addtuple(a, b), s);
     let rhs = addtuple(multuple(a, s), multuple(b, s));
@@ -196,7 +196,7 @@ fn multuple_distributivity_add() {
 #[test]
 fn multuple_scalar_associativity() {
     // v * (s1 * s2) == (v * s1) * s2
-    let v = (3.0, 4.0);
+    let v = Vec2::new(3.0, 4.0);
     let s1 = 2.0;
     let s2 = 3.0;
     let lhs = multuple(v, s1 * s2);
@@ -206,59 +206,60 @@ fn multuple_scalar_associativity() {
 
 #[test]
 fn multuple_negative_scalar() {
-    let v = (3.0, -4.0);
+    let v = Vec2::new(3.0, -4.0);
     let neg = multuple(v, -1.0);
-    assert!(vec2_approx_eq(neg, (-3.0, 4.0), EPS));
+    assert!(vec2_approx_eq(neg, Vec2::new(-3.0, 4.0), EPS));
 }
 
 #[test]
 fn multuple_known_values() {
-    assert!(vec2_approx_eq(multuple((2.0, 3.0), 4.0), (8.0, 12.0), EPS));
+    assert!(vec2_approx_eq(multuple(Vec2::new(2.0, 3.0), 4.0), Vec2::new(8.0, 12.0), EPS));
 }
 
 // ─── hypothenuse ─────────────────────────────────────────────────────────────
 
 #[test]
 fn hypothenuse_3_4_5() {
-    assert!(approx_eq(hypothenuse((3.0, 4.0)), 5.0, EPS));
-    assert!(approx_eq(hypothenuse((4.0, 3.0)), 5.0, EPS));
+    assert!(approx_eq(hypothenuse(Vec2::new(3.0, 4.0)), 5.0, EPS));
+    assert!(approx_eq(hypothenuse(Vec2::new(4.0, 3.0)), 5.0, EPS));
 }
 
 #[test]
 fn hypothenuse_zero() {
-    assert_eq!(hypothenuse((0.0, 0.0)), 0.0);
+    assert_eq!(hypothenuse(Vec2::new(0.0, 0.0)), 0.0);
 }
 
 #[test]
 fn hypothenuse_unit_vectors() {
-    assert!(approx_eq(hypothenuse((1.0, 0.0)), 1.0, EPS));
-    assert!(approx_eq(hypothenuse((0.0, 1.0)), 1.0, EPS));
+    assert!(approx_eq(hypothenuse(Vec2::new(1.0, 0.0)), 1.0, EPS));
+    assert!(approx_eq(hypothenuse(Vec2::new(0.0, 1.0)), 1.0, EPS));
 }
 
 #[test]
 fn hypothenuse_non_negative() {
-    for &(x, y) in &[(0.0, 0.0), (1.0, 0.0), (-1.0, 0.0), (3.0, -4.0), (-3.0, -4.0)] {
-        assert!(hypothenuse((x, y)) >= 0.0);
+    for v in &[Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0), Vec2::new(-1.0, 0.0), Vec2::new(3.0, -4.0), Vec2::new(-3.0, -4.0)] {
+        assert!(hypothenuse(*v) >= 0.0);
     }
 }
 
 #[test]
 fn hypothenuse_symmetry() {
     // hyp(x, y) == hyp(y, x) == hyp(-x, y) == hyp(x, -y)
-    let cases = [(3.0, 4.0), (1.5, 2.5), (1e7, 1e7)];
-    for (x, y) in cases {
-        let h = hypothenuse((x, y));
-        assert!(approx_eq(h, hypothenuse((y, x)), EPS));
-        assert!(approx_eq(h, hypothenuse((-x, y)), EPS));
-        assert!(approx_eq(h, hypothenuse((x, -y)), EPS));
-        assert!(approx_eq(h, hypothenuse((-x, -y)), EPS));
+    let cases = [Vec2::new(3.0, 4.0), Vec2::new(1.5, 2.5), Vec2::new(1e7, 1e7)];
+    for v in cases {
+        let (x, y) = (v.x, v.y);
+        let h = hypothenuse(v);
+        assert!(approx_eq(h, hypothenuse(Vec2::new(y, x)), EPS));
+        assert!(approx_eq(h, hypothenuse(Vec2::new(-x, y)), EPS));
+        assert!(approx_eq(h, hypothenuse(Vec2::new(x, -y)), EPS));
+        assert!(approx_eq(h, hypothenuse(Vec2::new(-x, -y)), EPS));
     }
 }
 
 #[test]
 fn hypothenuse_scaling() {
     // hyp(k*v) == k * hyp(v) for k > 0
-    let v = (3.0, 4.0);
+    let v = Vec2::new(3.0, 4.0);
     let k = 5.0;
     let scaled = multuple(v, k);
     assert!(approx_eq(hypothenuse(scaled), k * hypothenuse(v), EPS));
@@ -267,8 +268,8 @@ fn hypothenuse_scaling() {
 #[test]
 fn hypothenuse_triangle_inequality() {
     // |a + b| <= |a| + |b|
-    let a = (3.0, 4.0);
-    let b = (1.0, 2.0);
+    let a = Vec2::new(3.0, 4.0);
+    let b = Vec2::new(1.0, 2.0);
     let sum_mag = hypothenuse(addtuple(a, b));
     let mag_sum = hypothenuse(a) + hypothenuse(b);
     assert!(sum_mag <= mag_sum + EPS);
@@ -276,18 +277,18 @@ fn hypothenuse_triangle_inequality() {
 
 #[test]
 fn hypothenuse_known_5_12_13() {
-    assert!(approx_eq(hypothenuse((5.0, 12.0)), 13.0, EPS));
+    assert!(approx_eq(hypothenuse(Vec2::new(5.0, 12.0)), 13.0, EPS));
 }
 
 #[test]
 fn hypothenuse_large_values() {
-    let v = hypothenuse((1e15, 0.0));
+    let v = hypothenuse(Vec2::new(1e15, 0.0));
     assert!(approx_eq(v, 1e15, 1e5));
 }
 
 #[test]
 fn hypothenuse_small_values() {
-    let v = hypothenuse((1e-15, 0.0));
+    let v = hypothenuse(Vec2::new(1e-15, 0.0));
     assert!(approx_eq(v, 1e-15, 1e-25));
 }
 
@@ -295,23 +296,23 @@ fn hypothenuse_small_values() {
 
 #[test]
 fn distancecarre_self_is_zero() {
-    let p = (3.0, 4.0);
+    let p = Vec2::new(3.0, 4.0);
     assert_eq!(distancecarre(p, p), 0.0);
 }
 
 #[test]
 fn distancecarre_symmetry() {
-    let p1 = (1.0, 2.0);
-    let p2 = (4.0, 6.0);
+    let p1 = Vec2::new(1.0, 2.0);
+    let p2 = Vec2::new(4.0, 6.0);
     assert!(approx_eq(distancecarre(p1, p2), distancecarre(p2, p1), EPS));
 }
 
 #[test]
 fn distancecarre_non_negative() {
     let cases = [
-        ((0.0, 0.0), (1.0, 1.0)),
-        ((1.0, 2.0), (4.0, 6.0)),
-        ((-3.0, -4.0), (3.0, 4.0)),
+        (Vec2::new(0.0, 0.0), Vec2::new(1.0, 1.0)),
+        (Vec2::new(1.0, 2.0), Vec2::new(4.0, 6.0)),
+        (Vec2::new(-3.0, -4.0), Vec2::new(3.0, 4.0)),
     ];
     for (p1, p2) in cases {
         assert!(distancecarre(p1, p2) >= 0.0);
@@ -321,13 +322,13 @@ fn distancecarre_non_negative() {
 #[test]
 fn distancecarre_known_3_4_5() {
     // Distance from (0,0) to (3,4) should be sqrt(25) = 5, so d² = 25
-    assert!(approx_eq(distancecarre((0.0, 0.0), (3.0, 4.0)), 25.0, EPS));
+    assert!(approx_eq(distancecarre(Vec2::new(0.0, 0.0), Vec2::new(3.0, 4.0)), 25.0, EPS));
 }
 
 #[test]
 fn distancecarre_equals_hypothenuse_squared() {
-    let p1 = (1.0, 2.0);
-    let p2 = (4.0, 6.0);
+    let p1 = Vec2::new(1.0, 2.0);
+    let p2 = Vec2::new(4.0, 6.0);
     let diff = soustuple(p2, p1);
     let h = hypothenuse(diff);
     assert!(approx_eq(distancecarre(p1, p2), h * h, EPS));
@@ -336,9 +337,9 @@ fn distancecarre_equals_hypothenuse_squared() {
 #[test]
 fn distancecarre_triangle_inequality_squared() {
     // sqrt(d²(a,c)) <= sqrt(d²(a,b)) + sqrt(d²(b,c))
-    let a = (0.0, 0.0);
-    let b = (3.0, 4.0);
-    let c = (6.0, 0.0);
+    let a = Vec2::new(0.0, 0.0);
+    let b = Vec2::new(3.0, 4.0);
+    let c = Vec2::new(6.0, 0.0);
     let dac = distancecarre(a, c).sqrt();
     let dab = distancecarre(a, b).sqrt();
     let dbc = distancecarre(b, c).sqrt();
@@ -349,22 +350,22 @@ fn distancecarre_triangle_inequality_squared() {
 
 #[test]
 fn moytuple_ratio_one_returns_first() {
-    let a = (1.0, 2.0);
-    let b = (3.0, 4.0);
+    let a = Vec2::new(1.0, 2.0);
+    let b = Vec2::new(3.0, 4.0);
     assert!(vec2_approx_eq(moytuple(a, b, 1.0), a, EPS));
 }
 
 #[test]
 fn moytuple_ratio_zero_returns_second() {
-    let a = (1.0, 2.0);
-    let b = (3.0, 4.0);
+    let a = Vec2::new(1.0, 2.0);
+    let b = Vec2::new(3.0, 4.0);
     assert!(vec2_approx_eq(moytuple(a, b, 0.0), b, EPS));
 }
 
 #[test]
 fn moytuple_midpoint_equidistant() {
-    let a = (0.0, 0.0);
-    let b = (4.0, 4.0);
+    let a = Vec2::new(0.0, 0.0);
+    let b = Vec2::new(4.0, 4.0);
     let mid = moytuple(a, b, 0.5);
     let d1 = distancecarre(mid, a);
     let d2 = distancecarre(mid, b);
@@ -373,7 +374,7 @@ fn moytuple_midpoint_equidistant() {
 
 #[test]
 fn moytuple_same_value() {
-    let a = (5.0, 7.0);
+    let a = Vec2::new(5.0, 7.0);
     assert!(vec2_approx_eq(moytuple(a, a, 0.5), a, EPS));
     assert!(vec2_approx_eq(moytuple(a, a, 0.0), a, EPS));
     assert!(vec2_approx_eq(moytuple(a, a, 1.0), a, EPS));
@@ -381,10 +382,10 @@ fn moytuple_same_value() {
 
 #[test]
 fn moytuple_known_midpoint() {
-    let a = (0.0, 0.0);
-    let b = (2.0, 4.0);
+    let a = Vec2::new(0.0, 0.0);
+    let b = Vec2::new(2.0, 4.0);
     let mid = moytuple(a, b, 0.5);
-    assert!(vec2_approx_eq(mid, (1.0, 2.0), EPS));
+    assert!(vec2_approx_eq(mid, Vec2::new(1.0, 2.0), EPS));
 }
 
 // ─── moyfloat ─────────────────────────────────────────────────────────────────
@@ -420,39 +421,39 @@ fn moyfloat_known_values() {
 
 #[test]
 fn multuple_parallel_commutativity() {
-    let a = (2.0, 3.0);
-    let b = (4.0, 5.0);
+    let a = Vec2::new(2.0, 3.0);
+    let b = Vec2::new(4.0, 5.0);
     assert!(vec2_approx_eq(multuple_parallel(a, b), multuple_parallel(b, a), EPS));
 }
 
 #[test]
 fn multuple_parallel_identity() {
-    let v = (3.0, -4.0);
-    let one = (1.0, 1.0);
+    let v = Vec2::new(3.0, -4.0);
+    let one = Vec2::new(1.0, 1.0);
     assert!(vec2_approx_eq(multuple_parallel(v, one), v, EPS));
 }
 
 #[test]
 fn multuple_parallel_zero() {
-    let v = (3.0, -4.0);
-    let zero = (0.0, 0.0);
-    assert!(vec2_approx_eq(multuple_parallel(v, zero), (0.0, 0.0), EPS));
+    let v = Vec2::new(3.0, -4.0);
+    let zero = Vec2::new(0.0, 0.0);
+    assert!(vec2_approx_eq(multuple_parallel(v, zero), Vec2::ZERO, EPS));
 }
 
 #[test]
 fn multuple_parallel_known_values() {
     assert!(vec2_approx_eq(
-        multuple_parallel((2.0, 3.0), (4.0, 5.0)),
-        (8.0, 15.0),
+        multuple_parallel(Vec2::new(2.0, 3.0), Vec2::new(4.0, 5.0)),
+        Vec2::new(8.0, 15.0),
         EPS
     ));
 }
 
 #[test]
 fn multuple_parallel_associativity() {
-    let a = (2.0, 3.0);
-    let b = (4.0, 5.0);
-    let c = (6.0, 7.0);
+    let a = Vec2::new(2.0, 3.0);
+    let b = Vec2::new(4.0, 5.0);
+    let c = Vec2::new(6.0, 7.0);
     let lhs = multuple_parallel(multuple_parallel(a, b), c);
     let rhs = multuple_parallel(a, multuple_parallel(b, c));
     assert!(vec2_approx_eq(lhs, rhs, EPS));
@@ -462,66 +463,66 @@ fn multuple_parallel_associativity() {
 
 #[test]
 fn entretuple_inside() {
-    let min = (0.0, 0.0);
-    let max = (10.0, 10.0);
-    assert!(entretuple((5.0, 5.0), min, max));
-    assert!(entretuple((1.0, 9.0), min, max));
-    assert!(entretuple((9.0, 1.0), min, max));
+    let min = Vec2::new(0.0, 0.0);
+    let max = Vec2::new(10.0, 10.0);
+    assert!(entretuple(Vec2::new(5.0, 5.0), min, max));
+    assert!(entretuple(Vec2::new(1.0, 9.0), min, max));
+    assert!(entretuple(Vec2::new(9.0, 1.0), min, max));
 }
 
 #[test]
 fn entretuple_outside() {
-    let min = (0.0, 0.0);
-    let max = (10.0, 10.0);
-    assert!(!entretuple((-1.0, 5.0), min, max));
-    assert!(!entretuple((5.0, -1.0), min, max));
-    assert!(!entretuple((11.0, 5.0), min, max));
-    assert!(!entretuple((5.0, 11.0), min, max));
-    assert!(!entretuple((15.0, 15.0), min, max));
-    assert!(!entretuple((-5.0, -5.0), min, max));
+    let min = Vec2::new(0.0, 0.0);
+    let max = Vec2::new(10.0, 10.0);
+    assert!(!entretuple(Vec2::new(-1.0, 5.0), min, max));
+    assert!(!entretuple(Vec2::new(5.0, -1.0), min, max));
+    assert!(!entretuple(Vec2::new(11.0, 5.0), min, max));
+    assert!(!entretuple(Vec2::new(5.0, 11.0), min, max));
+    assert!(!entretuple(Vec2::new(15.0, 15.0), min, max));
+    assert!(!entretuple(Vec2::new(-5.0, -5.0), min, max));
 }
 
 #[test]
 fn entretuple_boundary_is_exclusive() {
-    let min = (0.0, 0.0);
-    let max = (10.0, 10.0);
+    let min = Vec2::new(0.0, 0.0);
+    let max = Vec2::new(10.0, 10.0);
     // Strict inequality, so boundary is NOT inside
-    assert!(!entretuple((0.0, 5.0), min, max));
-    assert!(!entretuple((10.0, 5.0), min, max));
-    assert!(!entretuple((5.0, 0.0), min, max));
-    assert!(!entretuple((5.0, 10.0), min, max));
+    assert!(!entretuple(Vec2::new(0.0, 5.0), min, max));
+    assert!(!entretuple(Vec2::new(10.0, 5.0), min, max));
+    assert!(!entretuple(Vec2::new(5.0, 0.0), min, max));
+    assert!(!entretuple(Vec2::new(5.0, 10.0), min, max));
 }
 
 #[test]
 fn entretuple_negative_coords() {
-    let min = (-5.0, -5.0);
-    let max = (5.0, 5.0);
-    assert!(entretuple((0.0, 0.0), min, max));
-    assert!(entretuple((-4.0, -4.0), min, max));
-    assert!(!entretuple((-6.0, 0.0), min, max));
+    let min = Vec2::new(-5.0, -5.0);
+    let max = Vec2::new(5.0, 5.0);
+    assert!(entretuple(Vec2::new(0.0, 0.0), min, max));
+    assert!(entretuple(Vec2::new(-4.0, -4.0), min, max));
+    assert!(!entretuple(Vec2::new(-6.0, 0.0), min, max));
 }
 
 // ─── inttuple / floattuple ───────────────────────────────────────────────────
 
 #[test]
 fn inttuple_known_values() {
-    assert_eq!(inttuple((3.0, 4.0)), (3, 4));
-    assert_eq!(inttuple((-1.0, -2.0)), (-1, -2));
-    assert_eq!(inttuple((0.0, 0.0)), (0, 0));
+    assert_eq!(inttuple(Vec2::new(3.0, 4.0)), (3, 4));
+    assert_eq!(inttuple(Vec2::new(-1.0, -2.0)), (-1, -2));
+    assert_eq!(inttuple(Vec2::new(0.0, 0.0)), (0, 0));
 }
 
 #[test]
 fn inttuple_truncates() {
     // f64 as i32 truncates toward zero
-    assert_eq!(inttuple((3.9, 4.9)), (3, 4));
-    assert_eq!(inttuple((-3.9, -4.9)), (-3, -4));
+    assert_eq!(inttuple(Vec2::new(3.9, 4.9)), (3, 4));
+    assert_eq!(inttuple(Vec2::new(-3.9, -4.9)), (-3, -4));
 }
 
 #[test]
 fn floattuple_known_values() {
-    assert!(vec2_approx_eq(floattuple((3, 4)), (3.0, 4.0), EPS));
-    assert!(vec2_approx_eq(floattuple((-1, -2)), (-1.0, -2.0), EPS));
-    assert!(vec2_approx_eq(floattuple((0, 0)), (0.0, 0.0), EPS));
+    assert!(vec2_approx_eq(floattuple((3, 4)), Vec2::new(3.0, 4.0), EPS));
+    assert!(vec2_approx_eq(floattuple((-1, -2)), Vec2::new(-1.0, -2.0), EPS));
+    assert!(vec2_approx_eq(floattuple((0, 0)), Vec2::new(0.0, 0.0), EPS));
 }
 
 #[test]
@@ -539,16 +540,16 @@ fn inttuple_floattuple_roundtrip() {
 
 #[test]
 fn proj_zero_ratio() {
-    let base = (1.0, 2.0);
-    let dir = (3.0, 4.0);
+    let base = Vec2::new(1.0, 2.0);
+    let dir = Vec2::new(3.0, 4.0);
     // proj(base, dir, 0) == base
     assert!(vec2_approx_eq(proj(base, dir, 0.0), base, EPS));
 }
 
 #[test]
 fn proj_unit_ratio() {
-    let base = (1.0, 2.0);
-    let dir = (3.0, 4.0);
+    let base = Vec2::new(1.0, 2.0);
+    let dir = Vec2::new(3.0, 4.0);
     // proj(base, dir, 1.0) == base + dir
     assert!(vec2_approx_eq(proj(base, dir, 1.0), addtuple(base, dir), EPS));
 }
@@ -556,15 +557,15 @@ fn proj_unit_ratio() {
 #[test]
 fn proj_known_values() {
     // proj((0,0), (1,0), 5) = (5, 0)
-    assert!(vec2_approx_eq(proj((0.0, 0.0), (1.0, 0.0), 5.0), (5.0, 0.0), EPS));
+    assert!(vec2_approx_eq(proj(Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0), 5.0), Vec2::new(5.0, 0.0), EPS));
     // proj((1,1), (1,1), 2) = (3, 3)
-    assert!(vec2_approx_eq(proj((1.0, 1.0), (1.0, 1.0), 2.0), (3.0, 3.0), EPS));
+    assert!(vec2_approx_eq(proj(Vec2::new(1.0, 1.0), Vec2::new(1.0, 1.0), 2.0), Vec2::new(3.0, 3.0), EPS));
 }
 
 #[test]
 fn proj_negative_ratio() {
-    let base = (5.0, 5.0);
-    let dir = (1.0, 1.0);
+    let base = Vec2::new(5.0, 5.0);
+    let dir = Vec2::new(1.0, 1.0);
     // proj(base, dir, -1) == base - dir
     assert!(vec2_approx_eq(proj(base, dir, -1.0), soustuple(base, dir), EPS));
 }
@@ -573,37 +574,37 @@ fn proj_negative_ratio() {
 
 #[test]
 fn polar_to_affine_unit_circle_zero_angle() {
-    let (x, y) = polar_to_affine(0.0, 1.0);
-    assert!(approx_eq(x, 1.0, EPS_TRIG));
-    assert!(approx_eq(y, 0.0, EPS_TRIG));
+    let v = polar_to_affine(0.0, 1.0);
+    assert!(approx_eq(v.x, 1.0, EPS_TRIG));
+    assert!(approx_eq(v.y, 0.0, EPS_TRIG));
 }
 
 #[test]
 fn polar_to_affine_unit_circle_pi_half() {
-    let (x, y) = polar_to_affine(PI / 2.0, 1.0);
-    assert!(approx_eq(x, 0.0, EPS_TRIG));
-    assert!(approx_eq(y, 1.0, EPS_TRIG));
+    let v = polar_to_affine(PI / 2.0, 1.0);
+    assert!(approx_eq(v.x, 0.0, EPS_TRIG));
+    assert!(approx_eq(v.y, 1.0, EPS_TRIG));
 }
 
 #[test]
 fn polar_to_affine_unit_circle_pi() {
-    let (x, y) = polar_to_affine(PI, 1.0);
-    assert!(approx_eq(x, -1.0, EPS_TRIG));
-    assert!(approx_eq(y, 0.0, EPS_TRIG));
+    let v = polar_to_affine(PI, 1.0);
+    assert!(approx_eq(v.x, -1.0, EPS_TRIG));
+    assert!(approx_eq(v.y, 0.0, EPS_TRIG));
 }
 
 #[test]
 fn polar_to_affine_unit_circle_3pi_half() {
-    let (x, y) = polar_to_affine(3.0 * PI / 2.0, 1.0);
-    assert!(approx_eq(x, 0.0, EPS_TRIG));
-    assert!(approx_eq(y, -1.0, EPS_TRIG));
+    let v = polar_to_affine(3.0 * PI / 2.0, 1.0);
+    assert!(approx_eq(v.x, 0.0, EPS_TRIG));
+    assert!(approx_eq(v.y, -1.0, EPS_TRIG));
 }
 
 #[test]
 fn polar_to_affine_zero_radius() {
-    let (x, y) = polar_to_affine(PI / 4.0, 0.0);
-    assert!(approx_eq(x, 0.0, EPS_TRIG));
-    assert!(approx_eq(y, 0.0, EPS_TRIG));
+    let v = polar_to_affine(PI / 4.0, 0.0);
+    assert!(approx_eq(v.x, 0.0, EPS_TRIG));
+    assert!(approx_eq(v.y, 0.0, EPS_TRIG));
 }
 
 #[test]
@@ -629,23 +630,23 @@ fn polar_to_affine_preserves_magnitude() {
 
 #[test]
 fn affine_to_polar_unit_x() {
-    let (angle, r) = affine_to_polar((1.0, 0.0));
-    assert!(approx_eq(r, 1.0, EPS_TRIG));
-    assert!(approx_eq(angle, 0.0, EPS_TRIG));
+    let polar = affine_to_polar(Vec2::new(1.0, 0.0));
+    assert!(approx_eq(polar.y, 1.0, EPS_TRIG));
+    assert!(approx_eq(polar.x, 0.0, EPS_TRIG));
 }
 
 #[test]
 fn affine_to_polar_unit_y() {
-    let (angle, r) = affine_to_polar((0.0, 1.0));
-    assert!(approx_eq(r, 1.0, EPS_TRIG));
-    assert!(approx_eq(angle, PI / 2.0, EPS_TRIG));
+    let polar = affine_to_polar(Vec2::new(0.0, 1.0));
+    assert!(approx_eq(polar.y, 1.0, EPS_TRIG));
+    assert!(approx_eq(polar.x, PI / 2.0, EPS_TRIG));
 }
 
 #[test]
 fn affine_to_polar_zero_vector() {
-    let (angle, r) = affine_to_polar((0.0, 0.0));
-    assert_eq!(angle, 0.0);
-    assert_eq!(r, 0.0);
+    let polar = affine_to_polar(Vec2::ZERO);
+    assert_eq!(polar.x, 0.0);
+    assert_eq!(polar.y, 0.0);
 }
 
 #[test]
@@ -656,15 +657,15 @@ fn polar_roundtrip_affine_to_polar_to_affine() {
     // This is a known limitation of this atan variant; it handles all practical
     // in-game vectors which never land exactly on the negative x-axis.
     let cases = [
-        (3.0, 4.0),
-        (-3.0, 4.0),
-        (3.0, -4.0),
-        (-3.0, -4.0),
-        (1.5, 2.5),
+        Vec2::new(3.0, 4.0),
+        Vec2::new(-3.0, 4.0),
+        Vec2::new(3.0, -4.0),
+        Vec2::new(-3.0, -4.0),
+        Vec2::new(1.5, 2.5),
     ];
     for v in cases {
         let polar = affine_to_polar(v);
-        let recovered = polar_to_affine(polar.0, polar.1);
+        let recovered = polar_to_affine(polar.x, polar.y);
         assert!(
             vec2_approx_eq(recovered, v, 1e-9),
             "roundtrip failed for {:?}: polar={:?}, recovered={:?}",
@@ -687,7 +688,9 @@ fn polar_roundtrip_polar_to_affine_to_polar() {
     ];
     for (angle, r) in cases {
         let v = polar_to_affine(angle, r);
-        let (ra, rr) = affine_to_polar(v);
+        let polar = affine_to_polar(v);
+        let ra = polar.x;
+        let rr = polar.y;
         assert!(
             approx_eq(rr, r, 1e-9),
             "magnitude roundtrip failed: original r={r}, got rr={rr}"
@@ -764,29 +767,29 @@ fn modulo_float_range_check() {
 
 #[test]
 fn modulo_reso_in_range() {
-    let r = modulo_reso((5.0, 5.0), 10.0, 10.0);
-    assert!(vec2_approx_eq(r, (5.0, 5.0), EPS));
+    let r = modulo_reso(Vec2::new(5.0, 5.0), 10.0, 10.0);
+    assert!(vec2_approx_eq(r, Vec2::new(5.0, 5.0), EPS));
 }
 
 #[test]
 fn modulo_reso_wraps_x() {
-    let r = modulo_reso((12.0, 5.0), 10.0, 10.0);
-    assert!(approx_eq(r.0, 2.0, EPS));
-    assert!(approx_eq(r.1, 5.0, EPS));
+    let r = modulo_reso(Vec2::new(12.0, 5.0), 10.0, 10.0);
+    assert!(approx_eq(r.x, 2.0, EPS));
+    assert!(approx_eq(r.y, 5.0, EPS));
 }
 
 #[test]
 fn modulo_reso_wraps_y() {
-    let r = modulo_reso((5.0, -1.0), 10.0, 10.0);
-    assert!(approx_eq(r.0, 5.0, EPS));
-    assert!(approx_eq(r.1, 9.0, EPS));
+    let r = modulo_reso(Vec2::new(5.0, -1.0), 10.0, 10.0);
+    assert!(approx_eq(r.x, 5.0, EPS));
+    assert!(approx_eq(r.y, 9.0, EPS));
 }
 
 #[test]
 fn modulo_reso_both_axes() {
-    let r = modulo_reso((-1.0, 11.0), 10.0, 10.0);
-    assert!(approx_eq(r.0, 9.0, EPS));
-    assert!(approx_eq(r.1, 1.0, EPS));
+    let r = modulo_reso(Vec2::new(-1.0, 11.0), 10.0, 10.0);
+    assert!(approx_eq(r.x, 9.0, EPS));
+    assert!(approx_eq(r.y, 1.0, EPS));
 }
 
 // ─── modulo_3reso ─────────────────────────────────────────────────────────────
@@ -794,37 +797,37 @@ fn modulo_reso_both_axes() {
 #[test]
 fn modulo_3reso_in_range() {
     // A point inside [-w, w) x [-h, h) (the 1-screen-wide margin) should stay
-    let r = modulo_3reso((5.0, 5.0), 10.0, 10.0);
+    let r = modulo_3reso(Vec2::new(5.0, 5.0), 10.0, 10.0);
     assert!(
-        r.0 >= -10.0 && r.0 < 10.0,
+        r.x >= -10.0 && r.x < 10.0,
         "x={} out of [-10, 10)",
-        r.0
+        r.x
     );
     assert!(
-        r.1 >= -10.0 && r.1 < 10.0,
+        r.y >= -10.0 && r.y < 10.0,
         "y={} out of [-10, 10)",
-        r.1
+        r.y
     );
 }
 
 #[test]
 fn modulo_3reso_far_positive() {
     // Point at (25, 5): 25 + 10 = 35, 35 mod 30 = 5, 5 - 10 = -5
-    let r = modulo_3reso((25.0, 5.0), 10.0, 10.0);
-    assert!(approx_eq(r.0, -5.0, EPS), "expected -5, got {}", r.0);
+    let r = modulo_3reso(Vec2::new(25.0, 5.0), 10.0, 10.0);
+    assert!(approx_eq(r.x, -5.0, EPS), "expected -5, got {}", r.x);
 }
 
 #[test]
 fn modulo_3reso_far_negative() {
     // Point at (-25, 5): -25 + 10 = -15, -15 mod 30 = 15, 15 - 10 = 5
-    let r = modulo_3reso((-25.0, 5.0), 10.0, 10.0);
-    assert!(approx_eq(r.0, 5.0, EPS), "expected 5, got {}", r.0);
+    let r = modulo_3reso(Vec2::new(-25.0, 5.0), 10.0, 10.0);
+    assert!(approx_eq(r.x, 5.0, EPS), "expected 5, got {}", r.x);
 }
 
 #[test]
 fn modulo_3reso_idempotent_in_range() {
     // Applying twice to an already in-range value should be no-op
-    let v = (5.0, 3.0);
+    let v = Vec2::new(5.0, 3.0);
     let w = 10.0;
     let h = 10.0;
     let once = modulo_3reso(v, w, h);

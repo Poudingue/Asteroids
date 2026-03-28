@@ -17,7 +17,7 @@ fn approx_eq(a: f64, b: f64, eps: f64) -> bool {
 }
 
 fn vec2_approx_eq(a: Vec2, b: Vec2, eps: f64) -> bool {
-    approx_eq(a.0, b.0, eps) && approx_eq(a.1, b.1, eps)
+    approx_eq(a.x, b.x, eps) && approx_eq(a.y, b.y, eps)
 }
 
 /// Create a Globals with a fixed dt and game_speed=1.0.
@@ -33,8 +33,8 @@ fn make_globals(dt: f64) -> Globals {
 /// Create a ship entity at origin with zero velocity and proper_time=1.0.
 fn make_entity() -> Entity {
     let mut e = spawn_ship();
-    e.position = (0.0, 0.0);
-    e.velocity = (0.0, 0.0);
+    e.position = Vec2::ZERO;
+    e.velocity = Vec2::ZERO;
     e.orientation = 0.0;
     e.moment = 0.0;
     e.proper_time = 1.0;
@@ -50,9 +50,9 @@ fn deplac_objet_basic_movement() {
     // new_pos = (0,0) + (3,4) * 1 = (3,4)
     let mut e = make_entity();
     let g = make_globals(1.0);
-    deplac_objet(&mut e, (3.0, 4.0), &g);
+    deplac_objet(&mut e, Vec2::new(3.0, 4.0), &g);
     assert!(
-        vec2_approx_eq(e.position, (3.0, 4.0), EPS),
+        vec2_approx_eq(e.position, Vec2::new(3.0, 4.0), EPS),
         "expected (3,4), got {:?}",
         e.position
     );
@@ -62,10 +62,10 @@ fn deplac_objet_basic_movement() {
 fn deplac_objet_zero_velocity() {
     let mut e = make_entity();
     let g = make_globals(1.0);
-    e.position = (5.0, 7.0);
-    deplac_objet(&mut e, (0.0, 0.0), &g);
+    e.position = Vec2::new(5.0, 7.0);
+    deplac_objet(&mut e, Vec2::new(0.0, 0.0), &g);
     assert!(
-        vec2_approx_eq(e.position, (5.0, 7.0), EPS),
+        vec2_approx_eq(e.position, Vec2::new(5.0, 7.0), EPS),
         "zero velocity should not move entity"
     );
 }
@@ -73,11 +73,11 @@ fn deplac_objet_zero_velocity() {
 #[test]
 fn deplac_objet_zero_dt() {
     let mut e = make_entity();
-    e.position = (5.0, 7.0);
+    e.position = Vec2::new(5.0, 7.0);
     let g = make_globals(0.0);
-    deplac_objet(&mut e, (3.0, 4.0), &g);
+    deplac_objet(&mut e, Vec2::new(3.0, 4.0), &g);
     assert!(
-        vec2_approx_eq(e.position, (5.0, 7.0), EPS),
+        vec2_approx_eq(e.position, Vec2::new(5.0, 7.0), EPS),
         "zero dt should not move entity"
     );
 }
@@ -87,11 +87,11 @@ fn deplac_objet_scales_with_dt() {
     // With dt=2 and vel=(1,0): displacement = 2 (since game_speed=1, OBSERVER_PROPER_TIME=1, proper_time=1)
     let mut e = make_entity();
     let g = make_globals(2.0);
-    deplac_objet(&mut e, (1.0, 0.0), &g);
+    deplac_objet(&mut e, Vec2::new(1.0, 0.0), &g);
     assert!(
-        approx_eq(e.position.0, 2.0, EPS),
+        approx_eq(e.position.x, 2.0, EPS),
         "position.x should be 2, got {}",
-        e.position.0
+        e.position.x
     );
 }
 
@@ -104,11 +104,11 @@ fn deplac_objet_scales_with_game_speed() {
     let mut g2 = make_globals(1.0);
     g1.game_speed = 1.0;
     g2.game_speed = 2.0;
-    let vel = (3.0, 4.0);
+    let vel = Vec2::new(3.0, 4.0);
     deplac_objet(&mut e1, vel, &g1);
     deplac_objet(&mut e2, vel, &g2);
     assert!(
-        vec2_approx_eq(e2.position, (e1.position.0 * 2.0, e1.position.1 * 2.0), EPS),
+        vec2_approx_eq(e2.position, Vec2::new(e1.position.x * 2.0, e1.position.y * 2.0), EPS),
         "game_speed=2 should double displacement"
     );
 }
@@ -116,11 +116,11 @@ fn deplac_objet_scales_with_game_speed() {
 #[test]
 fn deplac_objet_negative_velocity() {
     let mut e = make_entity();
-    e.position = (5.0, 5.0);
+    e.position = Vec2::new(5.0, 5.0);
     let g = make_globals(1.0);
-    deplac_objet(&mut e, (-2.0, -3.0), &g);
+    deplac_objet(&mut e, Vec2::new(-2.0, -3.0), &g);
     assert!(
-        vec2_approx_eq(e.position, (3.0, 2.0), EPS),
+        vec2_approx_eq(e.position, Vec2::new(3.0, 2.0), EPS),
         "expected (3,2), got {:?}",
         e.position
     );
@@ -132,11 +132,11 @@ fn deplac_objet_negative_velocity() {
 fn inertie_objet_basic() {
     // entity with velocity (1,2), dt=1 => moves by (1,2)
     let mut e = make_entity();
-    e.velocity = (1.0, 2.0);
+    e.velocity = Vec2::new(1.0, 2.0);
     let g = make_globals(1.0);
     inertie_objet(&mut e, &g);
     assert!(
-        vec2_approx_eq(e.position, (1.0, 2.0), EPS),
+        vec2_approx_eq(e.position, Vec2::new(1.0, 2.0), EPS),
         "expected (1,2), got {:?}",
         e.position
     );
@@ -145,12 +145,12 @@ fn inertie_objet_basic() {
 #[test]
 fn inertie_objet_stationary() {
     let mut e = make_entity();
-    e.velocity = (0.0, 0.0);
-    e.position = (3.0, 5.0);
+    e.velocity = Vec2::new(0.0, 0.0);
+    e.position = Vec2::new(3.0, 5.0);
     let g = make_globals(1.0);
     inertie_objet(&mut e, &g);
     assert!(
-        vec2_approx_eq(e.position, (3.0, 5.0), EPS),
+        vec2_approx_eq(e.position, Vec2::new(3.0, 5.0), EPS),
         "stationary entity should not move"
     );
 }
@@ -158,11 +158,11 @@ fn inertie_objet_stationary() {
 #[test]
 fn inertie_objet_does_not_change_velocity() {
     let mut e = make_entity();
-    e.velocity = (2.0, 3.0);
+    e.velocity = Vec2::new(2.0, 3.0);
     let g = make_globals(1.0);
     inertie_objet(&mut e, &g);
     assert!(
-        vec2_approx_eq(e.velocity, (2.0, 3.0), EPS),
+        vec2_approx_eq(e.velocity, Vec2::new(2.0, 3.0), EPS),
         "inertia should not alter velocity"
     );
 }
@@ -172,14 +172,14 @@ fn inertie_objet_uses_own_velocity() {
     // Displacement should equal velocity * time_factor
     let mut e1 = make_entity();
     let mut e2 = make_entity();
-    e1.velocity = (5.0, 0.0);
-    e2.velocity = (10.0, 0.0);
+    e1.velocity = Vec2::new(5.0, 0.0);
+    e2.velocity = Vec2::new(10.0, 0.0);
     let g = make_globals(1.0);
     inertie_objet(&mut e1, &g);
     inertie_objet(&mut e2, &g);
     // e2 should move twice as far as e1
     assert!(
-        approx_eq(e2.position.0, e1.position.0 * 2.0, EPS),
+        approx_eq(e2.position.x, e1.position.x * 2.0, EPS),
         "faster entity should move proportionally farther"
     );
 }
@@ -190,11 +190,11 @@ fn inertie_objet_uses_own_velocity() {
 fn accel_objet_basic() {
     // dt=1, game_speed=1 => velocity += accel * 1
     let mut e = make_entity();
-    e.velocity = (0.0, 0.0);
+    e.velocity = Vec2::new(0.0, 0.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, (2.0, 3.0), &g);
+    accel_objet(&mut e, Vec2::new(2.0, 3.0), &g);
     assert!(
-        vec2_approx_eq(e.velocity, (2.0, 3.0), EPS),
+        vec2_approx_eq(e.velocity, Vec2::new(2.0, 3.0), EPS),
         "expected velocity (2,3), got {:?}",
         e.velocity
     );
@@ -203,25 +203,25 @@ fn accel_objet_basic() {
 #[test]
 fn accel_objet_cumulative() {
     let mut e = make_entity();
-    e.velocity = (1.0, 0.0);
+    e.velocity = Vec2::new(1.0, 0.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, (1.0, 0.0), &g);
-    accel_objet(&mut e, (1.0, 0.0), &g);
+    accel_objet(&mut e, Vec2::new(1.0, 0.0), &g);
+    accel_objet(&mut e, Vec2::new(1.0, 0.0), &g);
     assert!(
-        approx_eq(e.velocity.0, 3.0, EPS),
+        approx_eq(e.velocity.x, 3.0, EPS),
         "two accelerations should accumulate: expected 3, got {}",
-        e.velocity.0
+        e.velocity.x
     );
 }
 
 #[test]
 fn accel_objet_zero_acceleration() {
     let mut e = make_entity();
-    e.velocity = (5.0, 7.0);
+    e.velocity = Vec2::new(5.0, 7.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, (0.0, 0.0), &g);
+    accel_objet(&mut e, Vec2::new(0.0, 0.0), &g);
     assert!(
-        vec2_approx_eq(e.velocity, (5.0, 7.0), EPS),
+        vec2_approx_eq(e.velocity, Vec2::new(5.0, 7.0), EPS),
         "zero acceleration should not change velocity"
     );
 }
@@ -229,11 +229,11 @@ fn accel_objet_zero_acceleration() {
 #[test]
 fn accel_objet_does_not_change_position() {
     let mut e = make_entity();
-    e.position = (3.0, 4.0);
+    e.position = Vec2::new(3.0, 4.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, (5.0, 6.0), &g);
+    accel_objet(&mut e, Vec2::new(5.0, 6.0), &g);
     assert!(
-        vec2_approx_eq(e.position, (3.0, 4.0), EPS),
+        vec2_approx_eq(e.position, Vec2::new(3.0, 4.0), EPS),
         "accel_objet should not change position"
     );
 }
@@ -241,13 +241,13 @@ fn accel_objet_does_not_change_position() {
 #[test]
 fn accel_objet_negative_deceleration() {
     let mut e = make_entity();
-    e.velocity = (5.0, 0.0);
+    e.velocity = Vec2::new(5.0, 0.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, (-2.0, 0.0), &g);
+    accel_objet(&mut e, Vec2::new(-2.0, 0.0), &g);
     assert!(
-        approx_eq(e.velocity.0, 3.0, EPS),
+        approx_eq(e.velocity.x, 3.0, EPS),
         "negative accel should reduce velocity: expected 3, got {}",
-        e.velocity.0
+        e.velocity.x
     );
 }
 
@@ -256,10 +256,10 @@ fn accel_objet_negative_deceleration() {
 #[test]
 fn boost_objet_basic() {
     let mut e = make_entity();
-    e.velocity = (1.0, 2.0);
-    boost_objet(&mut e, (3.0, 4.0));
+    e.velocity = Vec2::new(1.0, 2.0);
+    boost_objet(&mut e, Vec2::new(3.0, 4.0));
     assert!(
-        vec2_approx_eq(e.velocity, (4.0, 6.0), EPS),
+        vec2_approx_eq(e.velocity, Vec2::new(4.0, 6.0), EPS),
         "expected velocity (4,6), got {:?}",
         e.velocity
     );
@@ -268,10 +268,10 @@ fn boost_objet_basic() {
 #[test]
 fn boost_objet_zero_boost() {
     let mut e = make_entity();
-    e.velocity = (5.0, 6.0);
-    boost_objet(&mut e, (0.0, 0.0));
+    e.velocity = Vec2::new(5.0, 6.0);
+    boost_objet(&mut e, Vec2::new(0.0, 0.0));
     assert!(
-        vec2_approx_eq(e.velocity, (5.0, 6.0), EPS),
+        vec2_approx_eq(e.velocity, Vec2::new(5.0, 6.0), EPS),
         "zero boost should not change velocity"
     );
 }
@@ -281,10 +281,10 @@ fn boost_objet_no_time_scaling() {
     // boost_objet has no dt — apply same boost with dt=0 and dt=100: same result
     let mut e1 = make_entity();
     let mut e2 = make_entity();
-    e1.velocity = (0.0, 0.0);
-    e2.velocity = (0.0, 0.0);
-    boost_objet(&mut e1, (3.0, 4.0));
-    boost_objet(&mut e2, (3.0, 4.0));
+    e1.velocity = Vec2::ZERO;
+    e2.velocity = Vec2::ZERO;
+    boost_objet(&mut e1, Vec2::new(3.0, 4.0));
+    boost_objet(&mut e2, Vec2::new(3.0, 4.0));
     assert!(
         vec2_approx_eq(e1.velocity, e2.velocity, EPS),
         "boost_objet is time-independent"
@@ -294,10 +294,10 @@ fn boost_objet_no_time_scaling() {
 #[test]
 fn boost_objet_negative() {
     let mut e = make_entity();
-    e.velocity = (5.0, 5.0);
-    boost_objet(&mut e, (-3.0, -2.0));
+    e.velocity = Vec2::new(5.0, 5.0);
+    boost_objet(&mut e, Vec2::new(-3.0, -2.0));
     assert!(
-        vec2_approx_eq(e.velocity, (2.0, 3.0), EPS),
+        vec2_approx_eq(e.velocity, Vec2::new(2.0, 3.0), EPS),
         "expected (2,3), got {:?}",
         e.velocity
     );
@@ -486,8 +486,8 @@ fn moment_objet_scales_with_dt() {
 #[test]
 fn collision_circles_overlapping() {
     // Two circles of radius 5 at distance 3 apart — clearly overlapping
-    let pos0 = (0.0, 0.0);
-    let pos1 = (3.0, 0.0);
+    let pos0 = Vec2::new(0.0, 0.0);
+    let pos1 = Vec2::new(3.0, 0.0);
     assert!(
         collision_circles(pos0, 5.0, pos1, 5.0),
         "overlapping circles should collide"
@@ -497,8 +497,8 @@ fn collision_circles_overlapping() {
 #[test]
 fn collision_circles_non_overlapping() {
     // Two circles of radius 1 at distance 10 apart — no collision
-    let pos0 = (0.0, 0.0);
-    let pos1 = (10.0, 0.0);
+    let pos0 = Vec2::new(0.0, 0.0);
+    let pos1 = Vec2::new(10.0, 0.0);
     assert!(
         !collision_circles(pos0, 1.0, pos1, 1.0),
         "non-overlapping circles should not collide"
@@ -508,8 +508,8 @@ fn collision_circles_non_overlapping() {
 #[test]
 fn collision_circles_exactly_touching_not_colliding() {
     // Distance = sum of radii → strict < means NOT colliding
-    let pos0 = (0.0, 0.0);
-    let pos1 = (10.0, 0.0);
+    let pos0 = Vec2::new(0.0, 0.0);
+    let pos1 = Vec2::new(10.0, 0.0);
     // radii sum = 10, distance = 10: d² = 100, (r0+r1)² = 100 => not strictly less
     assert!(
         !collision_circles(pos0, 5.0, pos1, 5.0),
@@ -519,8 +519,8 @@ fn collision_circles_exactly_touching_not_colliding() {
 
 #[test]
 fn collision_circles_symmetry() {
-    let pos0 = (1.0, 2.0);
-    let pos1 = (4.0, 6.0);
+    let pos0 = Vec2::new(1.0, 2.0);
+    let pos1 = Vec2::new(4.0, 6.0);
     let r0 = 2.0;
     let r1 = 3.0;
     assert_eq!(
@@ -533,7 +533,7 @@ fn collision_circles_symmetry() {
 #[test]
 fn collision_circles_same_position() {
     // Two circles at same position always collide (d²=0 < (r0+r1)²)
-    let pos = (3.0, 4.0);
+    let pos = Vec2::new(3.0, 4.0);
     assert!(
         collision_circles(pos, 1.0, pos, 1.0),
         "circles at same position should always collide"
@@ -543,8 +543,8 @@ fn collision_circles_same_position() {
 #[test]
 fn collision_circles_zero_radius_inside() {
     // A point (r=0) inside a larger circle
-    let pos_circle = (0.0, 0.0);
-    let pos_point = (1.0, 0.0);
+    let pos_circle = Vec2::new(0.0, 0.0);
+    let pos_point = Vec2::new(1.0, 0.0);
     assert!(
         collision_circles(pos_circle, 5.0, pos_point, 0.0),
         "point inside circle should collide"
@@ -554,8 +554,8 @@ fn collision_circles_zero_radius_inside() {
 #[test]
 fn collision_circles_diagonal_overlap() {
     // 3-4-5 triangle: distance=5, radii sum=6 => overlap
-    let pos0 = (0.0, 0.0);
-    let pos1 = (3.0, 4.0); // distance = 5
+    let pos0 = Vec2::new(0.0, 0.0);
+    let pos1 = Vec2::new(3.0, 4.0); // distance = 5
     assert!(
         collision_circles(pos0, 3.0, pos1, 3.0),
         "circles with distance 5 and combined radius 6 should collide"
@@ -565,8 +565,8 @@ fn collision_circles_diagonal_overlap() {
 #[test]
 fn collision_circles_large_radii() {
     // Giant circles spanning huge distances
-    let pos0 = (0.0, 0.0);
-    let pos1 = (1000.0, 0.0);
+    let pos0 = Vec2::new(0.0, 0.0);
+    let pos1 = Vec2::new(1000.0, 0.0);
     assert!(
         collision_circles(pos0, 800.0, pos1, 800.0),
         "large overlapping circles should collide"
@@ -579,7 +579,7 @@ fn collision_circles_large_radii() {
 fn collision_point_inside() {
     // Point at (1,0) inside circle centered at origin with radius 5
     assert!(
-        collision_point((1.0, 0.0), (0.0, 0.0), 5.0),
+        collision_point(Vec2::new(1.0, 0.0), Vec2::new(0.0, 0.0), 5.0),
         "point inside circle should collide"
     );
 }
@@ -588,7 +588,7 @@ fn collision_point_inside() {
 fn collision_point_outside() {
     // Point at (10,0) outside circle at origin with radius 5
     assert!(
-        !collision_point((10.0, 0.0), (0.0, 0.0), 5.0),
+        !collision_point(Vec2::new(10.0, 0.0), Vec2::new(0.0, 0.0), 5.0),
         "point outside circle should not collide"
     );
 }
@@ -596,8 +596,8 @@ fn collision_point_outside() {
 #[test]
 fn collision_point_on_boundary_not_colliding() {
     // Point exactly on boundary: d²=r² => not strictly less => no collision
-    let pos_point = (5.0, 0.0);
-    let pos_circle = (0.0, 0.0);
+    let pos_point = Vec2::new(5.0, 0.0);
+    let pos_circle = Vec2::new(0.0, 0.0);
     assert!(
         !collision_point(pos_point, pos_circle, 5.0),
         "point exactly on circle boundary should not collide (strict <)"
@@ -608,7 +608,7 @@ fn collision_point_on_boundary_not_colliding() {
 fn collision_point_at_center() {
     // Point at circle center always inside (d²=0 < r²)
     assert!(
-        collision_point((3.0, 4.0), (3.0, 4.0), 1.0),
+        collision_point(Vec2::new(3.0, 4.0), Vec2::new(3.0, 4.0), 1.0),
         "point at circle center should always collide"
     );
 }
@@ -618,7 +618,7 @@ fn collision_point_zero_radius() {
     // Zero radius circle: only a coincident point would collide, but d²=0 < 0 is false
     // So nothing ever collides with a zero-radius circle
     assert!(
-        !collision_point((0.0, 0.0), (0.0, 0.0), 0.0),
+        !collision_point(Vec2::new(0.0, 0.0), Vec2::new(0.0, 0.0), 0.0),
         "zero-radius circle should not collide even with coincident point"
     );
 }
@@ -627,7 +627,7 @@ fn collision_point_zero_radius() {
 fn collision_point_diagonal_inside() {
     // Point at (3, 4): d² = 25, radius = 6, r² = 36 => inside
     assert!(
-        collision_point((3.0, 4.0), (0.0, 0.0), 6.0),
+        collision_point(Vec2::new(3.0, 4.0), Vec2::new(0.0, 0.0), 6.0),
         "point at distance 5 inside circle of radius 6 should collide"
     );
 }
@@ -636,7 +636,7 @@ fn collision_point_diagonal_inside() {
 fn collision_point_diagonal_outside() {
     // Point at (3, 4): d² = 25, radius = 4, r² = 16 => outside
     assert!(
-        !collision_point((3.0, 4.0), (0.0, 0.0), 4.0),
+        !collision_point(Vec2::new(3.0, 4.0), Vec2::new(0.0, 0.0), 4.0),
         "point at distance 5 outside circle of radius 4 should not collide"
     );
 }

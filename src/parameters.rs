@@ -4,6 +4,7 @@
 //! Contains all game configuration constants and mutable global state.
 
 use std::f64::consts::PI;
+use crate::math::Vec2;
 
 // ============================================================================
 // Constants (Display Parameters)
@@ -436,13 +437,13 @@ pub struct Globals {
     /// Offset from edge to safe zone in physics coords
     pub safe_offset_x: f64,
     pub safe_offset_y: f64,
-    pub current_jitter_double: (f64, f64),
-    pub current_jitter_coll_table: (f64, f64),
+    pub current_jitter_double: Vec2,
+    pub current_jitter_coll_table: Vec2,
 
     // Game event fields
     pub game_screenshake: f64,
-    pub game_screenshake_pos: (f64, f64),
-    pub game_screenshake_previous_pos: (f64, f64),
+    pub game_screenshake_pos: Vec2,
+    pub game_screenshake_previous_pos: Vec2,
     pub shake_score: f64,
 
     // Framerate fields
@@ -532,13 +533,13 @@ impl Globals {
             safe_phys_height: phys_height,
             safe_offset_x: 0.0,
             safe_offset_y: 0.0,
-            current_jitter_double: (0.0, 0.0),
-            current_jitter_coll_table: (0.0, 0.0),
+            current_jitter_double: Vec2::ZERO,
+            current_jitter_coll_table: Vec2::ZERO,
 
             // Game event fields
             game_screenshake: 0.0,
-            game_screenshake_pos: (0.0, 0.0),
-            game_screenshake_previous_pos: (0.0, 0.0),
+            game_screenshake_pos: Vec2::ZERO,
+            game_screenshake_previous_pos: Vec2::ZERO,
             shake_score: 0.0,
 
             // Framerate fields

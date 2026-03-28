@@ -35,8 +35,8 @@ fn entity_with_health(health: f64) -> Entity {
         dam_res: 0.0,
         phys_ratio: 1.0,
         phys_res: 0.0,
-        position: (0.0, 0.0),
-        velocity: (0.0, 0.0),
+        position: Vec2::ZERO,
+        velocity: Vec2::ZERO,
         orientation: 0.0,
         moment: 0.0,
         proper_time: 1.0,
@@ -173,7 +173,7 @@ fn too_small_big_enough_complementary_large() {
 #[test]
 fn check_spawn_not_spawn_complementary_inside() {
     // Entity clearly inside screen (1920x1080)
-    let e = entity_at_position((960.0, 540.0));
+    let e = entity_at_position(Vec2::new(960.0, 540.0));
     assert!(check_spawn(&e, 1920.0, 1080.0));
     assert!(!check_not_spawn(&e, 1920.0, 1080.0));
     assert_ne!(check_spawn(&e, 1920.0, 1080.0), check_not_spawn(&e, 1920.0, 1080.0));
@@ -182,7 +182,7 @@ fn check_spawn_not_spawn_complementary_inside() {
 #[test]
 fn check_spawn_not_spawn_complementary_outside() {
     // Entity far off-screen (well beyond screen + radius)
-    let e = entity_at_position((-5000.0, -5000.0));
+    let e = entity_at_position(Vec2::new(-5000.0, -5000.0));
     assert!(!check_spawn(&e, 1920.0, 1080.0));
     assert!(check_not_spawn(&e, 1920.0, 1080.0));
     assert_ne!(check_spawn(&e, 1920.0, 1080.0), check_not_spawn(&e, 1920.0, 1080.0));
@@ -191,7 +191,7 @@ fn check_spawn_not_spawn_complementary_outside() {
 #[test]
 fn check_spawn_not_spawn_complementary_edge() {
     // Entity just inside top-left corner
-    let e = entity_at_position((5.0, 5.0));
+    let e = entity_at_position(Vec2::new(5.0, 5.0));
     assert!(check_spawn(&e, 1920.0, 1080.0));
     assert!(!check_not_spawn(&e, 1920.0, 1080.0));
 }
@@ -203,7 +203,7 @@ fn check_spawn_not_spawn_complementary_edge() {
 #[test]
 fn close_enough_too_far_complementary_nearby() {
     // Entity near screen center
-    let e = entity_at_position((960.0, 540.0));
+    let e = entity_at_position(Vec2::new(960.0, 540.0));
     assert!(close_enough(&e, 1920.0, 1080.0));
     assert!(!too_far(&e, 1920.0, 1080.0));
     assert_ne!(close_enough(&e, 1920.0, 1080.0), too_far(&e, 1920.0, 1080.0));
@@ -212,7 +212,7 @@ fn close_enough_too_far_complementary_nearby() {
 #[test]
 fn close_enough_too_far_complementary_very_far() {
     // Entity extremely far from screen center (> MAX_DIST = 20000)
-    let e = entity_at_position((50000.0, 50000.0));
+    let e = entity_at_position(Vec2::new(50000.0, 50000.0));
     assert!(!close_enough(&e, 1920.0, 1080.0));
     assert!(too_far(&e, 1920.0, 1080.0));
     assert_ne!(close_enough(&e, 1920.0, 1080.0), too_far(&e, 1920.0, 1080.0));
@@ -265,8 +265,8 @@ fn spawn_ship_alive_and_not_chunk() {
 
 #[test]
 fn spawn_projectile_is_valid() {
-    let pos: Vec2 = (100.0, 200.0);
-    let vel: Vec2 = (300.0, 0.0);
+    let pos = Vec2::new(100.0, 200.0);
+    let vel = Vec2::new(300.0, 0.0);
     let proj = spawn_projectile(pos, vel, 1.0);
 
     assert_eq!(proj.kind, EntityKind::Projectile);
@@ -280,9 +280,9 @@ fn spawn_projectile_is_valid() {
 
 #[test]
 fn spawn_projectile_different_positions() {
-    let positions: &[Vec2] = &[(0.0, 0.0), (-500.0, 200.0), (1920.0, 1080.0)];
+    let positions: &[Vec2] = &[Vec2::new(0.0, 0.0), Vec2::new(-500.0, 200.0), Vec2::new(1920.0, 1080.0)];
     for &pos in positions {
-        let proj = spawn_projectile(pos, (0.0, 0.0), 1.0);
+        let proj = spawn_projectile(pos, Vec2::ZERO, 1.0);
         assert_eq!(proj.position, pos);
         assert_eq!(proj.kind, EntityKind::Projectile);
     }
@@ -291,8 +291,8 @@ fn spawn_projectile_different_positions() {
 #[test]
 fn spawn_asteroid_is_valid() {
     let mut rng = thread_rng();
-    let pos: Vec2 = (500.0, 400.0);
-    let vel: Vec2 = (10.0, -5.0);
+    let pos = Vec2::new(500.0, 400.0);
+    let vel = Vec2::new(10.0, -5.0);
     let radius = 150.0;
 
     let asteroid = spawn_asteroid(pos, vel, radius, &mut rng);
@@ -314,7 +314,7 @@ fn spawn_asteroid_is_valid() {
 #[test]
 fn spawn_asteroid_has_polygon_points() {
     let mut rng = thread_rng();
-    let asteroid = spawn_asteroid((0.0, 0.0), (0.0, 0.0), 200.0, &mut rng);
+    let asteroid = spawn_asteroid(Vec2::new(0.0, 0.0), Vec2::new(0.0, 0.0), 200.0, &mut rng);
     // Asteroid polygon should have vertices
     assert!(!asteroid.hitbox.points.0.is_empty(), "asteroid must have polygon points");
     assert!(!asteroid.visuals.shapes.is_empty(), "asteroid must have visual shapes");
@@ -324,7 +324,7 @@ fn spawn_asteroid_has_polygon_points() {
 fn spawn_asteroid_various_radii() {
     let mut rng = thread_rng();
     for &radius in &[50.0_f64, 100.0, 200.0, 500.0] {
-        let a = spawn_asteroid((0.0, 0.0), (0.0, 0.0), radius, &mut rng);
+        let a = spawn_asteroid(Vec2::new(0.0, 0.0), Vec2::new(0.0, 0.0), radius, &mut rng);
         assert_eq!(a.kind, EntityKind::Asteroid);
         assert!(a.health > 0.0);
         assert!(a.mass > 0.0);
@@ -336,7 +336,7 @@ fn spawn_asteroid_various_radii() {
 fn spawn_explosion_is_valid() {
     let mut rng = thread_rng();
     // Explosions are spawned from a projectile; build a minimal one
-    let proj = spawn_projectile((300.0, 400.0), (0.0, 0.0), 1.0);
+    let proj = spawn_projectile(Vec2::new(300.0, 400.0), Vec2::new(0.0, 0.0), 1.0);
     let explosion = spawn_explosion(&proj, &mut rng);
 
     assert_eq!(explosion.kind, EntityKind::Explosion);
@@ -348,7 +348,7 @@ fn spawn_explosion_is_valid() {
 #[test]
 fn spawn_explosion_radius_in_range() {
     let mut rng = thread_rng();
-    let proj = spawn_projectile((0.0, 0.0), (0.0, 0.0), 1.0);
+    let proj = spawn_projectile(Vec2::new(0.0, 0.0), Vec2::new(0.0, 0.0), 1.0);
 
     // Run multiple times to check randomized radius stays in bounds
     for _ in 0..20 {
