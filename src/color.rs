@@ -3,21 +3,21 @@
 #[derive(Clone, Copy, Debug)]
 pub struct HdrColor {
     pub r: f64,
-    pub v: f64,
+    pub g: f64,
     pub b: f64,
 }
 
 impl HdrColor {
     /// Create a new HdrColor with the given components
-    pub fn new(r: f64, v: f64, b: f64) -> Self {
-        HdrColor { r, v, b }
+    pub fn new(r: f64, g: f64, b: f64) -> Self {
+        HdrColor { r, g, b }
     }
 
     /// Create a black color (0, 0, 0)
     pub fn zero() -> Self {
         HdrColor {
             r: 0.,
-            v: 0.,
+            g: 0.,
             b: 0.,
         }
     }
@@ -26,7 +26,7 @@ impl HdrColor {
     pub fn one() -> Self {
         HdrColor {
             r: 1.,
-            v: 1.,
+            g: 1.,
             b: 1.,
         }
     }
@@ -52,7 +52,7 @@ impl Default for HdrColor {
 pub fn hdr_add(col1: HdrColor, col2: HdrColor) -> HdrColor {
     HdrColor {
         r: col1.r + col2.r,
-        v: col1.v + col2.v,
+        g: col1.g + col2.g,
         b: col1.b + col2.b,
     }
 }
@@ -61,7 +61,7 @@ pub fn hdr_add(col1: HdrColor, col2: HdrColor) -> HdrColor {
 pub fn hdr_sous(col1: HdrColor, col2: HdrColor) -> HdrColor {
     HdrColor {
         r: col1.r - col2.r,
-        v: col1.v - col2.v,
+        g: col1.g - col2.g,
         b: col1.b - col2.b,
     }
 }
@@ -70,7 +70,7 @@ pub fn hdr_sous(col1: HdrColor, col2: HdrColor) -> HdrColor {
 pub fn hdr_mul(col1: HdrColor, col2: HdrColor) -> HdrColor {
     HdrColor {
         r: col1.r * col2.r,
-        v: col1.v * col2.v,
+        g: col1.g * col2.g,
         b: col1.b * col2.b,
     }
 }
@@ -79,7 +79,7 @@ pub fn hdr_mul(col1: HdrColor, col2: HdrColor) -> HdrColor {
 pub fn intensify(hdr_in: HdrColor, i: f64) -> HdrColor {
     HdrColor {
         r: i * hdr_in.r,
-        v: i * hdr_in.v,
+        g: i * hdr_in.g,
         b: i * hdr_in.b,
     }
 }
@@ -96,7 +96,7 @@ pub fn half_color(col1: HdrColor, col2: HdrColor, half_life: f64, dt: f64) -> Hd
         col2,
         HdrColor {
             r: abso_exp_decay(col1.r - col2.r, half_life, dt),
-            v: abso_exp_decay(col1.v - col2.v, half_life, dt),
+            g: abso_exp_decay(col1.g - col2.g, half_life, dt),
             b: abso_exp_decay(col1.b - col2.b, half_life, dt),
         },
     )
@@ -106,22 +106,22 @@ pub fn half_color(col1: HdrColor, col2: HdrColor, half_life: f64, dt: f64) -> Hd
 /// When a channel exceeds 255, redistribute the excess to neighboring channels
 pub fn redirect_spectre(col: HdrColor) -> HdrColor {
     HdrColor {
-        r: if col.v > 255. {
-            col.r + col.v - 255.
+        r: if col.g > 255. {
+            col.r + col.g - 255.
         } else {
             col.r
         },
-        v: if col.b > 255. && col.r > 255. {
-            col.v + col.r + col.b - 510.
+        g: if col.b > 255. && col.r > 255. {
+            col.g + col.r + col.b - 510.
         } else if col.r > 255. {
-            col.v + col.r - 255.
+            col.g + col.r - 255.
         } else if col.b > 255. {
-            col.v + col.b - 255.
+            col.g + col.b - 255.
         } else {
-            col.v
+            col.g
         },
-        b: if col.v > 255. {
-            col.b + col.v - 255.
+        b: if col.g > 255. {
+            col.b + col.g - 255.
         } else {
             col.b
         },
@@ -132,36 +132,36 @@ pub fn redirect_spectre(col: HdrColor) -> HdrColor {
 pub fn redirect_spectre_wide(col: HdrColor) -> HdrColor {
     HdrColor {
         r: if col.b > 510. {
-            if col.v > 255. {
-                col.r + col.v + col.b - 510. - 255.
+            if col.g > 255. {
+                col.r + col.g + col.b - 510. - 255.
             } else {
                 col.r + col.b - 510.
             }
         } else {
-            if col.v > 255. {
-                col.r + col.v - 255.
+            if col.g > 255. {
+                col.r + col.g - 255.
             } else {
                 col.r
             }
         },
-        v: if col.b > 255. && col.r > 255. {
-            col.v + col.r + col.b - 510.
+        g: if col.b > 255. && col.r > 255. {
+            col.g + col.r + col.b - 510.
         } else if col.r > 255. {
-            col.v + col.r - 255.
+            col.g + col.r - 255.
         } else if col.b > 255. {
-            col.v + col.b - 255.
+            col.g + col.b - 255.
         } else {
-            col.v
+            col.g
         },
         b: if col.r > 510. {
-            if col.v > 255. {
-                col.r + col.v + col.b - 510. - 255.
+            if col.g > 255. {
+                col.r + col.g + col.b - 510. - 255.
             } else {
                 col.r + col.b - 510.
             }
         } else {
-            if col.v > 255. {
-                col.v + col.b - 255.
+            if col.g > 255. {
+                col.g + col.b - 255.
             } else {
                 col.b
             }
@@ -190,7 +190,7 @@ pub fn rgb_of_hdr(
 
     [
         normal_color(hdr_mod.r),
-        normal_color(hdr_mod.v),
+        normal_color(hdr_mod.g),
         normal_color(hdr_mod.b),
         255,
     ]
@@ -200,10 +200,10 @@ pub fn rgb_of_hdr(
 /// i ranges from 0 (grayscale) to any positive value (full saturation and beyond)
 /// i = 1.0 leaves the color unchanged
 pub fn saturate(hdr_in: HdrColor, i: f64) -> HdrColor {
-    let value = (hdr_in.r + hdr_in.v + hdr_in.b) / 3.;
+    let value = (hdr_in.r + hdr_in.g + hdr_in.b) / 3.;
     HdrColor {
         r: i * hdr_in.r + (1. - i) * value,
-        v: i * hdr_in.v + (1. - i) * value,
+        g: i * hdr_in.g + (1. - i) * value,
         b: i * hdr_in.b + (1. - i) * value,
     }
 }

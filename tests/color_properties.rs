@@ -9,11 +9,11 @@ fn approx(a: f64, b: f64) -> bool {
 }
 
 fn color_approx(a: HdrColor, b: HdrColor) -> bool {
-    approx(a.r, b.r) && approx(a.v, b.v) && approx(a.b, b.b)
+    approx(a.r, b.r) && approx(a.g, b.g) && approx(a.b, b.b)
 }
 
-fn c(r: f64, v: f64, b: f64) -> HdrColor {
-    HdrColor::new(r, v, b)
+fn c(r: f64, g: f64, b: f64) -> HdrColor {
+    HdrColor::new(r, g, b)
 }
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ fn c(r: f64, v: f64, b: f64) -> HdrColor {
 fn new_stores_fields() {
     let col = HdrColor::new(1.0, 2.0, 3.0);
     assert!(approx(col.r, 1.0));
-    assert!(approx(col.v, 2.0));
+    assert!(approx(col.g, 2.0));
     assert!(approx(col.b, 3.0));
 }
 
@@ -32,7 +32,7 @@ fn new_stores_fields() {
 fn zero_is_all_zeros() {
     let z = HdrColor::zero();
     assert!(approx(z.r, 0.0));
-    assert!(approx(z.v, 0.0));
+    assert!(approx(z.g, 0.0));
     assert!(approx(z.b, 0.0));
 }
 
@@ -40,7 +40,7 @@ fn zero_is_all_zeros() {
 fn one_is_all_ones() {
     let o = HdrColor::one();
     assert!(approx(o.r, 1.0));
-    assert!(approx(o.v, 1.0));
+    assert!(approx(o.g, 1.0));
     assert!(approx(o.b, 1.0));
 }
 
@@ -55,7 +55,7 @@ fn default_equals_zero() {
 fn new_accepts_negative_values() {
     let col = HdrColor::new(-1.0, -2.0, -3.0);
     assert!(approx(col.r, -1.0));
-    assert!(approx(col.v, -2.0));
+    assert!(approx(col.g, -2.0));
     assert!(approx(col.b, -3.0));
 }
 
@@ -63,7 +63,7 @@ fn new_accepts_negative_values() {
 fn new_accepts_large_values() {
     let col = HdrColor::new(1e9, 1e9, 1e9);
     assert!(approx(col.r, 1e9));
-    assert!(approx(col.v, 1e9));
+    assert!(approx(col.g, 1e9));
     assert!(approx(col.b, 1e9));
 }
 
@@ -253,7 +253,7 @@ fn half_color_large_dt_approaches_target() {
     let result = half_color(col1, col2, 1.0, 1000.0);
     // After very large dt, decay term ≈ 0, result ≈ col2
     assert!((result.r - col2.r).abs() < 1e-200);
-    assert!((result.v - col2.v).abs() < 1e-200);
+    assert!((result.g - col2.g).abs() < 1e-200);
     assert!((result.b - col2.b).abs() < 1e-200);
 }
 
@@ -336,7 +336,7 @@ fn redirect_spectre_wide_v_overflow_bleeds_to_r_and_b() {
     // b should also get v bleed: b + (v - 255) = 100 + 45 = 145
     assert!(approx(result.b, 145.0));
     // v itself stays as-is (no r or b overflow)
-    assert!(approx(result.v, 300.0));
+    assert!(approx(result.g, 300.0));
 }
 
 #[test]
@@ -345,7 +345,7 @@ fn redirect_spectre_wide_r_overflow_bleeds_to_v() {
     let col = c(300.0, 100.0, 100.0);
     let result = redirect_spectre_wide(col);
     // v: r > 255, b ≤ 255 → v + r - 255 = 100 + 300 - 255 = 145
-    assert!(approx(result.v, 145.0));
+    assert!(approx(result.g, 145.0));
     // r unchanged: b ≤ 510, v ≤ 255 → r = 300
     assert!(approx(result.r, 300.0));
     // b: r ≤ 510, v ≤ 255 → b unchanged = 100
@@ -358,7 +358,7 @@ fn redirect_spectre_wide_b_overflow_bleeds_to_v() {
     let col = c(100.0, 100.0, 300.0);
     let result = redirect_spectre_wide(col);
     // v: b > 255, r ≤ 255 → v + b - 255 = 100 + 300 - 255 = 145
-    assert!(approx(result.v, 145.0));
+    assert!(approx(result.g, 145.0));
 }
 
 #[test]
@@ -367,7 +367,7 @@ fn redirect_spectre_wide_r_and_b_overflow_v_gets_both() {
     let col = c(300.0, 100.0, 300.0);
     let result = redirect_spectre_wide(col);
     // v: r > 255 and b > 255 → v + r + b - 510 = 100 + 300 + 300 - 510 = 190
-    assert!(approx(result.v, 190.0));
+    assert!(approx(result.g, 190.0));
 }
 
 #[test]
@@ -469,7 +469,7 @@ fn saturate_zero_gives_grayscale() {
     let result = saturate(a, 0.0);
     let expected_value = (90.0 + 150.0 + 210.0) / 3.0;
     assert!(approx(result.r, expected_value));
-    assert!(approx(result.v, expected_value));
+    assert!(approx(result.g, expected_value));
     assert!(approx(result.b, expected_value));
 }
 
@@ -492,7 +492,7 @@ fn saturate_increases_contrast_above_one() {
     // b is above mean: should go further above
     assert!(result.b > 150.0);
     // v is at mean: should stay at mean
-    assert!(approx(result.v, 100.0));
+    assert!(approx(result.g, 100.0));
 }
 
 #[test]
@@ -503,7 +503,7 @@ fn saturate_partial_moves_toward_gray() {
     // r: 0.5*0 + 0.5*100 = 50
     assert!(approx(result.r, 50.0));
     // v: 0.5*0 + 0.5*100 = 50
-    assert!(approx(result.v, 50.0));
+    assert!(approx(result.g, 50.0));
     // b: 0.5*300 + 0.5*100 = 200
     assert!(approx(result.b, 200.0));
     let _ = mean;
@@ -520,7 +520,7 @@ fn saturate_negative_i_inverts_deviation() {
     // b: -1*150 + 2*100 = 50
     assert!(approx(result.b, -1.0 * 150.0 + 2.0 * mean));
     // v: -1*100 + 2*100 = 100 (unchanged, at mean)
-    assert!(approx(result.v, 100.0));
+    assert!(approx(result.g, 100.0));
 }
 
 #[test]

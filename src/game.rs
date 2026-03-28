@@ -453,10 +453,10 @@ pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mous
 
         // Visual flash + slow-mo (matches OCaml: add_color intensify, game_exposure *= tp, game_speed *= ratio_time_tp)
         if globals.flashes_enabled {
-            let flash = intensify(HdrColor { r: 0.0, v: 4.0, b: 40.0 }, 1.0);
+            let flash = intensify(HdrColor { r: 0.0, g: 4.0, b: 40.0 }, 1.0);
             globals.add_color = (
                 globals.add_color.0 + flash.r,
-                globals.add_color.1 + flash.v,
+                globals.add_color.1 + flash.g,
                 globals.add_color.2 + flash.b,
             );
         }
@@ -782,15 +782,15 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
             let dt = t1 - t0;
             globals.mul_color = {
                 let c = half_color(hdr(globals.mul_color), hdr(globals.mul_base), FILTER_HALF_LIFE, dt);
-                (c.r, c.v, c.b)
+                (c.r, c.g, c.b)
             };
             globals.space_color = {
                 let c = half_color(hdr(globals.space_color), hdr(globals.space_color_goal), SPACE_HALF_LIFE, dt);
-                (c.r, c.v, c.b)
+                (c.r, c.g, c.b)
             };
             globals.star_color = {
                 let c = half_color(hdr(globals.star_color), hdr(globals.star_color_goal), SPACE_HALF_LIFE, dt);
-                (c.r, c.v, c.b)
+                (c.r, c.g, c.b)
             };
         }
     }
@@ -814,10 +814,10 @@ fn damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
         globals.game_exposure *= EXPOSURE_RATIO_DAMAGE;
     }
     if globals.flashes_enabled {
-        let flash = intensify(HdrColor { r: 1.0, v: 0.7, b: 0.5 }, amount * FLASHES_DAMAGE);
+        let flash = intensify(HdrColor { r: 1.0, g: 0.7, b: 0.5 }, amount * FLASHES_DAMAGE);
         globals.add_color = (
             globals.add_color.0 + flash.r,
-            globals.add_color.1 + flash.v,
+            globals.add_color.1 + flash.g,
             globals.add_color.2 + flash.b,
         );
     }
@@ -1469,15 +1469,15 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             let new_hdr = hdr(new_col);
             globals.mul_base = {
                 let c = saturate(intensify(new_hdr, 1.0), FILTER_SATURATION);
-                (c.r, c.v, c.b)
+                (c.r, c.g, c.b)
             };
             globals.space_color_goal = {
                 let c = saturate(intensify(new_hdr, 10.0), SPACE_SATURATION);
-                (c.r, c.v, c.b)
+                (c.r, c.g, c.b)
             };
             globals.star_color_goal = {
                 let c = saturate(intensify(new_hdr, 100.0), STAR_SATURATION);
-                (c.r, c.v, c.b)
+                (c.r, c.g, c.b)
             };
         }
 
@@ -1543,7 +1543,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             let death_flash = intensify(HdrColor::new(1000.0, 0.0, 0.0), FLASHES_DEATH);
             globals.add_color = (
                 globals.add_color.0 + death_flash.r,
-                globals.add_color.1 + death_flash.v,
+                globals.add_color.1 + death_flash.g,
                 globals.add_color.2 + death_flash.b,
             );
         }
@@ -1597,7 +1597,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
                     let death_flash = intensify(HdrColor::new(1000.0, 0.0, 0.0), FLASHES_DEATH);
                     globals.add_color = (
                         globals.add_color.0 + death_flash.r,
-                        globals.add_color.1 + death_flash.v,
+                        globals.add_color.1 + death_flash.g,
                         globals.add_color.2 + death_flash.b,
                     );
                 }
@@ -1694,7 +1694,7 @@ pub fn tir(state: &mut GameState, globals: &mut Globals) {
             let flash = intensify(hdr((100.0, 50.0, 25.0)), FLASHES_TIR);
             globals.add_color = (
                 globals.add_color.0 + flash.r,
-                globals.add_color.1 + flash.v,
+                globals.add_color.1 + flash.g,
                 globals.add_color.2 + flash.b,
             );
         }
