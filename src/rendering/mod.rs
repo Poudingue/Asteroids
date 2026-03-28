@@ -1,3 +1,6 @@
+pub mod hud;
+pub mod world;
+
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -41,7 +44,7 @@ impl Renderer2D {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shape Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/shape.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shape.wgsl").into()),
         });
 
         let screen_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

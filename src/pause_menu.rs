@@ -1,8 +1,9 @@
 use rand::prelude::*;
 
-use crate::game::{render_string, GameState};
+use crate::game::GameState;
+use crate::rendering::hud::render_string;
 use crate::parameters::{GlobalToggle, Globals};
-use crate::renderer::Renderer2D;
+use crate::rendering::Renderer2D;
 
 // ============================================================================
 // Pause menu button system

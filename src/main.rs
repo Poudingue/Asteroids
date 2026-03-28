@@ -3,7 +3,7 @@ use asteroids::*;
 use std::time::Instant;
 
 use parameters::{Globals, MAX_DT};
-use renderer::Renderer2D;
+use rendering::Renderer2D;
 use sdl2::keyboard::Scancode;
 
 fn main() {

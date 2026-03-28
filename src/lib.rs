@@ -8,4 +8,4 @@ pub mod math_utils;
 pub mod objects;
 pub mod parameters;
 pub mod pause_menu;
-pub mod renderer;
+pub mod rendering;
