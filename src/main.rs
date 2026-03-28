@@ -131,7 +131,7 @@ fn main() {
                     repeat: false,
                     ..
                 } => {
-                    game::teleport(&mut state, &mut globals, mouse_x_snap, mouse_y_snap);
+                    input::teleport(&mut state, &mut globals, mouse_x_snap, mouse_y_snap);
                 }
                 // F11: toggle fullscreen
                 Event::KeyDown {
@@ -208,11 +208,11 @@ fn main() {
         if !globals.pause {
             // Mouse aim
             let mouse_state = event_pump.mouse_state();
-            game::aim_at_mouse(&mut state.ship, mouse_state.x(), mouse_state.y(), &globals);
+            input::aim_at_mouse(&mut state.ship, mouse_state.x(), mouse_state.y(), &globals);
 
             // Mouse click = accelerate forward
             if mouse_state.left() {
-                game::acceleration(&mut state, &globals);
+                input::acceleration(&mut state, &globals);
             }
 
             // Keyboard input (scancodes = physical key positions)
@@ -227,32 +227,32 @@ fn main() {
             let w_pressed = keyboard.is_scancode_pressed(Scancode::W);
             if globals.ship_impulse_pos {
                 if w_pressed && !prev_w_pressed {
-                    game::boost_forward(&mut state, &globals);
+                    input::boost_forward(&mut state, &globals);
                 }
             } else if w_pressed {
-                game::acceleration(&mut state, &globals);
+                input::acceleration(&mut state, &globals);
             }
             prev_w_pressed = w_pressed;
             // Rotate left: A (physical) = Q on AZERTY
             if keyboard.is_scancode_pressed(Scancode::A) {
-                game::handle_left(&mut state.ship, &globals);
+                input::handle_left(&mut state.ship, &globals);
             }
             // Rotate right: D (physical) = D on both
             if keyboard.is_scancode_pressed(Scancode::D) {
-                game::handle_right(&mut state.ship, &globals);
+                input::handle_right(&mut state.ship, &globals);
             }
             // Strafe left: Q (physical) = A on AZERTY
             if keyboard.is_scancode_pressed(Scancode::Q) {
-                game::strafe_left(&mut state.ship);
+                input::strafe_left(&mut state.ship);
             }
             // Strafe right: E (physical) = E on both
             if keyboard.is_scancode_pressed(Scancode::E) {
-                game::strafe_right(&mut state.ship);
+                input::strafe_right(&mut state.ship);
             }
 
             // Space = fire
             if keyboard.is_scancode_pressed(Scancode::Space) {
-                game::fire(&mut state, &mut globals);
+                input::fire(&mut state, &mut globals);
             }
 
             // Update game state (physics, wrapping, asteroids, etc.)
