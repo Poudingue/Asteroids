@@ -2,7 +2,7 @@ use asteroids::*;
 
 use std::time::Instant;
 
-use parameters::Globals;
+use parameters::{Globals, MAX_DT};
 use renderer::Renderer2D;
 use sdl2::keyboard::Scancode;
 
@@ -92,9 +92,13 @@ fn main() {
     while running {
         let frame_start = Instant::now();
 
-        // Update time
+        // Update time, capping dt to MAX_DT to prevent physics explosions on
+        // frame stalls (alt-tab, window drag, etc.). This is equivalent to a
+        // 20fps floor: physics never sees more than 50ms per frame.
         globals.time_last_frame = globals.time_current_frame;
-        globals.time_current_frame = start_time.elapsed().as_secs_f64();
+        let raw_elapsed = start_time.elapsed().as_secs_f64();
+        globals.time_current_frame =
+            globals.time_last_frame + (raw_elapsed - globals.time_last_frame).min(MAX_DT);
 
         // Snapshot mouse position and button state before poll_iter
         let (mouse_x_snap, mouse_y_snap, mouse_left_snap) = {

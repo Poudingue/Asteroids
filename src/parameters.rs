@@ -64,6 +64,9 @@ pub const FRAMERATE_LIMIT: f64 = 300.0;
 // Set it to your actual screen refresh rate,
 // and shutter_speed controls the blur length like a real camera.
 pub const FRAMERATE_RENDER: f64 = 60.0;
+// Maximum delta time to prevent physics explosions on frame stalls (alt-tab, window drag).
+// Equivalent to a 20fps floor: physics never sees more than 50ms per frame.
+pub const MAX_DT: f64 = 0.05;
 
 // Observer's proper time.
 // In this case, we get that of the ship.
