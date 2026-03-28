@@ -1,4 +1,5 @@
 pub mod camera;
+pub mod physics;
 pub mod color;
 pub mod math;
 pub mod game;

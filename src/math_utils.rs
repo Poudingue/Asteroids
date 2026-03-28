@@ -242,3 +242,15 @@ pub fn wrap_toroidal(v: Vec2, phys_width: f64, phys_height: f64) -> Vec2 {
 pub fn diff<T: PartialEq + Clone>(l1: &[T], l2: &[T]) -> Vec<T> {
     l1.iter().filter(|x| !l2.contains(x)).cloned().collect()
 }
+
+/// Convert a polar polygon to affine (cartesian) coordinates with rotation and scale.
+pub fn polygon_to_cartesian(poly: &[(f64, f64)], rotat: f64, scale: f64) -> Vec<Vec2> {
+    poly.iter()
+        .map(|&(theta, radius)| from_polar(theta + rotat, radius * scale))
+        .collect()
+}
+
+/// Displace all points in an affine polygon by a position offset.
+pub fn translate_polygon(poly: &[Vec2], pos: Vec2) -> Vec<Vec2> {
+    poly.iter().map(|&p| add_vec(p, pos)).collect()
+}
