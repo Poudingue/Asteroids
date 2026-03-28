@@ -5,7 +5,7 @@ use crate::parameters::{
     FRAGMENT_MIN_EXPOSURE, FRAGMENT_MAX_EXPOSURE,
 };
 use crate::math_utils::{
-    addtuple, carre, hypothenuse, multuple, polar_to_affine, randfloat, soustuple, Vec2,
+    add_vec, squared, magnitude, scale_vec, from_polar, rand_range, sub_vec, Vec2,
 };
 use rand::Rng;
 
@@ -226,7 +226,7 @@ pub fn spawn_ship() -> Entity {
                 (-3.0 * PI / 4.0, 2.0 * SHIP_RADIUS),
             ]),
         },
-        mass: PI * carre(SHIP_RADIUS) * SHIP_DENSITY,
+        mass: PI * squared(SHIP_RADIUS) * SHIP_DENSITY,
         health: SHIP_MAX_HEALTH,
         max_health: SHIP_MAX_HEALTH,
         dam_ratio: SHIP_DAM_RATIO,
@@ -287,14 +287,14 @@ pub fn spawn_n_projectiles(
             projectile_min_speed + rng.gen::<f64>() * (projectile_max_speed - projectile_min_speed);
 
         let vel = if projectile_herit_speed {
-            addtuple(ship.velocity, polar_to_affine(deviation_angle, speed))
+            add_vec(ship.velocity, from_polar(deviation_angle, speed))
         } else {
-            polar_to_affine(deviation_angle, speed)
+            from_polar(deviation_angle, speed)
         };
 
-        let pos = addtuple(
+        let pos = add_vec(
             ship.position,
-            polar_to_affine(ship.orientation, ship.hitbox.ext_radius),
+            from_polar(ship.orientation, ship.hitbox.ext_radius),
         );
 
         projectiles.push(spawn_projectile(pos, vel, ship.proper_time));
@@ -302,7 +302,7 @@ pub fn spawn_n_projectiles(
     projectiles
 }
 
-pub fn spawn_chunk_explo(
+pub fn spawn_explosion_chunk(
     position: Vec2,
     velocity: Vec2,
     color: (f64, f64, f64),
@@ -313,7 +313,7 @@ pub fn spawn_chunk_explo(
         kind: EntityKind::Asteroid,
         visuals: Visuals {
             color,
-            radius: randfloat(CHUNKS_EXPLO_MIN_RADIUS, CHUNKS_EXPLO_MAX_RADIUS, rng),
+            radius: rand_range(CHUNKS_EXPLO_MIN_RADIUS, CHUNKS_EXPLO_MAX_RADIUS, rng),
             shapes: vec![],
         },
         hitbox: Hitbox {
@@ -346,10 +346,10 @@ pub fn spawn_n_chunks(
     let mut chunks = Vec::new();
     for _ in 0..n {
         let angle = rng.gen::<f64>() * 2.0 * PI;
-        let speed = randfloat(CHUNKS_EXPLO_MIN_SPEED, CHUNKS_EXPLO_MAX_SPEED, rng);
-        let vel = addtuple(ship.velocity, polar_to_affine(angle, speed));
+        let speed = rand_range(CHUNKS_EXPLO_MIN_SPEED, CHUNKS_EXPLO_MAX_SPEED, rng);
+        let vel = add_vec(ship.velocity, from_polar(angle, speed));
 
-        chunks.push(spawn_chunk_explo(
+        chunks.push(spawn_explosion_chunk(
             ship.position,
             vel,
             color,
@@ -361,8 +361,8 @@ pub fn spawn_n_chunks(
 }
 
 pub fn spawn_explosion(projectile: &Entity, rng: &mut impl Rng) -> Entity {
-    let rad = randfloat(EXPLOSION_MIN_RADIUS, EXPLOSION_MAX_RADIUS, rng);
-    let rand_lum = randfloat(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng);
+    let rad = rand_range(EXPLOSION_MIN_RADIUS, EXPLOSION_MAX_RADIUS, rng);
+    let rand_lum = rand_range(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng);
 
     Entity {
         kind: EntityKind::Explosion,
@@ -384,7 +384,7 @@ pub fn spawn_explosion(projectile: &Entity, rng: &mut impl Rng) -> Entity {
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: projectile.position,
-        velocity: polar_to_affine(
+        velocity: from_polar(
             rng.gen::<f64>() * 2.0 * PI,
             rng.gen::<f64>() * SMOKE_MAX_SPEED,
         ),
@@ -411,7 +411,7 @@ pub fn spawn_explosion_object(
     rng: &mut impl Rng,
 ) -> (Entity, ExplosionObjectSideEffects) {
     let rad = EXPLOSION_RATIO_RADIUS * obj.hitbox.int_radius;
-    let rand_lum = randfloat(
+    let rand_lum = rand_range(
         EXPLOSION_MIN_EXPOSURE_HERITATE,
         EXPLOSION_MAX_EXPOSURE_HERITATE,
         rng,
@@ -465,7 +465,7 @@ pub fn spawn_explosion_object(
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: obj.position,
-        velocity: polar_to_affine(
+        velocity: from_polar(
             rng.gen::<f64>() * 2.0 * PI,
             rng.gen::<f64>() * SMOKE_MAX_SPEED,
         ),
@@ -479,8 +479,8 @@ pub fn spawn_explosion_object(
 }
 
 pub fn spawn_explosion_death(ship: &Entity, elapsed_time: f64, rng: &mut impl Rng) -> Entity {
-    let rad = randfloat(EXPLOSION_DEATH_MIN_RADIUS, EXPLOSION_DEATH_MAX_RADIUS, rng);
-    let rand_lum = randfloat(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng);
+    let rad = rand_range(EXPLOSION_DEATH_MIN_RADIUS, EXPLOSION_DEATH_MAX_RADIUS, rng);
+    let rand_lum = rand_range(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng);
 
     Entity {
         kind: EntityKind::Explosion,
@@ -502,7 +502,7 @@ pub fn spawn_explosion_death(ship: &Entity, elapsed_time: f64, rng: &mut impl Rn
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: ship.position,
-        velocity: polar_to_affine(
+        velocity: from_polar(
             rng.gen::<f64>() * 2.0 * PI,
             rng.gen::<f64>() * SMOKE_MAX_SPEED,
         ),
@@ -513,7 +513,7 @@ pub fn spawn_explosion_death(ship: &Entity, elapsed_time: f64, rng: &mut impl Rn
     }
 }
 
-pub fn spawn_explosion_chunk(
+pub fn spawn_chunk_explosion(
     obj: &Entity,
     flashes_enabled: bool,
     _flashes_saturate: f64,
@@ -522,7 +522,7 @@ pub fn spawn_explosion_chunk(
     rng: &mut impl Rng,
 ) -> (Entity, ExplosionObjectSideEffects) {
     let rad = EXPLOSION_RATIO_RADIUS * obj.visuals.radius;
-    let rand_lum = randfloat(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng);
+    let rand_lum = rand_range(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng);
 
     let mut side_effects = ExplosionObjectSideEffects {
         add_color: None,
@@ -564,7 +564,7 @@ pub fn spawn_explosion_chunk(
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: obj.position,
-        velocity: polar_to_affine(
+        velocity: from_polar(
             rng.gen::<f64>() * 2.0 * PI,
             rng.gen::<f64>() * SMOKE_MAX_SPEED,
         ),
@@ -578,7 +578,7 @@ pub fn spawn_explosion_chunk(
 }
 
 pub fn spawn_muzzle(projectile: &Entity, rng: &mut impl Rng) -> Entity {
-    let rand_lum = randfloat(
+    let rand_lum = rand_range(
         EXPLOSION_MIN_EXPOSURE_HERITATE,
         EXPLOSION_MAX_EXPOSURE_HERITATE,
         rng,
@@ -608,11 +608,11 @@ pub fn spawn_muzzle(projectile: &Entity, rng: &mut impl Rng) -> Entity {
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: projectile.position,
-        velocity: multuple(projectile.velocity, MUZZLE_RATIO_SPEED),
+        velocity: scale_vec(projectile.velocity, MUZZLE_RATIO_SPEED),
         orientation: 0.0,
         moment: 0.0,
         proper_time: projectile.proper_time,
-        hdr_exposure: randfloat(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng),
+        hdr_exposure: rand_range(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng),
     }
 }
 
@@ -636,19 +636,19 @@ pub fn spawn_fire(ship: &Entity, rng: &mut impl Rng) -> Entity {
         dam_ratio: 0.0,
         phys_res: 0.0,
         phys_ratio: 0.0,
-        position: addtuple(
+        position: add_vec(
             ship.position,
-            polar_to_affine(ship.orientation + PI, ship.hitbox.int_radius),
+            from_polar(ship.orientation + PI, ship.hitbox.int_radius),
         ),
         velocity: {
             // Backward kick scales with ship speed so fire always ejects visually
             let ship_speed = (ship.velocity.x * ship.velocity.x + ship.velocity.y * ship.velocity.y).sqrt();
             let kick = ship_speed + FIRE_MIN_SPEED + rng.gen::<f64>() * (FIRE_MAX_SPEED - FIRE_MIN_SPEED);
-            addtuple(
+            add_vec(
                 ship.velocity,
-                addtuple(
-                    polar_to_affine(ship.orientation + PI, kick),
-                    polar_to_affine(
+                add_vec(
+                    from_polar(ship.orientation + PI, kick),
+                    from_polar(
                         rng.gen::<f64>() * 2.0 * PI,
                         rng.gen::<f64>() * FIRE_MAX_RANDOM,
                     ),
@@ -658,18 +658,18 @@ pub fn spawn_fire(ship: &Entity, rng: &mut impl Rng) -> Entity {
         orientation: 0.0,
         moment: 0.0,
         proper_time: ship.proper_time,
-        hdr_exposure: randfloat(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng),
+        hdr_exposure: rand_range(EXPLOSION_MIN_EXPOSURE, EXPLOSION_MAX_EXPOSURE, rng),
     }
 }
 
-pub fn polygon_asteroid(radius: f64, rng: &mut impl Rng) -> Polygon {
+pub fn generate_asteroid_polygon(radius: f64, rng: &mut impl Rng) -> Polygon {
     let nb_sides =
         (ASTEROID_POLYGON_MIN_SIDES as f64).max(ASTEROID_POLYGON_SIZE_RATIO * radius) as i32;
     let mut points = Vec::new();
 
     for n in 1..=nb_sides {
         let angle = 2.0 * PI * n as f64 / nb_sides as f64;
-        let distance = radius * randfloat(ASTEROID_POLYGON_MIN, ASTEROID_POLYGON_MAX, rng);
+        let distance = radius * rand_range(ASTEROID_POLYGON_MIN, ASTEROID_POLYGON_MAX, rng);
         points.push((angle, distance));
     }
 
@@ -677,11 +677,11 @@ pub fn polygon_asteroid(radius: f64, rng: &mut impl Rng) -> Polygon {
 }
 
 pub fn spawn_asteroid(pos: Vec2, vel: Vec2, radius: f64, rng: &mut impl Rng) -> Entity {
-    let shape = polygon_asteroid(radius, rng);
+    let shape = generate_asteroid_polygon(radius, rng);
     let color = (
-        randfloat(ASTEROID_MIN_LUM, ASTEROID_MAX_LUM, rng),
-        randfloat(ASTEROID_MIN_LUM, ASTEROID_MAX_LUM, rng),
-        randfloat(ASTEROID_MIN_LUM, ASTEROID_MAX_LUM, rng),
+        rand_range(ASTEROID_MIN_LUM, ASTEROID_MAX_LUM, rng),
+        rand_range(ASTEROID_MIN_LUM, ASTEROID_MAX_LUM, rng),
+        rand_range(ASTEROID_MIN_LUM, ASTEROID_MAX_LUM, rng),
     );
 
     Entity {
@@ -696,9 +696,9 @@ pub fn spawn_asteroid(pos: Vec2, vel: Vec2, radius: f64, rng: &mut impl Rng) -> 
             ext_radius: radius * ASTEROID_POLYGON_MAX,
             points: shape,
         },
-        mass: PI * carre(radius) * ASTEROID_DENSITY,
-        health: ASTEROID_MASS_HEALTH * PI * carre(radius) * ASTEROID_DENSITY + ASTEROID_MIN_HEALTH,
-        max_health: ASTEROID_MASS_HEALTH * PI * carre(radius) * ASTEROID_DENSITY
+        mass: PI * squared(radius) * ASTEROID_DENSITY,
+        health: ASTEROID_MASS_HEALTH * PI * squared(radius) * ASTEROID_DENSITY + ASTEROID_MIN_HEALTH,
+        max_health: ASTEROID_MASS_HEALTH * PI * squared(radius) * ASTEROID_DENSITY
             + ASTEROID_MIN_HEALTH,
         dam_res: ASTEROID_DAM_RES,
         dam_ratio: ASTEROID_DAM_RATIO,
@@ -715,20 +715,20 @@ pub fn spawn_asteroid(pos: Vec2, vel: Vec2, radius: f64, rng: &mut impl Rng) -> 
 
 /// Spawn a random asteroid for the given stage, positioned off-screen
 pub fn spawn_random_asteroid(stage: i32, phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Entity {
-    let radius = randfloat(ASTEROID_MIN_SPAWN_RADIUS, ASTEROID_MAX_SPAWN_RADIUS, rng);
-    let pos = random_out_of_screen(radius, phys_w, phys_h, rng);
+    let radius = rand_range(ASTEROID_MIN_SPAWN_RADIUS, ASTEROID_MAX_SPAWN_RADIUS, rng);
+    let pos = random_offscreen_position(radius, phys_w, phys_h, rng);
     let vel_angle = rng.gen::<f64>() * 2.0 * PI;
-    let vel_magnitude = randfloat(
+    let vel_magnitude = rand_range(
         ASTEROID_MIN_VELOCITY,
         ASTEROID_MAX_VELOCITY + ASTEROID_STAGE_VELOCITY * stage as f64,
         rng,
     );
-    let vel = polar_to_affine(vel_angle, vel_magnitude);
+    let vel = from_polar(vel_angle, vel_magnitude);
     spawn_asteroid(pos, vel, radius, rng)
 }
 
 /// Create a single fragment from a parent asteroid
-pub fn frag_asteroid(parent: &Entity, rng: &mut impl Rng) -> Entity {
+pub fn fragment_asteroid(parent: &Entity, rng: &mut impl Rng) -> Entity {
     // Start with a fresh asteroid at parent's position/velocity/radius
     let mut fragment = spawn_asteroid(
         parent.position,
@@ -738,16 +738,16 @@ pub fn frag_asteroid(parent: &Entity, rng: &mut impl Rng) -> Entity {
     );
 
     let orientation = rng.gen::<f64>() * 2.0 * PI;
-    let new_radius = randfloat(FRAGMENT_MIN_SIZE, FRAGMENT_MAX_SIZE, rng)
+    let new_radius = rand_range(FRAGMENT_MIN_SIZE, FRAGMENT_MAX_SIZE, rng)
         * fragment.hitbox.int_radius;
 
     // Regenerate polygon for new size
-    let new_shape = polygon_asteroid(new_radius, rng);
+    let new_shape = generate_asteroid_polygon(new_radius, rng);
 
     // Offset position from parent center
-    fragment.position = addtuple(
+    fragment.position = add_vec(
         fragment.position,
-        polar_to_affine(orientation, fragment.hitbox.int_radius - new_radius),
+        from_polar(orientation, fragment.hitbox.int_radius - new_radius),
     );
 
     // Update visuals with parent color
@@ -761,27 +761,27 @@ pub fn frag_asteroid(parent: &Entity, rng: &mut impl Rng) -> Entity {
     fragment.hitbox.points = new_shape;
 
     // Recalculate mass and health for new size
-    fragment.mass = PI * carre(new_radius) * ASTEROID_DENSITY;
+    fragment.mass = PI * squared(new_radius) * ASTEROID_DENSITY;
     fragment.health = ASTEROID_MASS_HEALTH * fragment.mass + ASTEROID_MIN_HEALTH;
     fragment.max_health = fragment.health;
 
     // Add random velocity scatter
-    fragment.velocity = addtuple(
+    fragment.velocity = add_vec(
         fragment.velocity,
-        polar_to_affine(
+        from_polar(
             orientation,
-            randfloat(FRAGMENT_MIN_VELOCITY, FRAGMENT_MAX_VELOCITY, rng),
+            rand_range(FRAGMENT_MIN_VELOCITY, FRAGMENT_MAX_VELOCITY, rng),
         ),
     );
 
     // Adjust HDR exposure randomly
-    fragment.hdr_exposure *= randfloat(FRAGMENT_MIN_EXPOSURE, FRAGMENT_MAX_EXPOSURE, rng);
+    fragment.hdr_exposure *= rand_range(FRAGMENT_MIN_EXPOSURE, FRAGMENT_MAX_EXPOSURE, rng);
 
     fragment
 }
 
 /// Spawn fragment_number fragments for each dead entity in source, appending to dest.
-pub fn spawn_n_frags(
+pub fn spawn_fragments(
     source: &[Entity],
     dest: &mut Vec<Entity>,
     fragment_number: i32,
@@ -790,12 +790,12 @@ pub fn spawn_n_frags(
     let dead: Vec<&Entity> = source.iter().filter(|e| e.health <= 0.0).collect();
     for _ in 0..fragment_number {
         for parent in &dead {
-            dest.push(frag_asteroid(parent, rng));
+            dest.push(fragment_asteroid(parent, rng));
         }
     }
 }
 
-pub fn random_out_of_screen(radius: f64, phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Vec2 {
+pub fn random_offscreen_position(radius: f64, phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Vec2 {
     loop {
         let x = rng.gen::<f64>() * 3.0 * phys_w - phys_w;
         let y = rng.gen::<f64>() * 3.0 * phys_h - phys_h;
@@ -811,12 +811,12 @@ pub fn spawn_random_star(phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Star {
     Star {
         last_pos: randpos,
         pos: randpos,
-        proximity: randfloat(STAR_MIN_PROX, STAR_MAX_PROX, rng).powf(4.0),
-        lum: randfloat(STAR_MIN_LUM, STAR_MAX_LUM, rng),
+        proximity: rand_range(STAR_MIN_PROX, STAR_MAX_PROX, rng).powf(4.0),
+        lum: rand_range(STAR_MIN_LUM, STAR_MAX_LUM, rng),
     }
 }
 
-pub fn n_stars(n: i32, phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Vec<Star> {
+pub fn spawn_stars(n: i32, phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Vec<Star> {
     let mut stars = Vec::new();
     for _ in 0..n {
         stars.push(spawn_random_star(phys_w, phys_h, rng));
@@ -858,7 +858,7 @@ pub fn big_enough(e: &Entity) -> bool {
 
 pub fn close_enough(e: &Entity, phys_w: f64, phys_h: f64) -> bool {
     let center = Vec2::new(phys_w / 2.0, phys_h / 2.0);
-    hypothenuse(soustuple(e.position, center)) < MAX_DIST
+    magnitude(sub_vec(e.position, center)) < MAX_DIST
 }
 
 pub fn too_far(e: &Entity, phys_w: f64, phys_h: f64) -> bool {

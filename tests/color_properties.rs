@@ -113,40 +113,40 @@ fn hdr_add_large_values() {
 }
 
 // ---------------------------------------------------------------------------
-// hdr_sous (subtract)
+// hdr_sub (subtract)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn hdr_sous_basic() {
-    let result = hdr_sous(c(10.0, 20.0, 30.0), c(1.0, 2.0, 3.0));
+fn hdr_sub_basic() {
+    let result = hdr_sub(c(10.0, 20.0, 30.0), c(1.0, 2.0, 3.0));
     assert!(color_approx(result, c(9.0, 18.0, 27.0)));
 }
 
 #[test]
-fn hdr_sous_self_is_zero() {
+fn hdr_sub_self_is_zero() {
     let a = c(5.0, 10.0, 15.0);
-    assert!(color_approx(hdr_sous(a, a), HdrColor::zero()));
+    assert!(color_approx(hdr_sub(a, a), HdrColor::zero()));
 }
 
 #[test]
-fn hdr_sous_zero_right_is_identity() {
+fn hdr_sub_zero_right_is_identity() {
     let a = c(5.0, 10.0, 15.0);
-    assert!(color_approx(hdr_sous(a, HdrColor::zero()), a));
+    assert!(color_approx(hdr_sub(a, HdrColor::zero()), a));
 }
 
 #[test]
-fn hdr_sous_zero_left_negates() {
+fn hdr_sub_zero_left_negates() {
     let a = c(5.0, 10.0, 15.0);
-    let result = hdr_sous(HdrColor::zero(), a);
+    let result = hdr_sub(HdrColor::zero(), a);
     assert!(color_approx(result, c(-5.0, -10.0, -15.0)));
 }
 
 #[test]
-fn hdr_sous_not_commutative() {
+fn hdr_sub_not_commutative() {
     let a = c(5.0, 10.0, 15.0);
     let b = c(1.0, 2.0, 3.0);
-    let ab = hdr_sous(a, b);
-    let ba = hdr_sous(b, a);
+    let ab = hdr_sub(a, b);
+    let ba = hdr_sub(b, a);
     // a-b != b-a (unless equal), specifically ab.r should be 4, ba.r should be -4
     assert!(approx(ab.r, 4.0));
     assert!(approx(ba.r, -4.0));

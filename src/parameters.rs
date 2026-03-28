@@ -428,7 +428,7 @@ pub struct Globals {
     pub ship_impulse_rotat: bool,
 
     // Rendering fields
-    pub ratio_rendu: f64,
+    pub render_scale: f64,
     pub phys_width: f64,
     pub phys_height: f64,
     /// 16:9 safe zone in physics coords (always fully visible)
@@ -471,7 +471,7 @@ pub struct Globals {
     pub projectile_radius: f64,
     pub projectile_radius_hitbox: f64,
     pub projectile_number: i32,
-    pub ratio_phys_deg: f64,
+    pub physics_damage_ratio: f64,
     pub observer_proper_time: f64,
 }
 
@@ -481,9 +481,9 @@ impl Globals {
     pub fn new() -> Self {
         let width = WIDTH as f64;
         let height = HEIGHT as f64;
-        let ratio_rendu = ((width * height) / (GAME_SURFACE * 1000000.0)).sqrt();
-        let phys_width = width / ratio_rendu;
-        let phys_height = height / ratio_rendu;
+        let render_scale = ((width * height) / (GAME_SURFACE * 1000000.0)).sqrt();
+        let phys_width = width / render_scale;
+        let phys_height = height / render_scale;
 
         Self {
             // Time-related fields
@@ -526,7 +526,7 @@ impl Globals {
             ship_impulse_rotat: true,
 
             // Rendering fields
-            ratio_rendu,
+            render_scale,
             phys_width,
             phys_height,
             safe_phys_width: phys_width,   // updated by recompute_for_resolution
@@ -567,7 +567,7 @@ impl Globals {
             projectile_radius: 15.0,
             projectile_radius_hitbox: 20.0,
             projectile_number: 50,
-            ratio_phys_deg: 0.001,
+            physics_damage_ratio: 0.001,
             observer_proper_time: 1.0,
         }
     }
@@ -591,11 +591,11 @@ impl Globals {
             (sw, sw / safe_aspect)
         };
 
-        self.ratio_rendu = (safe_w * safe_h / (GAME_SURFACE * 1_000_000.0)).sqrt();
-        self.phys_width  = sw / self.ratio_rendu;
-        self.phys_height = sh / self.ratio_rendu;
-        self.safe_phys_width  = safe_w / self.ratio_rendu;
-        self.safe_phys_height = safe_h / self.ratio_rendu;
+        self.render_scale = (safe_w * safe_h / (GAME_SURFACE * 1_000_000.0)).sqrt();
+        self.phys_width  = sw / self.render_scale;
+        self.phys_height = sh / self.render_scale;
+        self.safe_phys_width  = safe_w / self.render_scale;
+        self.safe_phys_height = safe_h / self.render_scale;
         self.safe_offset_x = (self.phys_width  - self.safe_phys_width)  / 2.0;
         self.safe_offset_y = (self.phys_height - self.safe_phys_height) / 2.0;
     }

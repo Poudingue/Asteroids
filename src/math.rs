@@ -43,7 +43,7 @@ impl Vec2 {
 
     /// Linear interpolation: `self * t + other * (1 - t)`.
     ///
-    /// Matches the OCaml `moytuple` semantics where ratio=1 returns self.
+    /// Matches the OCaml `lerp_vec` semantics where ratio=1 returns self.
     #[inline]
     pub fn lerp(self, other: Vec2, t: f64) -> Vec2 {
         Vec2 {
@@ -64,7 +64,7 @@ impl Vec2 {
     /// Convert to polar coordinates `(angle, magnitude)`.
     ///
     /// Returns `(0.0, 0.0)` for the zero vector.
-    /// Uses the same formula as the OCaml `affine_to_polar`.
+    /// Uses the same formula as the OCaml `to_polar`.
     pub fn to_polar(self) -> (f64, f64) {
         let r = self.length();
         if r == 0.0 {

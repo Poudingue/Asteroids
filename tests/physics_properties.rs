@@ -1,6 +1,6 @@
 /// Property tests for movement and collision functions in game.rs
-/// Covers deplac_objet, inertie_objet, accel_objet, boost_objet, rotat_objet,
-/// tourn_objet, couple_objet (moment_objet), collision_circles, collision_point.
+/// Covers move_entity, apply_inertia, accelerate_entity, boost_entity, rotate_entity,
+/// turn_entity, apply_torque (apply_angular_momentum), collision_circles, collision_point.
 /// These tests serve as a safety net before the V2 refactor.
 
 use asteroids::game::*;
@@ -41,16 +41,16 @@ fn make_entity() -> Entity {
     e
 }
 
-// ─── deplac_objet ────────────────────────────────────────────────────────────
+// ─── move_entity ────────────────────────────────────────────────────────────
 
 #[test]
-fn deplac_objet_basic_movement() {
+fn move_entity_basic_movement() {
     // With dt=1, game_speed=1, OBSERVER_PROPER_TIME=1, proper_time=1:
     // time_factor = 1 * 1 * 1 / 1 = 1
     // new_pos = (0,0) + (3,4) * 1 = (3,4)
     let mut e = make_entity();
     let g = make_globals(1.0);
-    deplac_objet(&mut e, Vec2::new(3.0, 4.0), &g);
+    move_entity(&mut e, Vec2::new(3.0, 4.0), &g);
     assert!(
         vec2_approx_eq(e.position, Vec2::new(3.0, 4.0), EPS),
         "expected (3,4), got {:?}",
@@ -59,11 +59,11 @@ fn deplac_objet_basic_movement() {
 }
 
 #[test]
-fn deplac_objet_zero_velocity() {
+fn move_entity_zero_velocity() {
     let mut e = make_entity();
     let g = make_globals(1.0);
     e.position = Vec2::new(5.0, 7.0);
-    deplac_objet(&mut e, Vec2::new(0.0, 0.0), &g);
+    move_entity(&mut e, Vec2::new(0.0, 0.0), &g);
     assert!(
         vec2_approx_eq(e.position, Vec2::new(5.0, 7.0), EPS),
         "zero velocity should not move entity"
@@ -71,11 +71,11 @@ fn deplac_objet_zero_velocity() {
 }
 
 #[test]
-fn deplac_objet_zero_dt() {
+fn move_entity_zero_dt() {
     let mut e = make_entity();
     e.position = Vec2::new(5.0, 7.0);
     let g = make_globals(0.0);
-    deplac_objet(&mut e, Vec2::new(3.0, 4.0), &g);
+    move_entity(&mut e, Vec2::new(3.0, 4.0), &g);
     assert!(
         vec2_approx_eq(e.position, Vec2::new(5.0, 7.0), EPS),
         "zero dt should not move entity"
@@ -83,11 +83,11 @@ fn deplac_objet_zero_dt() {
 }
 
 #[test]
-fn deplac_objet_scales_with_dt() {
+fn move_entity_scales_with_dt() {
     // With dt=2 and vel=(1,0): displacement = 2 (since game_speed=1, OBSERVER_PROPER_TIME=1, proper_time=1)
     let mut e = make_entity();
     let g = make_globals(2.0);
-    deplac_objet(&mut e, Vec2::new(1.0, 0.0), &g);
+    move_entity(&mut e, Vec2::new(1.0, 0.0), &g);
     assert!(
         approx_eq(e.position.x, 2.0, EPS),
         "position.x should be 2, got {}",
@@ -96,7 +96,7 @@ fn deplac_objet_scales_with_dt() {
 }
 
 #[test]
-fn deplac_objet_scales_with_game_speed() {
+fn move_entity_scales_with_game_speed() {
     // game_speed=2 doubles displacement
     let mut e1 = make_entity();
     let mut e2 = make_entity();
@@ -105,8 +105,8 @@ fn deplac_objet_scales_with_game_speed() {
     g1.game_speed = 1.0;
     g2.game_speed = 2.0;
     let vel = Vec2::new(3.0, 4.0);
-    deplac_objet(&mut e1, vel, &g1);
-    deplac_objet(&mut e2, vel, &g2);
+    move_entity(&mut e1, vel, &g1);
+    move_entity(&mut e2, vel, &g2);
     assert!(
         vec2_approx_eq(e2.position, Vec2::new(e1.position.x * 2.0, e1.position.y * 2.0), EPS),
         "game_speed=2 should double displacement"
@@ -114,11 +114,11 @@ fn deplac_objet_scales_with_game_speed() {
 }
 
 #[test]
-fn deplac_objet_negative_velocity() {
+fn move_entity_negative_velocity() {
     let mut e = make_entity();
     e.position = Vec2::new(5.0, 5.0);
     let g = make_globals(1.0);
-    deplac_objet(&mut e, Vec2::new(-2.0, -3.0), &g);
+    move_entity(&mut e, Vec2::new(-2.0, -3.0), &g);
     assert!(
         vec2_approx_eq(e.position, Vec2::new(3.0, 2.0), EPS),
         "expected (3,2), got {:?}",
@@ -126,15 +126,15 @@ fn deplac_objet_negative_velocity() {
     );
 }
 
-// ─── inertie_objet ───────────────────────────────────────────────────────────
+// ─── apply_inertia ───────────────────────────────────────────────────────────
 
 #[test]
-fn inertie_objet_basic() {
+fn apply_inertia_basic() {
     // entity with velocity (1,2), dt=1 => moves by (1,2)
     let mut e = make_entity();
     e.velocity = Vec2::new(1.0, 2.0);
     let g = make_globals(1.0);
-    inertie_objet(&mut e, &g);
+    apply_inertia(&mut e, &g);
     assert!(
         vec2_approx_eq(e.position, Vec2::new(1.0, 2.0), EPS),
         "expected (1,2), got {:?}",
@@ -143,12 +143,12 @@ fn inertie_objet_basic() {
 }
 
 #[test]
-fn inertie_objet_stationary() {
+fn apply_inertia_stationary() {
     let mut e = make_entity();
     e.velocity = Vec2::new(0.0, 0.0);
     e.position = Vec2::new(3.0, 5.0);
     let g = make_globals(1.0);
-    inertie_objet(&mut e, &g);
+    apply_inertia(&mut e, &g);
     assert!(
         vec2_approx_eq(e.position, Vec2::new(3.0, 5.0), EPS),
         "stationary entity should not move"
@@ -156,11 +156,11 @@ fn inertie_objet_stationary() {
 }
 
 #[test]
-fn inertie_objet_does_not_change_velocity() {
+fn apply_inertia_does_not_change_velocity() {
     let mut e = make_entity();
     e.velocity = Vec2::new(2.0, 3.0);
     let g = make_globals(1.0);
-    inertie_objet(&mut e, &g);
+    apply_inertia(&mut e, &g);
     assert!(
         vec2_approx_eq(e.velocity, Vec2::new(2.0, 3.0), EPS),
         "inertia should not alter velocity"
@@ -168,15 +168,15 @@ fn inertie_objet_does_not_change_velocity() {
 }
 
 #[test]
-fn inertie_objet_uses_own_velocity() {
+fn apply_inertia_uses_own_velocity() {
     // Displacement should equal velocity * time_factor
     let mut e1 = make_entity();
     let mut e2 = make_entity();
     e1.velocity = Vec2::new(5.0, 0.0);
     e2.velocity = Vec2::new(10.0, 0.0);
     let g = make_globals(1.0);
-    inertie_objet(&mut e1, &g);
-    inertie_objet(&mut e2, &g);
+    apply_inertia(&mut e1, &g);
+    apply_inertia(&mut e2, &g);
     // e2 should move twice as far as e1
     assert!(
         approx_eq(e2.position.x, e1.position.x * 2.0, EPS),
@@ -184,15 +184,15 @@ fn inertie_objet_uses_own_velocity() {
     );
 }
 
-// ─── accel_objet ─────────────────────────────────────────────────────────────
+// ─── accelerate_entity ─────────────────────────────────────────────────────────────
 
 #[test]
-fn accel_objet_basic() {
+fn accelerate_entity_basic() {
     // dt=1, game_speed=1 => velocity += accel * 1
     let mut e = make_entity();
     e.velocity = Vec2::new(0.0, 0.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, Vec2::new(2.0, 3.0), &g);
+    accelerate_entity(&mut e, Vec2::new(2.0, 3.0), &g);
     assert!(
         vec2_approx_eq(e.velocity, Vec2::new(2.0, 3.0), EPS),
         "expected velocity (2,3), got {:?}",
@@ -201,12 +201,12 @@ fn accel_objet_basic() {
 }
 
 #[test]
-fn accel_objet_cumulative() {
+fn accelerate_entity_cumulative() {
     let mut e = make_entity();
     e.velocity = Vec2::new(1.0, 0.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, Vec2::new(1.0, 0.0), &g);
-    accel_objet(&mut e, Vec2::new(1.0, 0.0), &g);
+    accelerate_entity(&mut e, Vec2::new(1.0, 0.0), &g);
+    accelerate_entity(&mut e, Vec2::new(1.0, 0.0), &g);
     assert!(
         approx_eq(e.velocity.x, 3.0, EPS),
         "two accelerations should accumulate: expected 3, got {}",
@@ -215,11 +215,11 @@ fn accel_objet_cumulative() {
 }
 
 #[test]
-fn accel_objet_zero_acceleration() {
+fn accelerate_entity_zero_acceleration() {
     let mut e = make_entity();
     e.velocity = Vec2::new(5.0, 7.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, Vec2::new(0.0, 0.0), &g);
+    accelerate_entity(&mut e, Vec2::new(0.0, 0.0), &g);
     assert!(
         vec2_approx_eq(e.velocity, Vec2::new(5.0, 7.0), EPS),
         "zero acceleration should not change velocity"
@@ -227,23 +227,23 @@ fn accel_objet_zero_acceleration() {
 }
 
 #[test]
-fn accel_objet_does_not_change_position() {
+fn accelerate_entity_does_not_change_position() {
     let mut e = make_entity();
     e.position = Vec2::new(3.0, 4.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, Vec2::new(5.0, 6.0), &g);
+    accelerate_entity(&mut e, Vec2::new(5.0, 6.0), &g);
     assert!(
         vec2_approx_eq(e.position, Vec2::new(3.0, 4.0), EPS),
-        "accel_objet should not change position"
+        "accelerate_entity should not change position"
     );
 }
 
 #[test]
-fn accel_objet_negative_deceleration() {
+fn accelerate_entity_negative_deceleration() {
     let mut e = make_entity();
     e.velocity = Vec2::new(5.0, 0.0);
     let g = make_globals(1.0);
-    accel_objet(&mut e, Vec2::new(-2.0, 0.0), &g);
+    accelerate_entity(&mut e, Vec2::new(-2.0, 0.0), &g);
     assert!(
         approx_eq(e.velocity.x, 3.0, EPS),
         "negative accel should reduce velocity: expected 3, got {}",
@@ -251,13 +251,13 @@ fn accel_objet_negative_deceleration() {
     );
 }
 
-// ─── boost_objet ─────────────────────────────────────────────────────────────
+// ─── boost_entity ─────────────────────────────────────────────────────────────
 
 #[test]
-fn boost_objet_basic() {
+fn boost_entity_basic() {
     let mut e = make_entity();
     e.velocity = Vec2::new(1.0, 2.0);
-    boost_objet(&mut e, Vec2::new(3.0, 4.0));
+    boost_entity(&mut e, Vec2::new(3.0, 4.0));
     assert!(
         vec2_approx_eq(e.velocity, Vec2::new(4.0, 6.0), EPS),
         "expected velocity (4,6), got {:?}",
@@ -266,10 +266,10 @@ fn boost_objet_basic() {
 }
 
 #[test]
-fn boost_objet_zero_boost() {
+fn boost_entity_zero_boost() {
     let mut e = make_entity();
     e.velocity = Vec2::new(5.0, 6.0);
-    boost_objet(&mut e, Vec2::new(0.0, 0.0));
+    boost_entity(&mut e, Vec2::new(0.0, 0.0));
     assert!(
         vec2_approx_eq(e.velocity, Vec2::new(5.0, 6.0), EPS),
         "zero boost should not change velocity"
@@ -277,25 +277,25 @@ fn boost_objet_zero_boost() {
 }
 
 #[test]
-fn boost_objet_no_time_scaling() {
-    // boost_objet has no dt — apply same boost with dt=0 and dt=100: same result
+fn boost_entity_no_time_scaling() {
+    // boost_entity has no dt — apply same boost with dt=0 and dt=100: same result
     let mut e1 = make_entity();
     let mut e2 = make_entity();
     e1.velocity = Vec2::ZERO;
     e2.velocity = Vec2::ZERO;
-    boost_objet(&mut e1, Vec2::new(3.0, 4.0));
-    boost_objet(&mut e2, Vec2::new(3.0, 4.0));
+    boost_entity(&mut e1, Vec2::new(3.0, 4.0));
+    boost_entity(&mut e2, Vec2::new(3.0, 4.0));
     assert!(
         vec2_approx_eq(e1.velocity, e2.velocity, EPS),
-        "boost_objet is time-independent"
+        "boost_entity is time-independent"
     );
 }
 
 #[test]
-fn boost_objet_negative() {
+fn boost_entity_negative() {
     let mut e = make_entity();
     e.velocity = Vec2::new(5.0, 5.0);
-    boost_objet(&mut e, Vec2::new(-3.0, -2.0));
+    boost_entity(&mut e, Vec2::new(-3.0, -2.0));
     assert!(
         vec2_approx_eq(e.velocity, Vec2::new(2.0, 3.0), EPS),
         "expected (2,3), got {:?}",
@@ -303,15 +303,15 @@ fn boost_objet_negative() {
     );
 }
 
-// ─── rotat_objet ─────────────────────────────────────────────────────────────
+// ─── rotate_entity ─────────────────────────────────────────────────────────────
 
 #[test]
-fn rotat_objet_basic() {
+fn rotate_entity_basic() {
     // dt=1, game_speed=1, OBSERVER_PROPER_TIME=1, proper_time=1 => time_factor=1
     let mut e = make_entity();
     e.orientation = 0.0;
     let g = make_globals(1.0);
-    rotat_objet(&mut e, 1.0, &g);
+    rotate_entity(&mut e, 1.0, &g);
     assert!(
         approx_eq(e.orientation, 1.0, EPS),
         "expected orientation 1.0, got {}",
@@ -320,11 +320,11 @@ fn rotat_objet_basic() {
 }
 
 #[test]
-fn rotat_objet_zero_rotation() {
+fn rotate_entity_zero_rotation() {
     let mut e = make_entity();
     e.orientation = 2.0;
     let g = make_globals(1.0);
-    rotat_objet(&mut e, 0.0, &g);
+    rotate_entity(&mut e, 0.0, &g);
     assert!(
         approx_eq(e.orientation, 2.0, EPS),
         "zero rotation should not change orientation"
@@ -332,11 +332,11 @@ fn rotat_objet_zero_rotation() {
 }
 
 #[test]
-fn rotat_objet_zero_dt() {
+fn rotate_entity_zero_dt() {
     let mut e = make_entity();
     e.orientation = 1.5;
     let g = make_globals(0.0);
-    rotat_objet(&mut e, 10.0, &g);
+    rotate_entity(&mut e, 10.0, &g);
     assert!(
         approx_eq(e.orientation, 1.5, EPS),
         "zero dt should not change orientation"
@@ -344,11 +344,11 @@ fn rotat_objet_zero_dt() {
 }
 
 #[test]
-fn rotat_objet_negative_rotation() {
+fn rotate_entity_negative_rotation() {
     let mut e = make_entity();
     e.orientation = 2.0;
     let g = make_globals(1.0);
-    rotat_objet(&mut e, -1.0, &g);
+    rotate_entity(&mut e, -1.0, &g);
     assert!(
         approx_eq(e.orientation, 1.0, EPS),
         "expected orientation 1.0, got {}",
@@ -357,12 +357,12 @@ fn rotat_objet_negative_rotation() {
 }
 
 #[test]
-fn rotat_objet_cumulative() {
+fn rotate_entity_cumulative() {
     let mut e = make_entity();
     e.orientation = 0.0;
     let g = make_globals(1.0);
-    rotat_objet(&mut e, 1.0, &g);
-    rotat_objet(&mut e, 1.0, &g);
+    rotate_entity(&mut e, 1.0, &g);
+    rotate_entity(&mut e, 1.0, &g);
     assert!(
         approx_eq(e.orientation, 2.0, EPS),
         "two rotations should accumulate: expected 2.0, got {}",
@@ -370,13 +370,13 @@ fn rotat_objet_cumulative() {
     );
 }
 
-// ─── tourn_objet ─────────────────────────────────────────────────────────────
+// ─── turn_entity ─────────────────────────────────────────────────────────────
 
 #[test]
-fn tourn_objet_basic() {
+fn turn_entity_basic() {
     let mut e = make_entity();
     e.orientation = 0.5;
-    tourn_objet(&mut e, 1.0);
+    turn_entity(&mut e, 1.0);
     assert!(
         approx_eq(e.orientation, 1.5, EPS),
         "expected orientation 1.5, got {}",
@@ -385,10 +385,10 @@ fn tourn_objet_basic() {
 }
 
 #[test]
-fn tourn_objet_zero() {
+fn turn_entity_zero() {
     let mut e = make_entity();
     e.orientation = 2.0;
-    tourn_objet(&mut e, 0.0);
+    turn_entity(&mut e, 0.0);
     assert!(
         approx_eq(e.orientation, 2.0, EPS),
         "zero rotation should not change orientation"
@@ -396,25 +396,25 @@ fn tourn_objet_zero() {
 }
 
 #[test]
-fn tourn_objet_no_time_scaling() {
-    // Same result regardless of dt — tourn_objet is instant
+fn turn_entity_no_time_scaling() {
+    // Same result regardless of dt — turn_entity is instant
     let mut e1 = make_entity();
     let mut e2 = make_entity();
     e1.orientation = 0.0;
     e2.orientation = 0.0;
-    tourn_objet(&mut e1, 1.5);
-    tourn_objet(&mut e2, 1.5);
+    turn_entity(&mut e1, 1.5);
+    turn_entity(&mut e2, 1.5);
     assert!(
         approx_eq(e1.orientation, e2.orientation, EPS),
-        "tourn_objet is time-independent"
+        "turn_entity is time-independent"
     );
 }
 
 #[test]
-fn tourn_objet_negative() {
+fn turn_entity_negative() {
     let mut e = make_entity();
     e.orientation = 3.0;
-    tourn_objet(&mut e, -1.0);
+    turn_entity(&mut e, -1.0);
     assert!(
         approx_eq(e.orientation, 2.0, EPS),
         "expected 2.0, got {}",
@@ -422,16 +422,16 @@ fn tourn_objet_negative() {
     );
 }
 
-// ─── moment_objet ────────────────────────────────────────────────────────────
+// ─── apply_angular_momentum ────────────────────────────────────────────────────────────
 
 #[test]
-fn moment_objet_basic() {
+fn apply_angular_momentum_basic() {
     // entity with moment=1.0, dt=1 => orientation += 1 * 1 = 1
     let mut e = make_entity();
     e.orientation = 0.0;
     e.moment = 1.0;
     let g = make_globals(1.0);
-    moment_objet(&mut e, &g);
+    apply_angular_momentum(&mut e, &g);
     assert!(
         approx_eq(e.orientation, 1.0, EPS),
         "expected orientation 1.0, got {}",
@@ -440,12 +440,12 @@ fn moment_objet_basic() {
 }
 
 #[test]
-fn moment_objet_zero_moment() {
+fn apply_angular_momentum_zero_moment() {
     let mut e = make_entity();
     e.orientation = 2.0;
     e.moment = 0.0;
     let g = make_globals(1.0);
-    moment_objet(&mut e, &g);
+    apply_angular_momentum(&mut e, &g);
     assert!(
         approx_eq(e.orientation, 2.0, EPS),
         "zero moment should not change orientation"
@@ -453,19 +453,19 @@ fn moment_objet_zero_moment() {
 }
 
 #[test]
-fn moment_objet_does_not_change_moment_field() {
+fn apply_angular_momentum_does_not_change_moment_field() {
     let mut e = make_entity();
     e.moment = 3.0;
     let g = make_globals(1.0);
-    moment_objet(&mut e, &g);
+    apply_angular_momentum(&mut e, &g);
     assert!(
         approx_eq(e.moment, 3.0, EPS),
-        "moment_objet should not alter moment field"
+        "apply_angular_momentum should not alter moment field"
     );
 }
 
 #[test]
-fn moment_objet_scales_with_dt() {
+fn apply_angular_momentum_scales_with_dt() {
     // dt=2 => twice the angular displacement
     let mut e1 = make_entity();
     let mut e2 = make_entity();
@@ -473,8 +473,8 @@ fn moment_objet_scales_with_dt() {
     e2.moment = 1.0;
     let g1 = make_globals(1.0);
     let g2 = make_globals(2.0);
-    moment_objet(&mut e1, &g1);
-    moment_objet(&mut e2, &g2);
+    apply_angular_momentum(&mut e1, &g1);
+    apply_angular_momentum(&mut e2, &g2);
     assert!(
         approx_eq(e2.orientation, e1.orientation * 2.0, EPS),
         "doubling dt should double angular displacement"

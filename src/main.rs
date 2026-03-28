@@ -252,7 +252,7 @@ fn main() {
 
             // Space = fire
             if keyboard.is_scancode_pressed(Scancode::Space) {
-                game::tir(&mut state, &mut globals);
+                game::fire(&mut state, &mut globals);
             }
 
             // Update game state (physics, wrapping, asteroids, etc.)

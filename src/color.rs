@@ -58,7 +58,7 @@ pub fn hdr_add(col1: HdrColor, col2: HdrColor) -> HdrColor {
 }
 
 /// Subtract col2 from col1
-pub fn hdr_sous(col1: HdrColor, col2: HdrColor) -> HdrColor {
+pub fn hdr_sub(col1: HdrColor, col2: HdrColor) -> HdrColor {
     HdrColor {
         r: col1.r - col2.r,
         g: col1.g - col2.g,

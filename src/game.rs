@@ -141,7 +141,7 @@ impl GameState {
             smoke: Vec::new(),
             smoke_oos: Vec::new(),
             sparks: Vec::new(),
-            stars: n_stars(
+            stars: spawn_stars(
                 globals.stars_nb,
                 globals.phys_width,
                 globals.phys_height,
@@ -178,84 +178,84 @@ fn to_rgba(color: HdrColor, globals: &Globals) -> [u8; 4] {
 // ============================================================================
 
 /// Displace an object by a velocity vector, scaled by dt * game_speed * observer/proper time
-pub fn deplac_objet(entity: &mut Entity, vel: Vec2, globals: &Globals) {
+pub fn move_entity(entity: &mut Entity, vel: Vec2, globals: &Globals) {
     let time_factor = globals.dt() * globals.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.position = proj(entity.position, vel, time_factor);
 }
 
 /// Apply an object's velocity as displacement (inertia)
-pub fn inertie_objet(entity: &mut Entity, globals: &Globals) {
+pub fn apply_inertia(entity: &mut Entity, globals: &Globals) {
     let vel = entity.velocity;
-    deplac_objet(entity, vel, globals);
+    move_entity(entity, vel, globals);
 }
 
 /// Accelerate an object (velocity += accel * dt * ...)
-pub fn accel_objet(entity: &mut Entity, accel: Vec2, globals: &Globals) {
+pub fn accelerate_entity(entity: &mut Entity, accel: Vec2, globals: &Globals) {
     let time_factor = globals.dt() * globals.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.velocity = proj(entity.velocity, accel, time_factor);
 }
 
 /// Instant velocity change (no time scaling)
-pub fn boost_objet(entity: &mut Entity, boost: Vec2) {
+pub fn boost_entity(entity: &mut Entity, boost: Vec2) {
     entity.velocity = proj(entity.velocity, boost, 1.0);
 }
 
 /// Timed rotation (orientation += rotation * dt * ...)
-pub fn rotat_objet(entity: &mut Entity, rotation: f64, globals: &Globals) {
+pub fn rotate_entity(entity: &mut Entity, rotation: f64, globals: &Globals) {
     let time_factor = globals.dt() * globals.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.orientation += rotation * time_factor;
 }
 
 /// Instant rotation (no time scaling)
-pub fn tourn_objet(entity: &mut Entity, rotation: f64) {
+pub fn turn_entity(entity: &mut Entity, rotation: f64) {
     entity.orientation += rotation;
 }
 
 /// Angular acceleration (moment += momentum * dt * ...)
-pub fn couple_objet(entity: &mut Entity, momentum: f64, globals: &Globals) {
+pub fn apply_torque(entity: &mut Entity, momentum: f64, globals: &Globals) {
     let time_factor = globals.dt() * globals.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.moment += momentum * time_factor;
 }
 
 /// Instant angular momentum change
-pub fn couple_objet_boost(entity: &mut Entity, momentum: f64) {
+pub fn boost_torque(entity: &mut Entity, momentum: f64) {
     entity.moment += momentum;
 }
 
 /// Apply moment as rotation (rotational inertia)
-pub fn moment_objet(entity: &mut Entity, globals: &Globals) {
+pub fn apply_angular_momentum(entity: &mut Entity, globals: &Globals) {
     let moment = entity.moment;
-    rotat_objet(entity, moment, globals);
+    rotate_entity(entity, moment, globals);
 }
 
 /// Instant absolute displacement (for camera movement)
-pub fn deplac_objet_abso(entity: &mut Entity, velocity: Vec2) {
+pub fn translate_entity(entity: &mut Entity, velocity: Vec2) {
     entity.position = proj(entity.position, velocity, 1.0);
 }
 
 /// Apply inertia to all entities in a list
-pub fn inertie_objets(entities: &mut [Entity], globals: &Globals) {
+pub fn apply_inertia_all(entities: &mut [Entity], globals: &Globals) {
     for e in entities.iter_mut() {
-        inertie_objet(e, globals);
+        apply_inertia(e, globals);
     }
 }
 
 /// Apply angular momentum to all entities in a list
-pub fn moment_objets(entities: &mut [Entity], globals: &Globals) {
+pub fn apply_angular_momentum_all(entities: &mut [Entity], globals: &Globals) {
     for e in entities.iter_mut() {
-        moment_objet(e, globals);
+        apply_angular_momentum(e, globals);
     }
 }
 
 /// Wrap entity position using 3x-resolution modulo (toroidal world)
-pub fn recenter_objet(entity: &mut Entity, globals: &Globals) {
-    entity.position = modulo_3reso(entity.position, globals.phys_width, globals.phys_height);
+pub fn wrap_entity(entity: &mut Entity, globals: &Globals) {
+    entity.position = wrap_toroidal(entity.position, globals.phys_width, globals.phys_height);
 }
 
 /// Wrap all entities' positions (toroidal world)
-pub fn recenter_objets(entities: &mut [Entity], globals: &Globals) {
+pub fn wrap_entities(entities: &mut [Entity], globals: &Globals) {
     for e in entities.iter_mut() {
-        recenter_objet(e, globals);
+        wrap_entity(e, globals);
     }
 }
 
@@ -388,10 +388,10 @@ fn despawn(state: &mut GameState, globals: &Globals) {
 }
 
 /// Move a star by velocity scaled by its proximity (parallax)
-pub fn deplac_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
+pub fn move_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
     star.last_pos = star.pos;
-    let next = addtuple(star.pos, multuple(velocity, star.proximity));
-    star.pos = modulo_reso(next, globals.phys_width, globals.phys_height);
+    let next = add_vec(star.pos, scale_vec(velocity, star.proximity));
+    star.pos = wrap_single(next, globals.phys_width, globals.phys_height);
     // Avoid incorrect motion blur from screen-edge teleport
     if next.x > globals.phys_width || next.x < 0.0 || next.y > globals.phys_height || next.y < 0.0 {
         star.last_pos = star.pos;
@@ -406,19 +406,19 @@ pub fn deplac_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
 pub fn aim_at_mouse(ship: &mut Entity, mouse_x: i32, mouse_y: i32, globals: &Globals) {
         // Flip SDL2 Y-down to renderer Y-up coordinates
     let mouse_phys = Vec2::new(
-        mouse_x as f64 / globals.ratio_rendu,
-        (globals.phys_height * globals.ratio_rendu - mouse_y as f64) / globals.ratio_rendu,
+        mouse_x as f64 / globals.render_scale,
+        (globals.phys_height * globals.render_scale - mouse_y as f64) / globals.render_scale,
     );
-    let polar = affine_to_polar(soustuple(mouse_phys, ship.position));
+    let polar = to_polar(sub_vec(mouse_phys, ship.position));
     let theta = polar.x;
     ship.orientation = theta;
 }
 
 pub fn acceleration(state: &mut GameState, globals: &Globals) {
     let orientation = state.ship.orientation;
-    accel_objet(
+    accelerate_entity(
         &mut state.ship,
-        polar_to_affine(orientation, SHIP_MAX_ACCEL),
+        from_polar(orientation, SHIP_MAX_ACCEL),
         globals,
     );
     // Engine fire: spawn 1 particle when accelerating (OCaml: spawn_fire)
@@ -432,7 +432,7 @@ pub fn acceleration(state: &mut GameState, globals: &Globals) {
 /// Also spawns 9 engine fire particles for a more intense thrust effect (matches OCaml `boost`).
 pub fn boost_forward(state: &mut GameState, globals: &Globals) {
     let orientation = state.ship.orientation;
-    boost_objet(&mut state.ship, polar_to_affine(orientation, SHIP_MAX_BOOST));
+    boost_entity(&mut state.ship, from_polar(orientation, SHIP_MAX_BOOST));
     // Engine fire: spawn 9 particles on boost (OCaml: 3 lists of 3)
     if state.ship.health > 0.0 && globals.smoke_enabled {
         for _ in 0..9 {
@@ -447,7 +447,7 @@ pub fn boost_forward(state: &mut GameState, globals: &Globals) {
 pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mouse_y: f64) {
     if state.cooldown_tp <= 0.0 {
         // Teleport to mouse position in physics space
-        let new_pos = Vec2::new(mouse_x / globals.ratio_rendu, mouse_y / globals.ratio_rendu);
+        let new_pos = Vec2::new(mouse_x / globals.render_scale, mouse_y / globals.render_scale);
         state.ship.position = new_pos;
         state.ship.velocity = Vec2::ZERO;
 
@@ -477,14 +477,14 @@ pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mous
 pub fn handle_left(ship: &mut Entity, globals: &Globals) {
     if globals.ship_impulse_pos {
         if globals.ship_direct_rotat {
-            tourn_objet(ship, SHIP_MAX_ROTAT);
+            turn_entity(ship, SHIP_MAX_ROTAT);
         } else {
-            couple_objet_boost(ship, SHIP_MAX_TOURN_BOOST);
+            boost_torque(ship, SHIP_MAX_TOURN_BOOST);
         }
     } else if globals.ship_direct_rotat {
-        rotat_objet(ship, SHIP_MAX_TOURN, globals);
+        rotate_entity(ship, SHIP_MAX_TOURN, globals);
     } else {
-        couple_objet(ship, SHIP_MAX_TOURN, globals);
+        apply_torque(ship, SHIP_MAX_TOURN, globals);
     }
 }
 
@@ -492,27 +492,27 @@ pub fn handle_left(ship: &mut Entity, globals: &Globals) {
 pub fn handle_right(ship: &mut Entity, globals: &Globals) {
     if globals.ship_impulse_pos {
         if globals.ship_direct_rotat {
-            tourn_objet(ship, -SHIP_MAX_ROTAT);
+            turn_entity(ship, -SHIP_MAX_ROTAT);
         } else {
-            couple_objet_boost(ship, -SHIP_MAX_TOURN_BOOST);
+            boost_torque(ship, -SHIP_MAX_TOURN_BOOST);
         }
     } else if globals.ship_direct_rotat {
-        rotat_objet(ship, -SHIP_MAX_TOURN, globals);
+        rotate_entity(ship, -SHIP_MAX_TOURN, globals);
     } else {
-        couple_objet(ship, -SHIP_MAX_TOURN, globals);
+        apply_torque(ship, -SHIP_MAX_TOURN, globals);
     }
 }
 
 /// Strafe left (always impulse boost perpendicular to heading)
 pub fn strafe_left(ship: &mut Entity) {
     let orientation = ship.orientation + PI / 2.0;
-    boost_objet(ship, polar_to_affine(orientation, SHIP_MAX_BOOST));
+    boost_entity(ship, from_polar(orientation, SHIP_MAX_BOOST));
 }
 
 /// Strafe right (always impulse boost perpendicular to heading)
 pub fn strafe_right(ship: &mut Entity) {
     let orientation = ship.orientation - PI / 2.0;
-    boost_objet(ship, polar_to_affine(orientation, SHIP_MAX_BOOST));
+    boost_entity(ship, from_polar(orientation, SHIP_MAX_BOOST));
 }
 
 // ============================================================================
@@ -520,15 +520,15 @@ pub fn strafe_right(ship: &mut Entity) {
 // ============================================================================
 
 /// Convert a polar polygon to affine (cartesian) coordinates with rotation and scale
-fn poly_to_affine(poly: &[(f64, f64)], rotat: f64, scale: f64) -> Vec<Vec2> {
+fn polygon_to_cartesian(poly: &[(f64, f64)], rotat: f64, scale: f64) -> Vec<Vec2> {
     poly.iter()
-        .map(|&(theta, radius)| polar_to_affine(theta + rotat, radius * scale))
+        .map(|&(theta, radius)| from_polar(theta + rotat, radius * scale))
         .collect()
 }
 
 /// Displace all points in an affine polygon by a position offset
-fn depl_affine_poly(poly: &[Vec2], pos: Vec2) -> Vec<Vec2> {
-    poly.iter().map(|&p| addtuple(p, pos)).collect()
+fn translate_polygon(poly: &[Vec2], pos: Vec2) -> Vec<Vec2> {
+    poly.iter().map(|&p| add_vec(p, pos)).collect()
 }
 
 /// Render a single polar polygon at a position with rotation and color
@@ -540,11 +540,11 @@ fn render_poly(
     renderer: &mut Renderer2D,
     globals: &Globals,
 ) {
-    let affine = poly_to_affine(poly, rotat, globals.ratio_rendu);
-    let displaced = depl_affine_poly(&affine, pos);
+    let affine = polygon_to_cartesian(poly, rotat, globals.render_scale);
+    let displaced = translate_polygon(&affine, pos);
     let screen_points: Vec<(i32, i32)> = displaced
         .iter()
-        .map(|&p| dither_tuple(p, DITHER_AA, globals.current_jitter_double))
+        .map(|&p| dither_vec(p, DITHER_AA, globals.current_jitter_double))
         .collect();
     if globals.retro {
         renderer.draw_poly(&screen_points, [255, 255, 255, 255], 1.0);
@@ -577,21 +577,21 @@ pub fn render_visuals(
     rng: &mut impl Rng,
 ) {
     let visuals = &entity.visuals;
-    let position = multuple(
-        addtuple(
-            addtuple(entity.position, globals.game_screenshake_pos),
+    let position = scale_vec(
+        add_vec(
+            add_vec(entity.position, globals.game_screenshake_pos),
             offset,
         ),
-        globals.ratio_rendu,
+        globals.render_scale,
     );
     let exposure = globals.game_exposure * entity.hdr_exposure;
 
     // Base circle (not in retro mode)
     if visuals.radius > 0.0 && !globals.retro {
         let color = to_rgba(intensify(hdr(visuals.color), exposure), globals);
-        let (x, y) = dither_tuple(position, DITHER_AA, globals.current_jitter_double);
+        let (x, y) = dither_vec(position, DITHER_AA, globals.current_jitter_double);
         let r = dither_radius(
-            visuals.radius * globals.ratio_rendu,
+            visuals.radius * globals.render_scale,
             DITHER_AA,
             DITHER_POWER_RADIUS,
             rng,
@@ -617,15 +617,15 @@ fn render_chunk(
     globals: &Globals,
     rng: &mut impl Rng,
 ) {
-    let pos = multuple(
-        addtuple(entity.position, globals.game_screenshake_pos),
-        globals.ratio_rendu,
+    let pos = scale_vec(
+        add_vec(entity.position, globals.game_screenshake_pos),
+        globals.render_scale,
     );
     if globals.retro {
-        let (x, y) = dither_tuple(pos, DITHER_AA, globals.current_jitter_double);
+        let (x, y) = dither_vec(pos, DITHER_AA, globals.current_jitter_double);
         renderer.fill_circle(
             x as f64, y as f64,
-            (0.25 * globals.ratio_rendu * entity.visuals.radius).max(1.0),
+            (0.25 * globals.render_scale * entity.visuals.radius).max(1.0),
             [128, 128, 128, 255],
         );
     } else {
@@ -634,9 +634,9 @@ fn render_chunk(
             intensify(hdr(entity.visuals.color), intensity_chunk * globals.game_exposure * entity.hdr_exposure),
             globals,
         );
-        let (x, y) = dither_tuple(pos, DITHER_AA, globals.current_jitter_double);
+        let (x, y) = dither_vec(pos, DITHER_AA, globals.current_jitter_double);
         let r = dither_radius(
-            globals.ratio_rendu * entity.visuals.radius,
+            globals.render_scale * entity.visuals.radius,
             DITHER_AA, DITHER_POWER_RADIUS, rng,
         );
         renderer.fill_circle(x as f64, y as f64, r.max(1) as f64, color);
@@ -650,17 +650,17 @@ pub fn render_star_trail(
     globals: &Globals,
     rng: &mut impl Rng,
 ) {
-    let pos1 = multuple(
-        addtuple(star.pos, globals.game_screenshake_pos),
-        globals.ratio_rendu,
+    let pos1 = scale_vec(
+        add_vec(star.pos, globals.game_screenshake_pos),
+        globals.render_scale,
     );
-    let last_position = multuple(
-        addtuple(star.last_pos, globals.game_screenshake_previous_pos),
-        globals.ratio_rendu,
+    let last_position = scale_vec(
+        add_vec(star.last_pos, globals.game_screenshake_previous_pos),
+        globals.render_scale,
     );
-    let pos2 = moytuple(last_position, pos1, SHUTTER_SPEED);
-    let (x1, y1) = dither_tuple(pos1, DITHER_AA, globals.current_jitter_double);
-    let (x2, y2) = dither_tuple(pos2, DITHER_AA, globals.current_jitter_double);
+    let pos2 = lerp_vec(last_position, pos1, SHUTTER_SPEED);
+    let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.current_jitter_double);
+    let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.current_jitter_double);
 
     let lum = if globals.pause {
         star.lum + 0.5 * STAR_RAND_LUM
@@ -697,7 +697,7 @@ pub fn render_star_trail(
         renderer.plot(x1 - 1, y1 - 1, diag_color);
     } else {
         // Moving star: render as a line trail
-        let dist = hypothenuse(soustuple(pos1, pos2));
+        let dist = magnitude(sub_vec(pos1, pos2));
         let trail_lum = (1.0 / (1.0 + dist)).sqrt();
         let trail_color = hdr_add(
             intensify(star_color_tmp, trail_lum),
@@ -762,14 +762,14 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
             abso_exp_decay(globals.shake_score, SHAKE_SCORE_HALF_LIFE, t0, t1);
         globals.game_screenshake_previous_pos = globals.game_screenshake_pos;
         if globals.screenshake_enabled {
-            globals.game_screenshake_pos = multuple(
+            globals.game_screenshake_pos = scale_vec(
                 Vec2::new(rng.gen::<f64>() * 2.0 - 1.0, rng.gen::<f64>() * 2.0 - 1.0),
                 globals.game_screenshake,
             );
             // Smooth screenshake: blend toward previous position for a low-pass effect.
-            // Matches OCaml: game_screenshake_pos := moytuple !game_screenshake_previous_pos !game_screenshake_pos screenshake_smoothness
+            // Matches OCaml: game_screenshake_pos := lerp_vec !game_screenshake_previous_pos !game_screenshake_pos screenshake_smoothness
             if SCREENSHAKE_SMOOTH {
-                globals.game_screenshake_pos = moytuple(
+                globals.game_screenshake_pos = lerp_vec(
                     globals.game_screenshake_previous_pos,
                     globals.game_screenshake_pos,
                     SCREENSHAKE_SMOOTHNESS,
@@ -832,11 +832,11 @@ fn phys_damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
 }
 
 pub fn collision_circles(pos0: Vec2, r0: f64, pos1: Vec2, r1: f64) -> bool {
-    distancecarre(pos0, pos1) < carre(r0 + r1)
+    distance_squared(pos0, pos1) < squared(r0 + r1)
 }
 
 pub fn collision_point(pos_point: Vec2, pos_circle: Vec2, radius: f64) -> bool {
-    distancecarre(pos_point, pos_circle) < carre(radius)
+    distance_squared(pos_point, pos_circle) < squared(radius)
 }
 
 fn collisions_points(points: &[Vec2], pos_circle: Vec2, radius: f64) -> bool {
@@ -844,7 +844,7 @@ fn collisions_points(points: &[Vec2], pos_circle: Vec2, radius: f64) -> bool {
 }
 
 fn collision_poly(pos: Vec2, poly: &[(f64, f64)], rotat: f64, circle_pos: Vec2, radius: f64) -> bool {
-    let pts = depl_affine_poly(&poly_to_affine(poly, rotat, 1.0), pos);
+    let pts = translate_polygon(&polygon_to_cartesian(poly, rotat, 1.0), pos);
     collisions_points(&pts, circle_pos, radius)
 }
 
@@ -895,24 +895,24 @@ fn consequences_collision(
 ) -> (Entity, Entity) {
     let total_mass = e1.mass + e2.mass;
     // Mass-weighted average velocity (accounts for proper time)
-    let moy_vel = moytuple(
-        multuple(e1.velocity, 1.0 / e1.proper_time),
-        multuple(e2.velocity, 1.0 / e2.proper_time),
+    let moy_vel = lerp_vec(
+        scale_vec(e1.velocity, 1.0 / e1.proper_time),
+        scale_vec(e2.velocity, 1.0 / e2.proper_time),
         e1.mass / total_mass,
     );
-        let angle1 = affine_to_polar(soustuple(e1.position, e2.position)).x;
-    let angle2 = affine_to_polar(soustuple(e2.position, e1.position)).x;
+        let angle1 = to_polar(sub_vec(e1.position, e2.position)).x;
+    let angle2 = to_polar(sub_vec(e2.position, e1.position)).x;
 
     let old_vel1 = e1.velocity;
     let old_vel2 = e2.velocity;
 
     // New velocities — elastic bounce scaled by proper time
-    e1.velocity = multuple(
-        addtuple(moy_vel, polar_to_affine(angle1, total_mass / e1.mass)),
+    e1.velocity = scale_vec(
+        add_vec(moy_vel, from_polar(angle1, total_mass / e1.mass)),
         e1.proper_time,
     );
-    e2.velocity = multuple(
-        addtuple(moy_vel, polar_to_affine(angle2, total_mass / (e2.mass * e2.proper_time))),
+    e2.velocity = scale_vec(
+        add_vec(moy_vel, from_polar(angle2, total_mass / (e2.mass * e2.proper_time))),
         e2.proper_time,
     );
 
@@ -921,31 +921,31 @@ fn consequences_collision(
         // to simulated time during slowdown events.
         let dt = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
         // Positional repulsion to separate overlapping entities
-        e1.position = addtuple(e1.position, polar_to_affine(angle1, MIN_REPULSION * dt));
-        e2.position = addtuple(e2.position, polar_to_affine(angle2, MIN_REPULSION * dt));
+        e1.position = add_vec(e1.position, from_polar(angle1, MIN_REPULSION * dt));
+        e2.position = add_vec(e2.position, from_polar(angle2, MIN_REPULSION * dt));
         // Velocity bounce impulse
-        e1.velocity = addtuple(e1.velocity, polar_to_affine(angle1, MIN_BOUNCE * dt));
-        e2.velocity = addtuple(e2.velocity, polar_to_affine(angle2, MIN_BOUNCE * dt));
+        e1.velocity = add_vec(e1.velocity, from_polar(angle1, MIN_BOUNCE * dt));
+        e2.velocity = add_vec(e2.velocity, from_polar(angle2, MIN_BOUNCE * dt));
         // Physical damage proportional to velocity change²
-        let g1 = hypothenuse(soustuple(old_vel1, e1.velocity));
-        let g2 = hypothenuse(soustuple(old_vel2, e2.velocity));
-        phys_damage(&mut e1, globals.ratio_phys_deg * carre(g1), globals);
-        phys_damage(&mut e2, globals.ratio_phys_deg * carre(g2), globals);
+        let g1 = magnitude(sub_vec(old_vel1, e1.velocity));
+        let g2 = magnitude(sub_vec(old_vel2, e2.velocity));
+        phys_damage(&mut e1, globals.physics_damage_ratio * squared(g1), globals);
+        phys_damage(&mut e2, globals.physics_damage_ratio * squared(g2), globals);
     }
     (e1, e2)
 }
 
 /// Apply fragment-vs-fragment repulsion (no damage).
 fn consequences_collision_frags(mut f1: Entity, mut f2: Entity, globals: &Globals) -> (Entity, Entity) {
-        let angle1 = affine_to_polar(soustuple(f1.position, f2.position)).x;
-    let angle2 = affine_to_polar(soustuple(f2.position, f1.position)).x;
+        let angle1 = to_polar(sub_vec(f1.position, f2.position)).x;
+    let angle2 = to_polar(sub_vec(f2.position, f1.position)).x;
     // Note: unlike OCaml, we scale by game_speed so repulsion stays proportional
     // to simulated time during slowdown events.
     let dt = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
-    f1.position = addtuple(f1.position, polar_to_affine(angle1, dt * FRAGMENT_MIN_REPULSION));
-    f2.position = addtuple(f2.position, polar_to_affine(angle2, dt * FRAGMENT_MIN_REPULSION));
-    f1.velocity = addtuple(f1.velocity, polar_to_affine(angle1, dt * FRAGMENT_MIN_BOUNCE));
-    f2.velocity = addtuple(f2.velocity, polar_to_affine(angle2, dt * FRAGMENT_MIN_BOUNCE));
+    f1.position = add_vec(f1.position, from_polar(angle1, dt * FRAGMENT_MIN_REPULSION));
+    f2.position = add_vec(f2.position, from_polar(angle2, dt * FRAGMENT_MIN_REPULSION));
+    f1.velocity = add_vec(f1.velocity, from_polar(angle1, dt * FRAGMENT_MIN_BOUNCE));
+    f2.velocity = add_vec(f2.velocity, from_polar(angle2, dt * FRAGMENT_MIN_BOUNCE));
     (f1, f2)
 }
 
@@ -1082,11 +1082,11 @@ fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
 fn center_of_attention(objects: &[Entity], ship_pos: Vec2, globals: &Globals) -> Vec2 {
     let screen_center = Vec2::new(globals.phys_width / 2.0, globals.phys_height / 2.0);
     objects.iter().fold(Vec2::ZERO, |acc, obj| {
-        let rel_pos = soustuple(obj.position, ship_pos);
-        let dist2 = distancecarre(rel_pos, Vec2::ZERO);
+        let rel_pos = sub_vec(obj.position, ship_pos);
+        let dist2 = distance_squared(rel_pos, Vec2::ZERO);
         let weight = obj.mass / (10.0 + dist2);
-        let pull = multuple(soustuple(obj.position, screen_center), weight);
-        addtuple(acc, pull)
+        let pull = scale_vec(sub_vec(obj.position, screen_center), weight);
+        add_vec(acc, pull)
     })
 }
 
@@ -1098,27 +1098,27 @@ pub fn update_camera(state: &mut GameState, globals: &Globals) {
     let ship = &state.ship;
 
     // 1. Compute camera target (next_x, next_y)
-    let facing_offset = polar_to_affine(
+    let facing_offset = from_polar(
         ship.orientation,
         globals.phys_width * CAMERA_RATIO_VISION,
     );
 
     let next = if globals.pause {
         // Paused: just keep ship in view with facing offset, no velocity lookahead
-        addtuple(ship.position, facing_offset)
+        add_vec(ship.position, facing_offset)
     } else {
         // Active: ship pos + velocity lookahead + asteroid pull + facing offset
-        let velocity_lookahead = multuple(ship.velocity, CAMERA_PREDICTION);
+        let velocity_lookahead = scale_vec(ship.velocity, CAMERA_PREDICTION);
         let mut combined: Vec<Entity> = state.objects.clone();
         combined.extend(state.objects_oos.clone());
-        let asteroid_pull = multuple(
+        let asteroid_pull = scale_vec(
             center_of_attention(&combined, ship.position, globals),
             CAMERA_RATIO_OBJECTS,
         );
-        addtuple(
+        add_vec(
             facing_offset,
-            addtuple(
-                addtuple(ship.position, velocity_lookahead),
+            add_vec(
+                add_vec(ship.position, velocity_lookahead),
                 asteroid_pull,
             ),
         )
@@ -1159,22 +1159,22 @@ pub fn update_camera(state: &mut GameState, globals: &Globals) {
     let move_camera = Vec2::new(movex, movey);
 
     // 4. Apply displacement to all entities
-    deplac_objet_abso(&mut state.ship, move_camera);
-    for e in state.objects.iter_mut()      { deplac_objet_abso(e, move_camera); }
-    for e in state.objects_oos.iter_mut()  { deplac_objet_abso(e, move_camera); }
-    for e in state.toosmall.iter_mut()     { deplac_objet_abso(e, move_camera); }
-    for e in state.toosmall_oos.iter_mut() { deplac_objet_abso(e, move_camera); }
-    for e in state.fragments.iter_mut()    { deplac_objet_abso(e, move_camera); }
-    for e in state.chunks.iter_mut()       { deplac_objet_abso(e, move_camera); }
-    for e in state.chunks_oos.iter_mut()   { deplac_objet_abso(e, move_camera); }
-    for e in state.chunks_explo.iter_mut() { deplac_objet_abso(e, move_camera); }
-    for e in state.projectiles.iter_mut()  { deplac_objet_abso(e, move_camera); }
-    for e in state.explosions.iter_mut()   { deplac_objet_abso(e, move_camera); }
-    for e in state.smoke.iter_mut()        { deplac_objet_abso(e, move_camera); }
-    for e in state.smoke_oos.iter_mut()    { deplac_objet_abso(e, move_camera); }
-    for e in state.sparks.iter_mut()       { deplac_objet_abso(e, move_camera); }
+    translate_entity(&mut state.ship, move_camera);
+    for e in state.objects.iter_mut()      { translate_entity(e, move_camera); }
+    for e in state.objects_oos.iter_mut()  { translate_entity(e, move_camera); }
+    for e in state.toosmall.iter_mut()     { translate_entity(e, move_camera); }
+    for e in state.toosmall_oos.iter_mut() { translate_entity(e, move_camera); }
+    for e in state.fragments.iter_mut()    { translate_entity(e, move_camera); }
+    for e in state.chunks.iter_mut()       { translate_entity(e, move_camera); }
+    for e in state.chunks_oos.iter_mut()   { translate_entity(e, move_camera); }
+    for e in state.chunks_explo.iter_mut() { translate_entity(e, move_camera); }
+    for e in state.projectiles.iter_mut()  { translate_entity(e, move_camera); }
+    for e in state.explosions.iter_mut()   { translate_entity(e, move_camera); }
+    for e in state.smoke.iter_mut()        { translate_entity(e, move_camera); }
+    for e in state.smoke_oos.iter_mut()    { translate_entity(e, move_camera); }
+    for e in state.sparks.iter_mut()       { translate_entity(e, move_camera); }
     // Stars get parallax treatment (proximity-scaled displacement)
-    for star in state.stars.iter_mut()     { deplac_star(star, move_camera, globals); }
+    for star in state.stars.iter_mut()     { move_star(star, move_camera, globals); }
 }
 
 /// Main game update: movement, transfers, collisions, spawning, despawn.
@@ -1259,7 +1259,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     if !globals.pause {
         let explo_chunks: Vec<Entity> = state.chunks_explo.iter()
             .map(|c| {
-                let (explo, se) = spawn_explosion_chunk(
+                let (explo, se) = spawn_chunk_explosion(
                     c,
                     globals.flashes_enabled,
                     FLASHES_SATURATE,
@@ -1289,12 +1289,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // --- Projectile inertia ---
     for p in state.projectiles.iter_mut() {
-        inertie_objet(p, globals);
+        apply_inertia(p, globals);
     }
 
     // --- Explosion inertia (one frame entities) ---
     for e in state.explosions.iter_mut() {
-        inertie_objet(e, globals);
+        apply_inertia(e, globals);
     }
 
     // --- Filter dead or OOS projectiles (projectiles don't wrap, they despawn) ---
@@ -1316,23 +1316,23 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     }
 
     // --- Inertia (position update) ---
-    inertie_objet(&mut state.ship, globals);
-    inertie_objets(&mut state.objects, globals);
-    inertie_objets(&mut state.objects_oos, globals);
-    inertie_objets(&mut state.toosmall, globals);
-    inertie_objets(&mut state.toosmall_oos, globals);
-    inertie_objets(&mut state.fragments, globals);
-    inertie_objets(&mut state.chunks, globals);
-    inertie_objets(&mut state.chunks_oos, globals);
-    inertie_objets(&mut state.chunks_explo, globals);
+    apply_inertia(&mut state.ship, globals);
+    apply_inertia_all(&mut state.objects, globals);
+    apply_inertia_all(&mut state.objects_oos, globals);
+    apply_inertia_all(&mut state.toosmall, globals);
+    apply_inertia_all(&mut state.toosmall_oos, globals);
+    apply_inertia_all(&mut state.fragments, globals);
+    apply_inertia_all(&mut state.chunks, globals);
+    apply_inertia_all(&mut state.chunks_oos, globals);
+    apply_inertia_all(&mut state.chunks_explo, globals);
 
     // --- Rotation (moment update) ---
-    moment_objet(&mut state.ship, globals);
-    moment_objets(&mut state.objects, globals);
-    moment_objets(&mut state.objects_oos, globals);
-    moment_objets(&mut state.toosmall, globals);
-    moment_objets(&mut state.toosmall_oos, globals);
-    moment_objets(&mut state.fragments, globals);
+    apply_angular_momentum(&mut state.ship, globals);
+    apply_angular_momentum_all(&mut state.objects, globals);
+    apply_angular_momentum_all(&mut state.objects_oos, globals);
+    apply_angular_momentum_all(&mut state.toosmall, globals);
+    apply_angular_momentum_all(&mut state.toosmall_oos, globals);
+    apply_angular_momentum_all(&mut state.fragments, globals);
 
     // --- Size classification: move too-small asteroids ---
     let small_objs = drain_filter_stable(&mut state.objects, too_small);
@@ -1435,20 +1435,20 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     run_fragment_collisions(state, globals);
 
     // --- Fragmentation (spawn fragments from dead entities) ---
-    spawn_n_frags(&state.objects.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
-    spawn_n_frags(&state.toosmall.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
-    spawn_n_frags(&state.fragments.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
+    spawn_fragments(&state.objects.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
+    spawn_fragments(&state.toosmall.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
+    spawn_fragments(&state.fragments.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
 
     // --- Move chunks out of fragments ---
     let new_chunks = drain_filter_stable(&mut state.fragments, ischunk);
     state.chunks.extend(new_chunks);
 
     // --- Recenter (wrap positions) ---
-    recenter_objets(&mut state.objects, globals);
-    recenter_objets(&mut state.toosmall, globals);
-    recenter_objets(&mut state.objects_oos, globals);
-    recenter_objets(&mut state.toosmall_oos, globals);
-    recenter_objets(&mut state.fragments, globals);
+    wrap_entities(&mut state.objects, globals);
+    wrap_entities(&mut state.toosmall, globals);
+    wrap_entities(&mut state.objects_oos, globals);
+    wrap_entities(&mut state.toosmall_oos, globals);
+    wrap_entities(&mut state.fragments, globals);
 
     // --- Spawning ---
     if globals.time_since_last_spawn > TIME_SPAWN_ASTEROID {
@@ -1462,9 +1462,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
             // Pick new random stage colors (matches OCaml)
             let new_col = (
-                randfloat(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
-                randfloat(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
-                randfloat(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
+                rand_range(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
+                rand_range(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
+                rand_range(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
             );
             let new_hdr = hdr(new_col);
             globals.mul_base = {
@@ -1630,34 +1630,34 @@ fn render_light_trail(
     renderer: &mut Renderer2D,
     globals: &Globals,
 ) {
-    let pos1 = multuple(addtuple(pos, globals.game_screenshake_pos), globals.ratio_rendu);
+    let pos1 = scale_vec(add_vec(pos, globals.game_screenshake_pos), globals.render_scale);
     let dt_game = globals.game_speed
         * (globals.time_current_frame - globals.time_last_frame)
             .max(1.0 / FRAMERATE_RENDER);
-    let veloc = multuple(velocity, -(globals.observer_proper_time / proper_time) * dt_game);
-    let last_pos = multuple(
-        addtuple(soustuple(pos, veloc), globals.game_screenshake_previous_pos),
-        globals.ratio_rendu,
+    let veloc = scale_vec(velocity, -(globals.observer_proper_time / proper_time) * dt_game);
+    let last_pos = scale_vec(
+        add_vec(sub_vec(pos, veloc), globals.game_screenshake_previous_pos),
+        globals.render_scale,
     );
-    let pos2 = moytuple(last_pos, pos1, SHUTTER_SPEED);
-    let dist = hypothenuse(soustuple(pos1, pos2));
+    let pos2 = lerp_vec(last_pos, pos1, SHUTTER_SPEED);
+    let dist = magnitude(sub_vec(pos1, pos2));
     let trail_lum = 0.5 * (radius / (radius + dist)).sqrt();
     let color = to_rgba(intensify(hdr_color, trail_lum), globals);
-    let (x1, y1) = dither_tuple(pos1, DITHER_AA, globals.current_jitter_double);
-    let (x2, y2) = dither_tuple(pos2, DITHER_AA, globals.current_jitter_double);
+    let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.current_jitter_double);
+    let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.current_jitter_double);
     let line_width = dither_radius(2.0 * radius, DITHER_AA, DITHER_POWER_RADIUS, &mut rand::thread_rng());
     renderer.draw_line(x1, y1, x2, y2, color, line_width.max(1) as f32);
 }
 
 /// Render a projectile as four concentric light trails. Ported from OCaml render_projectile.
 fn render_projectile(entity: &Entity, renderer: &mut Renderer2D, globals: &Globals, rng: &mut impl Rng) {
-    let rad = globals.ratio_rendu
-        * randfloat(0.5, 1.0, rng)
+    let rad = globals.render_scale
+        * rand_range(0.5, 1.0, rng)
         * entity.visuals.radius;
     if globals.retro {
         // Retro mode: simple white filled circle at projectile position
-        let pos = multuple(entity.position, globals.ratio_rendu);
-        let (x, y) = dither_tuple(pos, DITHER_AA, globals.current_jitter_double);
+        let pos = scale_vec(entity.position, globals.render_scale);
+        let (x, y) = dither_vec(pos, DITHER_AA, globals.current_jitter_double);
         renderer.fill_circle(x as f64, y as f64, rad.max(1.0), [255, 255, 255, 255]);
     } else {
         let pos = entity.position;
@@ -1685,9 +1685,9 @@ pub fn decay_smoke(smoke: &mut Entity, globals: &Globals) {
     }
 }
 
-/// Fire projectiles (tir). Called when Space is held and cooldown allows.
+/// Fire projectiles. Called when Space is held and cooldown allows.
 /// Ported from OCaml tir.
-pub fn tir(state: &mut GameState, globals: &mut Globals) {
+pub fn fire(state: &mut GameState, globals: &mut Globals) {
     while state.cooldown <= 0.0 {
         // Flash effect
         if globals.flashes_enabled {
@@ -1726,8 +1726,8 @@ pub fn tir(state: &mut GameState, globals: &mut Globals) {
         state.cooldown += globals.projectile_cooldown;
 
         // Recoil
-        let recoil = polar_to_affine(state.ship.orientation + PI, globals.projectile_recoil);
-        state.ship.velocity = addtuple(state.ship.velocity, recoil);
+        let recoil = from_polar(state.ship.orientation + PI, globals.projectile_recoil);
+        state.ship.velocity = add_vec(state.ship.velocity, recoil);
     }
 }
 
@@ -1786,21 +1786,21 @@ fn shape_char(c: char) -> Vec<(f64, f64)> {
 
 /// Map a relative coordinate (relx, rely) inside a bounding quad to screen pixels.
 /// Matches OCaml `displacement`: bilinear interpolation across the 4 bounding points,
-/// then multiply by ratio_rendu.
+/// then multiply by render_scale.
 /// Points: [p0=bottom-left, p1=bottom-right, p2=top-right, p3=top-left] (physical coords)
 ///
-/// OCaml formula: moytuple a b ratio = a*ratio + b*(1-ratio)
-/// top = moytuple(p2, p1, rely) = p2*rely + p1*(1-rely)
-/// bot = moytuple(p3, p0, rely) = p3*rely + p0*(1-rely)
-/// result = moytuple(top, bot, relx) = top*relx + bot*(1-relx)
+/// OCaml formula: lerp_vec a b ratio = a*ratio + b*(1-ratio)
+/// top = lerp_vec(p2, p1, rely) = p2*rely + p1*(1-rely)
+/// bot = lerp_vec(p3, p0, rely) = p3*rely + p0*(1-rely)
+/// result = lerp_vec(top, bot, relx) = top*relx + bot*(1-relx)
 fn displacement(
     encadrement: &[(f64, f64); 4],
     rel: (f64, f64),
-    ratio_rendu: f64,
+    render_scale: f64,
 ) -> (f64, f64) {
     let (relx, rely) = rel;
     let [p0, p1, p2, p3] = encadrement;
-    // moytuple a b ratio = a*ratio + b*(1-ratio)
+    // lerp_vec a b ratio = a*ratio + b*(1-ratio)
     let top = (
         p2.0 * rely + p1.0 * (1.0 - rely),
         p2.1 * rely + p1.1 * (1.0 - rely),
@@ -1813,19 +1813,19 @@ fn displacement(
         top.0 * relx + bot.0 * (1.0 - relx),
         top.1 * relx + bot.1 * (1.0 - relx),
     );
-    (interp.0 * ratio_rendu, interp.1 * ratio_rendu)
+    (interp.0 * render_scale, interp.1 * render_scale)
 }
 
 /// Convert shape relative coords to screen pixel coords for a given bounding quad.
 fn displace_shape(
     encadrement: &[(f64, f64); 4],
     shape: &[(f64, f64)],
-    ratio_rendu: f64,
+    render_scale: f64,
 ) -> Vec<(i32, i32)> {
     shape
         .iter()
         .map(|&pt| {
-            let (x, y) = displacement(encadrement, pt, ratio_rendu);
+            let (x, y) = displacement(encadrement, pt, render_scale);
             (x.round() as i32, y.round() as i32)
         })
         .collect()
@@ -1837,10 +1837,10 @@ fn render_char(
     c: char,
     color: [u8; 4],
     renderer: &mut Renderer2D,
-    ratio_rendu: f64,
+    render_scale: f64,
 ) {
     let shape = shape_char(c);
-    let pts = displace_shape(encadrement, &shape, ratio_rendu);
+    let pts = displace_shape(encadrement, &shape, render_scale);
     renderer.fill_poly(&pts, color);
 }
 
@@ -1867,14 +1867,14 @@ fn render_string(
     let y0 = pos.1;
     for c in s.chars() {
         let c = c.to_ascii_uppercase();
-        let sx0 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
-        let sy0 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
-        let sx1 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
-        let sy1 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
-        let sx2 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
-        let sy2 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
-        let sx3 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
-        let sy3 = if shake > 0.0 { randfloat(-shake, shake, rng) } else { 0.0 };
+        let sx0 = if shake > 0.0 { rand_range(-shake, shake, rng) } else { 0.0 };
+        let sy0 = if shake > 0.0 { rand_range(-shake, shake, rng) } else { 0.0 };
+        let sx1 = if shake > 0.0 { rand_range(-shake, shake, rng) } else { 0.0 };
+        let sy1 = if shake > 0.0 { rand_range(-shake, shake, rng) } else { 0.0 };
+        let sx2 = if shake > 0.0 { rand_range(-shake, shake, rng) } else { 0.0 };
+        let sy2 = if shake > 0.0 { rand_range(-shake, shake, rng) } else { 0.0 };
+        let sx3 = if shake > 0.0 { rand_range(-shake, shake, rng) } else { 0.0 };
+        let sy3 = if shake > 0.0 { rand_range(-shake, shake, rng) } else { 0.0 };
         // Bounding quad: [bottom-left, bottom-right, top-right, top-left]
         let encadrement: [(f64, f64); 4] = [
             (x0 + sx0, y0 + sy0),
@@ -1882,7 +1882,7 @@ fn render_string(
             (x0 + sx2 + l_char, y0 + sy2 + h_char),
             (x0 + sx3, y0 + sy3 + h_char),
         ];
-        render_char(&encadrement, c, color, renderer, globals.ratio_rendu);
+        render_char(&encadrement, c, color, renderer, globals.render_scale);
         x0 += l_char + l_space;
     }
 }
@@ -1890,8 +1890,8 @@ fn render_string(
 /// Fill a quadrilateral bar from 0 (empty) to ratio (full).
 /// The quad is given as [p0, p1, p2, p3] in physical ratio coords [0,1],
 /// where p0,p1 are the "zero" side and p2,p3 are the "full" side.
-/// Matches OCaml `affiche_barre`.
-fn affiche_barre(
+/// Matches OCaml `render_bar`.
+fn render_bar(
     ratio: f64,
     quad: &[(f64, f64); 4],
     color: [u8; 4],
@@ -1900,17 +1900,17 @@ fn affiche_barre(
 ) {
     // relative_poly converts [0,1] coords to pixels: multiply by (width, height)
     // p0=quad[0], p1=quad[1], p2=quad[2], p3=quad[3]
-    // For bar: use points p0, p1, moytuple(p2,p1,ratio), moytuple(p3,p0,ratio)
-    let p0 = (quad[0].0 * globals.phys_width * globals.ratio_rendu,
-              quad[0].1 * globals.phys_height * globals.ratio_rendu);
-    let p1 = (quad[1].0 * globals.phys_width * globals.ratio_rendu,
-              quad[1].1 * globals.phys_height * globals.ratio_rendu);
-    let p2_full = (quad[2].0 * globals.phys_width * globals.ratio_rendu,
-                   quad[2].1 * globals.phys_height * globals.ratio_rendu);
-    let p3_full = (quad[3].0 * globals.phys_width * globals.ratio_rendu,
-                   quad[3].1 * globals.phys_height * globals.ratio_rendu);
+    // For bar: use points p0, p1, lerp_vec(p2,p1,ratio), lerp_vec(p3,p0,ratio)
+    let p0 = (quad[0].0 * globals.phys_width * globals.render_scale,
+              quad[0].1 * globals.phys_height * globals.render_scale);
+    let p1 = (quad[1].0 * globals.phys_width * globals.render_scale,
+              quad[1].1 * globals.phys_height * globals.render_scale);
+    let p2_full = (quad[2].0 * globals.phys_width * globals.render_scale,
+                   quad[2].1 * globals.phys_height * globals.render_scale);
+    let p3_full = (quad[3].0 * globals.phys_width * globals.render_scale,
+                   quad[3].1 * globals.phys_height * globals.render_scale);
 
-    // OCaml: moytuple p2 p1 ratio = p2*ratio + p1*(1-ratio)
+    // OCaml: lerp_vec p2 p1 ratio = p2*ratio + p1*(1-ratio)
     // ratio=1 → p2_full (full side) → full bar
     // ratio=0 → p1/p0 (zero side) → empty bar
     let p2 = (
@@ -1939,13 +1939,13 @@ fn draw_heart(
     pos1: (f64, f64),
     color: [u8; 4],
     renderer: &mut Renderer2D,
-    ratio_rendu: f64,
+    render_scale: f64,
 ) {
     // Scale to pixels
-    let x0 = pos0.0 * ratio_rendu;
-    let y0 = pos0.1 * ratio_rendu;
-    let x1 = pos1.0 * ratio_rendu;
-    let y1 = pos1.1 * ratio_rendu;
+    let x0 = pos0.0 * render_scale;
+    let y0 = pos0.1 * render_scale;
+    let x1 = pos1.0 * render_scale;
+    let y1 = pos1.1 * render_scale;
 
     let quartx = (x1 - x0) / 4.0;
     let tiery  = (y1 - y0) / 3.0;
@@ -1985,7 +1985,7 @@ fn draw_n_hearts(n: i32, color: [u8; 4], renderer: &mut Renderer2D, globals: &Gl
             (lastx,              sy + 0.80 * sh),
             color,
             renderer,
-            globals.ratio_rendu,
+            globals.render_scale,
         );
         lastx -= 0.05 * sw;
     }
@@ -2001,8 +2001,8 @@ fn draw_bar_frame(
 ) {
     let pts: Vec<(i32, i32)> = quad.iter().map(|&(rx, ry)| {
         (
-            (rx * globals.phys_width  * globals.ratio_rendu).round() as i32,
-            (ry * globals.phys_height * globals.ratio_rendu).round() as i32,
+            (rx * globals.phys_width  * globals.render_scale).round() as i32,
+            (ry * globals.phys_height * globals.render_scale).round() as i32,
         )
     }).collect();
     renderer.draw_poly(&pts, color, line_width);
@@ -2031,7 +2031,7 @@ pub fn render_hud(
     let dark_yellow: [u8; 4] = [32, 16, 0, 255];
     let white : [u8; 4] = [255, 255, 255, 255];
     let frame_color: [u8; 4] = [64, 64, 64, 255];
-    let frame_width: f32 = 10.0 * globals.ratio_rendu as f32;
+    let frame_width: f32 = 10.0 * globals.render_scale as f32;
 
     // ----- Safe zone for HUD placement -----
     let sx = globals.safe_offset_x;
@@ -2041,8 +2041,8 @@ pub fn render_hud(
     let pw = globals.phys_width;
     let ph = globals.phys_height;
 
-    // Helper: convert safe-zone-relative fraction to full-screen fraction for affiche_barre
-    // affiche_barre quads use fractions of phys_width/phys_height
+    // Helper: convert safe-zone-relative fraction to full-screen fraction for render_bar
+    // render_bar quads use fractions of phys_width/phys_height
     let fx = |frac: f64| -> f64 { (sx + frac * sw) / pw };
     let fy = |frac: f64| -> f64 { (sy + frac * sh) / ph };
 
@@ -2055,12 +2055,12 @@ pub fn render_hud(
         (fx(0.95), fy(0.9)),  (fx(0.95), fy(0.85)),
         (fx(0.6),  fy(0.85)), (fx(0.55), fy(0.9)),
     ];
-    affiche_barre(1.0, &health_quad, dark_red,  renderer, globals);
-    affiche_barre(
+    render_bar(1.0, &health_quad, dark_red,  renderer, globals);
+    render_bar(
         (state.last_health / SHIP_MAX_HEALTH).min(1.0).max(0.0),
         &health_quad, orange, renderer, globals,
     );
-    affiche_barre(
+    render_bar(
         (state.ship.health / SHIP_MAX_HEALTH).min(1.0).max(0.0),
         &health_quad, red, renderer, globals,
     );
@@ -2072,8 +2072,8 @@ pub fn render_hud(
         (fx(0.8),  fy(0.65)), (fx(0.75), fy(0.7)),
     ];
     let tp_ratio = ((COOLDOWN_TP - state.cooldown_tp.max(0.0)) / COOLDOWN_TP).min(1.0).max(0.0);
-    affiche_barre(1.0, &tp_quad, dark_blue, renderer, globals);
-    affiche_barre(tp_ratio, &tp_quad, cyan, renderer, globals);
+    render_bar(1.0, &tp_quad, dark_blue, renderer, globals);
+    render_bar(tp_ratio, &tp_quad, cyan, renderer, globals);
     draw_bar_frame(&tp_quad, frame_color, frame_width, renderer, globals);
 
     // Render 'F' indicator when teleport ready
@@ -2084,7 +2084,7 @@ pub fn render_hud(
             (sx + 0.72 * sw, sy + 0.7  * sh),
             (sx + 0.7  * sw, sy + 0.7  * sh),
         ];
-        render_char(&encadrement, 'F', cyan, renderer, globals.ratio_rendu);
+        render_char(&encadrement, 'F', cyan, renderer, globals.render_scale);
     }
 
     // ----- Weapon cooldown bar -----
@@ -2095,8 +2095,8 @@ pub fn render_hud(
     let weapon_ratio = ((globals.projectile_cooldown - state.cooldown.max(0.0)) / globals.projectile_cooldown)
         .min(1.0)
         .max(0.0);
-    affiche_barre(1.0, &weapon_quad, dark_yellow, renderer, globals);
-    affiche_barre(weapon_ratio, &weapon_quad, yellow, renderer, globals);
+    render_bar(1.0, &weapon_quad, dark_yellow, renderer, globals);
+    render_bar(weapon_ratio, &weapon_quad, yellow, renderer, globals);
     draw_bar_frame(&weapon_quad, frame_color, frame_width, renderer, globals);
 
     // ----- Score -----
@@ -2280,7 +2280,7 @@ fn make_buttons(globals: &Globals) -> Vec<ButtonBoolean> {
 /// Convert screen Y (SDL2, Y-down) to physical Y (Y-up).
 #[inline]
 fn screen_to_phys_y(screen_y: f64, globals: &Globals) -> f64 {
-    globals.phys_height - screen_y / globals.ratio_rendu
+    globals.phys_height - screen_y / globals.render_scale
 }
 
 /// Render and process one pause-screen button.
@@ -2288,7 +2288,7 @@ fn screen_to_phys_y(screen_y: f64, globals: &Globals) -> f64 {
 /// `mouse_down`: is the left mouse button currently pressed?
 ///
 /// Returns `true` if the button was just clicked (rising edge).
-pub fn applique_button(
+pub fn apply_button(
     btn: &mut ButtonBoolean,
     globals: &mut Globals,
     renderer: &mut Renderer2D,
@@ -2297,7 +2297,7 @@ pub fn applique_button(
     mouse_sy: f64,
     mouse_down: bool,
 ) {
-    let rr = globals.ratio_rendu;
+    let rr = globals.render_scale;
 
     // Physical mouse position (Y-flipped)
     let mx = mouse_sx / rr;
@@ -2333,7 +2333,7 @@ pub fn applique_button(
         let fill_col: [u8; 4] = if on { [0, 128, 0, 255] } else { [128, 0, 0, 255] };
         renderer.fill_poly(&rect_pts, fill_col);
 
-        // Border: dark grey, 10 * ratio_rendu px wide
+        // Border: dark grey, 10 * render_scale px wide
         let border_w = 10.0 * rr as f32;
         renderer.draw_poly(&rect_pts, [64, 64, 64, 255], border_w);
     }
@@ -2384,7 +2384,7 @@ pub fn render_button_tooltip(
     mouse_sx: f64,
     mouse_sy: f64,
 ) {
-    let rr = globals.ratio_rendu;
+    let rr = globals.render_scale;
     let mx = mouse_sx / rr;
     let my = screen_to_phys_y(mouse_sy, globals);
 
@@ -2456,7 +2456,7 @@ pub fn render_pause_title(
     for i in 0..btn_count {
         let rng = &mut state.rng as *mut _;
         let btn = &mut state.buttons[i] as *mut ButtonBoolean;
-        applique_button(
+        apply_button(
             unsafe { &mut *btn },
             globals,
             renderer,
