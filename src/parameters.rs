@@ -385,13 +385,11 @@ pub const FLASHES_DEATH: f64 = 200.0;
 pub const FLASHES_HALF_LIFE: f64 = 0.01;
 
 // ============================================================================
-// Global Mutable State
+// Global Mutable State — Sub-structs
 // ============================================================================
 
-/// Global game state that changes during execution.
-/// This corresponds to all the `let ... = ref ...` bindings in the OCaml code.
-pub struct Globals {
-    // Time-related fields
+/// Time, speed, and game flow control.
+pub struct TimeConfig {
     pub game_speed: f64,
     pub game_speed_target: f64,
     pub time_last_frame: f64,
@@ -400,19 +398,19 @@ pub struct Globals {
     pub pause: bool,
     pub restart: bool,
     pub quit: bool,
+}
 
-    // Visual fields
+/// Exposure and color overlay state.
+pub struct ExposureConfig {
     pub game_exposure: f64,
     pub game_exposure_target: f64,
     pub add_color: (f64, f64, f64),
     pub mul_color: (f64, f64, f64),
     pub mul_base: (f64, f64, f64),
-    pub space_color: (f64, f64, f64),
-    pub space_color_goal: (f64, f64, f64),
-    pub star_color: (f64, f64, f64),
-    pub star_color_goal: (f64, f64, f64),
+}
 
-    // Settings fields
+/// Visual/rendering toggles and color goals.
+pub struct VisualConfig {
     pub retro: bool,
     pub oldschool: bool,
     pub scanlines: bool,
@@ -422,15 +420,24 @@ pub struct Globals {
     pub smoke_enabled: bool,
     pub chunks_enabled: bool,
     pub flashes_enabled: bool,
-    pub advanced_hitbox: bool,
     pub dyn_color: bool,
     pub variable_exposure: bool,
+    pub space_color: (f64, f64, f64),
+    pub space_color_goal: (f64, f64, f64),
+    pub star_color: (f64, f64, f64),
+    pub star_color_goal: (f64, f64, f64),
+}
+
+/// Ship movement control mode flags.
+pub struct ShipControlConfig {
     pub ship_direct_pos: bool,
     pub ship_direct_rotat: bool,
     pub ship_impulse_pos: bool,
     pub ship_impulse_rotat: bool,
+}
 
-    // Rendering fields
+/// Rendering scale and physics / safe-zone dimensions.
+pub struct RenderState {
     pub render_scale: f64,
     pub phys_width: f64,
     pub phys_height: f64,
@@ -442,15 +449,20 @@ pub struct Globals {
     pub safe_offset_y: f64,
     pub current_jitter_double: Vec2,
     pub current_jitter_coll_table: Vec2,
+}
 
-    // Game event fields
+/// Screen-shake intensity and position state.
+pub struct ScreenshakeState {
     pub game_screenshake: f64,
     pub game_screenshake_pos: Vec2,
     pub game_screenshake_previous_pos: Vec2,
     pub shake_score: f64,
+}
 
-    // Framerate fields
-    pub frame_compute_secs: f64,  // frame computation time excluding vsync
+/// Framerate measurement and control state.
+pub struct FramerateState {
+    /// Frame computation time excluding vsync
+    pub frame_compute_secs: f64,
     pub locked_framerate: bool,
     pub time_last_count: f64,
     pub time_current_count: f64,
@@ -458,14 +470,18 @@ pub struct Globals {
     pub current_count: i32,
     pub even_frame: bool,
     pub evener_frame: bool,
+}
 
-    // Spawning fields
+/// Asteroid spawn progression state.
+pub struct SpawnState {
     pub current_stage_asteroids: i32,
     pub time_since_last_spawn: f64,
     pub stars_nb: i32,
     pub stars_nb_previous: i32,
+}
 
-    // Projectile fields
+/// Active weapon parameters (current projectile type).
+pub struct WeaponState {
     pub projectile_recoil: f64,
     pub projectile_cooldown: f64,
     pub projectile_max_speed: f64,
@@ -475,6 +491,25 @@ pub struct Globals {
     pub projectile_radius_hitbox: f64,
     pub projectile_number: i32,
     pub physics_damage_ratio: f64,
+}
+
+// ============================================================================
+// Global Mutable State
+// ============================================================================
+
+/// Global game state that changes during execution.
+/// This corresponds to all the `let ... = ref ...` bindings in the OCaml code.
+pub struct Globals {
+    pub time: TimeConfig,
+    pub exposure: ExposureConfig,
+    pub visual: VisualConfig,
+    pub ship_control: ShipControlConfig,
+    pub render: RenderState,
+    pub screenshake: ScreenshakeState,
+    pub framerate: FramerateState,
+    pub spawn: SpawnState,
+    pub weapon: WeaponState,
+    pub advanced_hitbox: bool,
     pub observer_proper_time: f64,
 }
 
@@ -489,88 +524,91 @@ impl Globals {
         let phys_height = height / render_scale;
 
         Self {
-            // Time-related fields
-            game_speed: 1.0,
-            game_speed_target: 1.0,
-            time_last_frame: 0.0,
-            time_current_frame: 0.0,
-            time_of_death: 0.0,
-            pause: false,
-            restart: false,
-            quit: false,
-
-            // Visual fields
-            game_exposure: 0.0,
-            game_exposure_target: 2.0,
-            add_color: (0.0, 0.0, 0.0),
-            mul_color: (1.0, 1.0, 1.0),
-            mul_base: (1.0, 1.0, 1.0),
-            space_color: (0.0, 0.0, 0.0),
-            space_color_goal: (0.0, 0.0, 0.0),
-            star_color: (100.0, 100.0, 100.0),
-            star_color_goal: (100.0, 100.0, 100.0),
-
-            // Settings fields
-            retro: false,
-            oldschool: false,
-            scanlines: false,
-            scanlines_offset: 0,
-            motion_blur: false,
-            screenshake_enabled: true,
-            smoke_enabled: true,
-            chunks_enabled: true,
-            flashes_enabled: true,
+            time: TimeConfig {
+                game_speed: 1.0,
+                game_speed_target: 1.0,
+                time_last_frame: 0.0,
+                time_current_frame: 0.0,
+                time_of_death: 0.0,
+                pause: false,
+                restart: false,
+                quit: false,
+            },
+            exposure: ExposureConfig {
+                game_exposure: 0.0,
+                game_exposure_target: 2.0,
+                add_color: (0.0, 0.0, 0.0),
+                mul_color: (1.0, 1.0, 1.0),
+                mul_base: (1.0, 1.0, 1.0),
+            },
+            visual: VisualConfig {
+                retro: false,
+                oldschool: false,
+                scanlines: false,
+                scanlines_offset: 0,
+                motion_blur: false,
+                screenshake_enabled: true,
+                smoke_enabled: true,
+                chunks_enabled: true,
+                flashes_enabled: true,
+                dyn_color: true,
+                variable_exposure: true,
+                space_color: (0.0, 0.0, 0.0),
+                space_color_goal: (0.0, 0.0, 0.0),
+                star_color: (100.0, 100.0, 100.0),
+                star_color_goal: (100.0, 100.0, 100.0),
+            },
+            ship_control: ShipControlConfig {
+                ship_direct_pos: false,
+                ship_direct_rotat: false,
+                ship_impulse_pos: true,
+                ship_impulse_rotat: true,
+            },
+            render: RenderState {
+                render_scale,
+                phys_width,
+                phys_height,
+                safe_phys_width: phys_width,   // updated by recompute_for_resolution
+                safe_phys_height: phys_height,
+                safe_offset_x: 0.0,
+                safe_offset_y: 0.0,
+                current_jitter_double: Vec2::ZERO,
+                current_jitter_coll_table: Vec2::ZERO,
+            },
+            screenshake: ScreenshakeState {
+                game_screenshake: 0.0,
+                game_screenshake_pos: Vec2::ZERO,
+                game_screenshake_previous_pos: Vec2::ZERO,
+                shake_score: 0.0,
+            },
+            framerate: FramerateState {
+                frame_compute_secs: 1.0 / 60.0,
+                locked_framerate: false,
+                time_last_count: 0.0,
+                time_current_count: 10.0,
+                last_count: 0,
+                current_count: 0,
+                even_frame: false,
+                evener_frame: false,
+            },
+            spawn: SpawnState {
+                current_stage_asteroids: 3,
+                time_since_last_spawn: 9.5,
+                stars_nb: 200,
+                stars_nb_previous: 200,
+            },
+            weapon: WeaponState {
+                projectile_recoil: 500.0,
+                projectile_cooldown: 0.5,
+                projectile_max_speed: 15000.0,
+                projectile_min_speed: 8000.0,
+                projectile_deviation: 0.3,
+                projectile_radius: 15.0,
+                projectile_radius_hitbox: 20.0,
+                projectile_number: 50,
+                physics_damage_ratio: 0.001,
+            },
             advanced_hitbox: true,
-            dyn_color: true,
-            variable_exposure: true,
-            ship_direct_pos: false,
-            ship_direct_rotat: false,
-            ship_impulse_pos: true,
-            ship_impulse_rotat: true,
-
-            // Rendering fields
-            render_scale,
-            phys_width,
-            phys_height,
-            safe_phys_width: phys_width,   // updated by recompute_for_resolution
-            safe_phys_height: phys_height,
-            safe_offset_x: 0.0,
-            safe_offset_y: 0.0,
-            current_jitter_double: Vec2::ZERO,
-            current_jitter_coll_table: Vec2::ZERO,
-
-            // Game event fields
-            game_screenshake: 0.0,
-            game_screenshake_pos: Vec2::ZERO,
-            game_screenshake_previous_pos: Vec2::ZERO,
-            shake_score: 0.0,
-
-            // Framerate fields
-            frame_compute_secs: 1.0 / 60.0,
-            locked_framerate: false,
-            time_last_count: 0.0,
-            time_current_count: 10.0,
-            last_count: 0,
-            current_count: 0,
-            even_frame: false,
-            evener_frame: false,
-
-            // Spawning fields
-            current_stage_asteroids: 3,
-            time_since_last_spawn: 9.5,
-            stars_nb: 200,
-            stars_nb_previous: 200,
-
-            // Projectile fields
-            projectile_recoil: 500.0,
-            projectile_cooldown: 0.5,
-            projectile_max_speed: 15000.0,
-            projectile_min_speed: 8000.0,
-            projectile_deviation: 0.3,
-            projectile_radius: 15.0,
-            projectile_radius_hitbox: 20.0,
-            projectile_number: 50,
-            physics_damage_ratio: 0.001,
             observer_proper_time: 1.0,
         }
     }
@@ -594,51 +632,51 @@ impl Globals {
             (sw, sw / safe_aspect)
         };
 
-        self.render_scale = (safe_w * safe_h / (GAME_SURFACE * 1_000_000.0)).sqrt();
-        self.phys_width  = sw / self.render_scale;
-        self.phys_height = sh / self.render_scale;
-        self.safe_phys_width  = safe_w / self.render_scale;
-        self.safe_phys_height = safe_h / self.render_scale;
-        self.safe_offset_x = (self.phys_width  - self.safe_phys_width)  / 2.0;
-        self.safe_offset_y = (self.phys_height - self.safe_phys_height) / 2.0;
+        self.render.render_scale = (safe_w * safe_h / (GAME_SURFACE * 1_000_000.0)).sqrt();
+        self.render.phys_width  = sw / self.render.render_scale;
+        self.render.phys_height = sh / self.render.render_scale;
+        self.render.safe_phys_width  = safe_w / self.render.render_scale;
+        self.render.safe_phys_height = safe_h / self.render.render_scale;
+        self.render.safe_offset_x = (self.render.phys_width  - self.render.safe_phys_width)  / 2.0;
+        self.render.safe_offset_y = (self.render.phys_height - self.render.safe_phys_height) / 2.0;
     }
 
     /// Get the delta time since the last frame.
     pub fn dt(&self) -> f64 {
-        self.time_current_frame - self.time_last_frame
+        self.time.time_current_frame - self.time.time_last_frame
     }
 
     /// Get the value of a boolean global by toggle enum.
     pub fn get_toggle(&self, t: &GlobalToggle) -> bool {
         match t {
-            GlobalToggle::Quit           => self.quit,
-            GlobalToggle::Pause          => self.pause,
-            GlobalToggle::Restart        => self.restart,
-            GlobalToggle::Scanlines      => self.scanlines,
-            GlobalToggle::Retro          => self.retro,
+            GlobalToggle::Quit           => self.time.quit,
+            GlobalToggle::Pause          => self.time.pause,
+            GlobalToggle::Restart        => self.time.restart,
+            GlobalToggle::Scanlines      => self.visual.scanlines,
+            GlobalToggle::Retro          => self.visual.retro,
             GlobalToggle::AdvancedHitbox => self.advanced_hitbox,
-            GlobalToggle::Smoke          => self.smoke_enabled,
-            GlobalToggle::Screenshake    => self.screenshake_enabled,
-            GlobalToggle::Flashes        => self.flashes_enabled,
-            GlobalToggle::Chunks         => self.chunks_enabled,
-            GlobalToggle::DynColor       => self.dyn_color,
+            GlobalToggle::Smoke          => self.visual.smoke_enabled,
+            GlobalToggle::Screenshake    => self.visual.screenshake_enabled,
+            GlobalToggle::Flashes        => self.visual.flashes_enabled,
+            GlobalToggle::Chunks         => self.visual.chunks_enabled,
+            GlobalToggle::DynColor       => self.visual.dyn_color,
         }
     }
 
     /// Set the value of a boolean global by toggle enum.
     pub fn set_toggle(&mut self, t: &GlobalToggle, val: bool) {
         match t {
-            GlobalToggle::Quit           => self.quit            = val,
-            GlobalToggle::Pause          => self.pause           = val,
-            GlobalToggle::Restart        => self.restart         = val,
-            GlobalToggle::Scanlines      => self.scanlines       = val,
-            GlobalToggle::Retro          => self.retro           = val,
-            GlobalToggle::AdvancedHitbox => self.advanced_hitbox = val,
-            GlobalToggle::Smoke          => self.smoke_enabled   = val,
-            GlobalToggle::Screenshake    => self.screenshake_enabled = val,
-            GlobalToggle::Flashes        => self.flashes_enabled = val,
-            GlobalToggle::Chunks         => self.chunks_enabled  = val,
-            GlobalToggle::DynColor       => self.dyn_color       = val,
+            GlobalToggle::Quit           => self.time.quit            = val,
+            GlobalToggle::Pause          => self.time.pause           = val,
+            GlobalToggle::Restart        => self.time.restart         = val,
+            GlobalToggle::Scanlines      => self.visual.scanlines     = val,
+            GlobalToggle::Retro          => self.visual.retro         = val,
+            GlobalToggle::AdvancedHitbox => self.advanced_hitbox      = val,
+            GlobalToggle::Smoke          => self.visual.smoke_enabled = val,
+            GlobalToggle::Screenshake    => self.visual.screenshake_enabled = val,
+            GlobalToggle::Flashes        => self.visual.flashes_enabled = val,
+            GlobalToggle::Chunks         => self.visual.chunks_enabled = val,
+            GlobalToggle::DynColor       => self.visual.dyn_color     = val,
         }
     }
 }

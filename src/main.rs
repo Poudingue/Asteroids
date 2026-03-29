@@ -95,10 +95,10 @@ fn main() {
         // Update time, capping dt to MAX_DT to prevent physics explosions on
         // frame stalls (alt-tab, window drag, etc.). This is equivalent to a
         // 20fps floor: physics never sees more than 50ms per frame.
-        globals.time_last_frame = globals.time_current_frame;
+        globals.time.time_last_frame = globals.time.time_current_frame;
         let raw_elapsed = start_time.elapsed().as_secs_f64();
-        globals.time_current_frame =
-            globals.time_last_frame + (raw_elapsed - globals.time_last_frame).min(MAX_DT);
+        globals.time.time_current_frame =
+            globals.time.time_last_frame + (raw_elapsed - globals.time.time_last_frame).min(MAX_DT);
 
         // Snapshot mouse position and button state before poll_iter
         let (mouse_x_snap, mouse_y_snap, mouse_left_snap) = {
@@ -120,15 +120,15 @@ fn main() {
                     keycode: Some(Keycode::P) | Some(Keycode::Escape),
                     repeat: false,
                     ..
-                } => globals.pause = !globals.pause,
+                } => globals.time.pause = !globals.time.pause,
                 Event::KeyDown {
                     keycode: Some(Keycode::R),
                     repeat: false,
                     ..
                 } => {
                     state = game::GameState::new(&globals);
-                    globals.game_exposure = 0.0;
-                    globals.pause = false;
+                    globals.exposure.game_exposure = 0.0;
+                    globals.time.pause = false;
                 }
                 Event::KeyDown {
                     scancode: Some(Scancode::F),
@@ -196,20 +196,20 @@ fn main() {
         }
 
         // Handle flags set by pause menu buttons
-        if globals.quit {
+        if globals.time.quit {
             running = false;
         }
-        if globals.restart {
-            globals.restart = false;
-            globals.pause = false;
+        if globals.time.restart {
+            globals.time.restart = false;
+            globals.time.pause = false;
             state = game::GameState::new(&globals);
-            globals.game_exposure = 0.0;
+            globals.exposure.game_exposure = 0.0;
         }
 
         // Track mouse button state in GameState
         state.mouse_button_down = mouse_left_snap;
 
-        if !globals.pause {
+        if !globals.time.pause {
             // Mouse aim
             let mouse_state = event_pump.mouse_state();
             input::aim_at_mouse(&mut state.ship, mouse_state.x(), mouse_state.y(), &globals);
@@ -229,7 +229,7 @@ fn main() {
             // Impulse mode: fire boost only on key-down transition (edge-triggered, matches OCaml)
             // Continuous mode: call acceleration every frame while held
             let w_pressed = keyboard.is_scancode_pressed(Scancode::W);
-            if globals.ship_impulse_pos {
+            if globals.ship_control.ship_impulse_pos {
                 if w_pressed && !prev_w_pressed {
                     input::boost_forward(&mut state, &globals);
                 }
@@ -291,7 +291,7 @@ fn main() {
         renderer.begin_frame();
         game::render_frame(&mut state, &mut globals, &mut renderer, mouse_x_snap, mouse_y_snap, mouse_left_snap);
         renderer.end_frame(&device, &queue, &view, [0.0, 0.0, 0.0, 1.0]);
-        globals.frame_compute_secs = frame_start.elapsed().as_secs_f64();
+        globals.framerate.frame_compute_secs = frame_start.elapsed().as_secs_f64();
         output.present();
     }
 

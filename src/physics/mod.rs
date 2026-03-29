@@ -50,11 +50,11 @@ pub fn insert_into_grid(
 ) {
     let gw = WIDTH_COLLISION_TABLE as f64;
     let gh = HEIGHT_COLLISION_TABLE as f64;
-    let jx = globals.current_jitter_coll_table.x;
-    let jy = globals.current_jitter_coll_table.y;
+    let jx = globals.render.current_jitter_coll_table.x;
+    let jy = globals.render.current_jitter_coll_table.y;
     for &(entry, pos) in entries {
-        let x2 = jx + gw * (pos.x + globals.phys_width) / (3.0 * globals.phys_width);
-        let y2 = jy + gh * (pos.y + globals.phys_height) / (3.0 * globals.phys_height);
+        let x2 = jx + gw * (pos.x + globals.render.phys_width) / (3.0 * globals.render.phys_width);
+        let y2 = jy + gh * (pos.y + globals.render.phys_height) / (3.0 * globals.render.phys_height);
         if x2 < 0.0 || y2 < 0.0 || x2 >= gw || y2 >= gh {
             continue;
         }

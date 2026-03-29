@@ -33,10 +33,10 @@ pub struct ButtonBoolean {
 /// Build the full list of pause-screen buttons.
 /// Positions are computed as fractions of the 16:9 safe zone on a 16×24 grid.
 pub fn make_buttons(globals: &Globals) -> Vec<ButtonBoolean> {
-    let sx = globals.safe_offset_x;
-    let sy = globals.safe_offset_y;
-    let w = globals.safe_phys_width;
-    let h = globals.safe_phys_height;
+    let sx = globals.render.safe_offset_x;
+    let sy = globals.render.safe_offset_y;
+    let w = globals.render.safe_phys_width;
+    let h = globals.render.safe_phys_height;
     // Macro-style helper: build one ButtonBoolean from grid fractions
     macro_rules! btn {
         ($text:expr, $text_over:expr,
@@ -81,7 +81,7 @@ pub fn make_buttons(globals: &Globals) -> Vec<ButtonBoolean> {
 /// Convert screen Y (SDL2, Y-down) to physical Y (Y-up).
 #[inline]
 fn screen_to_phys_y(screen_y: f64, globals: &Globals) -> f64 {
-    globals.phys_height - screen_y / globals.render_scale
+    globals.render.phys_height - screen_y / globals.render.render_scale
 }
 
 /// Render and process one pause-screen button.
@@ -98,7 +98,7 @@ pub fn apply_button(
     mouse_sy: f64,
     mouse_down: bool,
 ) {
-    let rr = globals.render_scale;
+    let rr = globals.render.render_scale;
 
     // Physical mouse position (Y-flipped)
     let mx = mouse_sx / rr;
@@ -123,7 +123,7 @@ pub fn apply_button(
     // fill_poly rect: bottom-left, bottom-right, top-right, top-left
     let rect_pts = vec![(px1, py1), (px2, py1), (px2, py2), (px1, py2)];
 
-    if globals.retro {
+    if globals.visual.retro {
         // Retro mode: white fill if ON, black fill if OFF
         let fill_col = if on { [255u8, 255, 255, 255] } else { [0u8, 0, 0, 255] };
         renderer.fill_poly(&rect_pts, fill_col);
@@ -141,7 +141,7 @@ pub fn apply_button(
 
     // ---- Centered text (both modes) ----
     // Uniform character size based on safe zone (like HUD text), not button dimensions
-    let sh = globals.safe_phys_height;
+    let sh = globals.render.safe_phys_height;
     let char_h = 0.02 * sh;
     let char_w = char_h * 0.6;  // fixed aspect ratio
     let char_sp = char_w * 0.15;
@@ -149,12 +149,12 @@ pub fn apply_button(
     // Center text in button
     let text_x = x1 + ((x2 - x1) - text_total_w) * 0.5;
     let text_y = y1 + ((y2 - y1) - char_h) * 0.5;
-    let text_col = if globals.retro {
+    let text_col = if globals.visual.retro {
         if on { [0u8, 0, 0, 255] } else { [255u8, 255, 255, 255] }
     } else {
         [255, 255, 255, 255]
     };
-    if !globals.retro {
+    if !globals.visual.retro {
         // Shadow: offset by -1 phys unit
         render_string(
             btn.text, (text_x - 1.0, text_y - 1.0),
@@ -185,7 +185,7 @@ pub fn render_button_tooltip(
     mouse_sx: f64,
     mouse_sy: f64,
 ) {
-    let rr = globals.render_scale;
+    let rr = globals.render.render_scale;
     let mx = mouse_sx / rr;
     let my = screen_to_phys_y(mouse_sy, globals);
 
@@ -194,8 +194,8 @@ pub fn render_button_tooltip(
     let hovered = mx >= x1 && mx <= x2 && my >= y1 && my <= y2;
 
     if hovered {
-        let sw = globals.safe_phys_width;
-        let sh = globals.safe_phys_height;
+        let sw = globals.render.safe_phys_width;
+        let sh = globals.render.safe_phys_height;
         let tip_x = mx + 0.5;
         let tip_y = my + 0.5;
         let tip_char_w = 0.009 * sw;
@@ -227,10 +227,10 @@ pub fn render_pause_title(
     mouse_down: bool,
 ) {
     // Safe zone for pause menu positioning
-    let sx = globals.safe_offset_x;
-    let sy = globals.safe_offset_y;
-    let sw = globals.safe_phys_width;
-    let sh = globals.safe_phys_height;
+    let sx = globals.render.safe_offset_x;
+    let sy = globals.render.safe_offset_y;
+    let sw = globals.render.safe_phys_width;
+    let sh = globals.render.safe_phys_height;
 
     // Shadow (black, slightly offset)
     let shadow_col = [0u8, 0, 0, 255];

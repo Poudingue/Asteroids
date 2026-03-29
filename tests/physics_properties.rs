@@ -24,9 +24,9 @@ fn vec2_approx_eq(a: Vec2, b: Vec2, eps: f64) -> bool {
 /// dt = time_current_frame - time_last_frame
 fn make_globals(dt: f64) -> Globals {
     let mut g = Globals::new();
-    g.game_speed = 1.0;
-    g.time_last_frame = 0.0;
-    g.time_current_frame = dt;
+    g.time.game_speed = 1.0;
+    g.time.time_last_frame = 0.0;
+    g.time.time_current_frame = dt;
     g
 }
 
@@ -102,8 +102,8 @@ fn move_entity_scales_with_game_speed() {
     let mut e2 = make_entity();
     let mut g1 = make_globals(1.0);
     let mut g2 = make_globals(1.0);
-    g1.game_speed = 1.0;
-    g2.game_speed = 2.0;
+    g1.time.game_speed = 1.0;
+    g2.time.game_speed = 2.0;
     let vel = Vec2::new(3.0, 4.0);
     move_entity(&mut e1, vel, &g1);
     move_entity(&mut e2, vel, &g2);

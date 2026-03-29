@@ -58,7 +58,7 @@ impl GameState {
     pub fn new(globals: &Globals) -> Self {
         let mut rng = thread_rng();
         let mut ship = spawn_ship();
-        ship.position = Vec2::new(globals.phys_width / 2.0, globals.phys_height / 2.0);
+        ship.position = Vec2::new(globals.render.phys_width / 2.0, globals.render.phys_height / 2.0);
 
         Self {
             score: 0,
@@ -84,9 +84,9 @@ impl GameState {
             smoke_oos: Vec::new(),
             sparks: Vec::new(),
             stars: spawn_stars(
-                globals.stars_nb,
-                globals.phys_width,
-                globals.phys_height,
+                globals.spawn.stars_nb,
+                globals.render.phys_width,
+                globals.render.phys_height,
                 &mut rng,
             ),
             rng,
@@ -109,9 +109,9 @@ pub(crate) fn hdr(color: (f64, f64, f64)) -> HdrColor {
 pub(crate) fn to_rgba(color: HdrColor, globals: &Globals) -> [u8; 4] {
     rgb_of_hdr(
         color,
-        &hdr(globals.add_color),
-        &hdr(globals.mul_color),
-        globals.game_exposure,
+        &hdr(globals.exposure.add_color),
+        &hdr(globals.exposure.mul_color),
+        globals.exposure.game_exposure,
     )
 }
 
@@ -121,7 +121,7 @@ pub(crate) fn to_rgba(color: HdrColor, globals: &Globals) -> [u8; 4] {
 
 /// Displace an object by a velocity vector, scaled by dt * game_speed * observer/proper time
 pub fn move_entity(entity: &mut Entity, vel: Vec2, globals: &Globals) {
-    let time_factor = globals.dt() * globals.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
+    let time_factor = globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.position = proj(entity.position, vel, time_factor);
 }
 
@@ -133,7 +133,7 @@ pub fn apply_inertia(entity: &mut Entity, globals: &Globals) {
 
 /// Accelerate an object (velocity += accel * dt * ...)
 pub fn accelerate_entity(entity: &mut Entity, accel: Vec2, globals: &Globals) {
-    let time_factor = globals.dt() * globals.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
+    let time_factor = globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.velocity = proj(entity.velocity, accel, time_factor);
 }
 
@@ -144,7 +144,7 @@ pub fn boost_entity(entity: &mut Entity, boost: Vec2) {
 
 /// Timed rotation (orientation += rotation * dt * ...)
 pub fn rotate_entity(entity: &mut Entity, rotation: f64, globals: &Globals) {
-    let time_factor = globals.dt() * globals.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
+    let time_factor = globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.orientation += rotation * time_factor;
 }
 
@@ -155,7 +155,7 @@ pub fn turn_entity(entity: &mut Entity, rotation: f64) {
 
 /// Angular acceleration (moment += momentum * dt * ...)
 pub fn apply_torque(entity: &mut Entity, momentum: f64, globals: &Globals) {
-    let time_factor = globals.dt() * globals.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
+    let time_factor = globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.moment += momentum * time_factor;
 }
 
@@ -191,7 +191,7 @@ pub fn apply_angular_momentum_all(entities: &mut [Entity], globals: &Globals) {
 
 /// Wrap entity position using 3x-resolution modulo (toroidal world)
 pub fn wrap_entity(entity: &mut Entity, globals: &Globals) {
-    entity.position = wrap_toroidal(entity.position, globals.phys_width, globals.phys_height);
+    entity.position = wrap_toroidal(entity.position, globals.render.phys_width, globals.render.phys_height);
 }
 
 /// Wrap all entities' positions (toroidal world)
@@ -237,8 +237,8 @@ fn checkspawn_objet(entity: &Entity, globals: &Globals) -> bool {
     let x = entity.position.x;
     let y = entity.position.y;
     let rad = entity.hitbox.ext_radius;
-    (x - rad < globals.phys_width) && (x + rad > 0.0)
-        && (y - rad < globals.phys_height) && (y + rad > 0.0)
+    (x - rad < globals.render.phys_width) && (x + rad > 0.0)
+        && (y - rad < globals.render.phys_height) && (y + rad > 0.0)
 }
 
 /// Transfer entities between on-screen and off-screen lists.
@@ -291,7 +291,7 @@ fn drain_filter_stable<T>(vec: &mut Vec<T>, pred: impl Fn(&T) -> bool) -> Vec<T>
 /// Remove dead entities, transfer chunk-sized asteroids to chunks list, and remove zero-radius debris.
 /// Matches OCaml despawn: collects ischunk from all asteroid lists before filtering notchunk.
 fn despawn(state: &mut GameState, globals: &Globals) {
-    if globals.chunks_enabled {
+    if globals.visual.chunks_enabled {
         // Collect chunk-sized asteroids from all asteroid lists (OCaml: ischunk filter then append to ref_chunks)
         let new_from_objects      = drain_filter_stable(&mut state.objects,      ischunk);
         let new_from_objects_oos  = drain_filter_stable(&mut state.objects_oos,  ischunk);
@@ -333,9 +333,9 @@ fn despawn(state: &mut GameState, globals: &Globals) {
 pub fn move_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
     star.last_pos = star.pos;
     let next = add_vec(star.pos, scale_vec(velocity, star.proximity));
-    star.pos = wrap_single(next, globals.phys_width, globals.phys_height);
+    star.pos = wrap_single(next, globals.render.phys_width, globals.render.phys_height);
     // Avoid incorrect motion blur from screen-edge teleport
-    if next.x > globals.phys_width || next.x < 0.0 || next.y > globals.phys_height || next.y < 0.0 {
+    if next.x > globals.render.phys_width || next.x < 0.0 || next.y > globals.render.phys_height || next.y < 0.0 {
         star.last_pos = star.pos;
     }
 }
@@ -347,28 +347,28 @@ pub fn move_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
 /// Update per-frame globals: jitter, game speed interpolation, exposure
 pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
     // Jitter for dithering
-    globals.current_jitter_double = Vec2::new(
+    globals.render.current_jitter_double = Vec2::new(
         rng.gen::<f64>() * DITHER_POWER,
         rng.gen::<f64>() * DITHER_POWER,
     );
 
-    if !globals.pause {
-        let t0 = globals.time_last_frame;
-        let t1 = globals.time_current_frame;
+    if !globals.time.pause {
+        let t0 = globals.time.time_last_frame;
+        let t1 = globals.time.time_current_frame;
 
         // Game speed interpolation (real-time based, not game-time)
-        globals.game_speed = globals.game_speed_target
+        globals.time.game_speed = globals.time.game_speed_target
             + abso_exp_decay(
-                globals.game_speed - globals.game_speed_target,
+                globals.time.game_speed - globals.time.game_speed_target,
                 HALF_SPEED_CHANGE,
                 t0,
                 t1,
             );
 
         // Exposure interpolation
-        globals.game_exposure = globals.game_exposure_target
+        globals.exposure.game_exposure = globals.exposure.game_exposure_target
             + abso_exp_decay(
-                globals.game_exposure - globals.game_exposure_target,
+                globals.exposure.game_exposure - globals.exposure.game_exposure_target,
                 EXPOSURE_HALF_LIFE,
                 t0,
                 t1,
@@ -376,61 +376,61 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
 
         // Flash decay
         let flash_decay = abso_exp_decay(1.0, FLASHES_HALF_LIFE, t0, t1);
-        globals.add_color = (
-            globals.add_color.0 * flash_decay,
-            globals.add_color.1 * flash_decay,
-            globals.add_color.2 * flash_decay,
+        globals.exposure.add_color = (
+            globals.exposure.add_color.0 * flash_decay,
+            globals.exposure.add_color.1 * flash_decay,
+            globals.exposure.add_color.2 * flash_decay,
         );
 
         // Screenshake decay
-        globals.game_screenshake =
-            abso_exp_decay(globals.game_screenshake, SCREENSHAKE_HALF_LIFE, t0, t1);
+        globals.screenshake.game_screenshake =
+            abso_exp_decay(globals.screenshake.game_screenshake, SCREENSHAKE_HALF_LIFE, t0, t1);
 
         // Score shake decay
-        globals.shake_score =
-            abso_exp_decay(globals.shake_score, SHAKE_SCORE_HALF_LIFE, t0, t1);
-        globals.game_screenshake_previous_pos = globals.game_screenshake_pos;
-        if globals.screenshake_enabled {
-            globals.game_screenshake_pos = scale_vec(
+        globals.screenshake.shake_score =
+            abso_exp_decay(globals.screenshake.shake_score, SHAKE_SCORE_HALF_LIFE, t0, t1);
+        globals.screenshake.game_screenshake_previous_pos = globals.screenshake.game_screenshake_pos;
+        if globals.visual.screenshake_enabled {
+            globals.screenshake.game_screenshake_pos = scale_vec(
                 Vec2::new(rng.gen::<f64>() * 2.0 - 1.0, rng.gen::<f64>() * 2.0 - 1.0),
-                globals.game_screenshake,
+                globals.screenshake.game_screenshake,
             );
             // Smooth screenshake: blend toward previous position for a low-pass effect.
             // Matches OCaml: game_screenshake_pos := lerp_vec !game_screenshake_previous_pos !game_screenshake_pos screenshake_smoothness
             if SCREENSHAKE_SMOOTH {
-                globals.game_screenshake_pos = lerp_vec(
-                    globals.game_screenshake_previous_pos,
-                    globals.game_screenshake_pos,
+                globals.screenshake.game_screenshake_pos = lerp_vec(
+                    globals.screenshake.game_screenshake_previous_pos,
+                    globals.screenshake.game_screenshake_pos,
                     SCREENSHAKE_SMOOTHNESS,
                 );
             }
         }
 
         // Color interpolation (dynamic color mode)
-        if globals.dyn_color {
+        if globals.visual.dyn_color {
             let dt = t1 - t0;
-            globals.mul_color = {
-                let c = half_color(hdr(globals.mul_color), hdr(globals.mul_base), FILTER_HALF_LIFE, dt);
+            globals.exposure.mul_color = {
+                let c = half_color(hdr(globals.exposure.mul_color), hdr(globals.exposure.mul_base), FILTER_HALF_LIFE, dt);
                 (c.r, c.g, c.b)
             };
-            globals.space_color = {
-                let c = half_color(hdr(globals.space_color), hdr(globals.space_color_goal), SPACE_HALF_LIFE, dt);
+            globals.visual.space_color = {
+                let c = half_color(hdr(globals.visual.space_color), hdr(globals.visual.space_color_goal), SPACE_HALF_LIFE, dt);
                 (c.r, c.g, c.b)
             };
-            globals.star_color = {
-                let c = half_color(hdr(globals.star_color), hdr(globals.star_color_goal), SPACE_HALF_LIFE, dt);
+            globals.visual.star_color = {
+                let c = half_color(hdr(globals.visual.star_color), hdr(globals.visual.star_color_goal), SPACE_HALF_LIFE, dt);
                 (c.r, c.g, c.b)
             };
         }
     }
 
     // --- FPS counter (matches OCaml end-of-frame block) ---
-    globals.time_current_count = globals.time_current_frame;
-    globals.current_count += 1;
-    if globals.time_current_count - globals.time_last_count > 1.0 {
-        globals.last_count = globals.current_count;
-        globals.current_count = 0;
-        globals.time_last_count = globals.time_current_count;
+    globals.framerate.time_current_count = globals.time.time_current_frame;
+    globals.framerate.current_count += 1;
+    if globals.framerate.time_current_count - globals.framerate.time_last_count > 1.0 {
+        globals.framerate.last_count = globals.framerate.current_count;
+        globals.framerate.current_count = 0;
+        globals.framerate.time_last_count = globals.framerate.time_current_count;
     }
 }
 
@@ -477,7 +477,7 @@ fn collect_pairs_for_cell(
             }
             let ent1 = get_entity(state, e1);
             let ent2 = get_entity(state, e2);
-            if collision_entities(ent1, ent2, precis, globals.advanced_hitbox) {
+            if collision_entities(ent1, ent2, precis, globals.advanced_hitbox) {  // advanced_hitbox stays top-level
                 pairs.push((e1, e2));
             }
         }
@@ -550,7 +550,7 @@ fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
     let mut pairs: Vec<(usize, usize)> = Vec::new();
     for i in 0..n {
         for j in (i + 1)..n {
-            if collision_entities(&state.fragments[i], &state.fragments[j], false, globals.advanced_hitbox) {
+            if collision_entities(&state.fragments[i], &state.fragments[j], false, globals.advanced_hitbox) {  // advanced_hitbox stays top-level
                 pairs.push((i, j));
                 involved[i] = true;
                 involved[j] = true;
@@ -587,7 +587,7 @@ fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
 /// Called each frame when not paused.
 pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // Update observer proper time (for time dilation)
-    globals.observer_proper_time = state.ship.proper_time;
+    globals.observer_proper_time = state.ship.proper_time;  // observer_proper_time stays top-level
 
     // --- Smoke & chunk decay ---
     for s in state.smoke.iter_mut() { decay_smoke(s, globals); }
@@ -597,7 +597,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // OCaml formula: radius -= observer_proper_time * game_speed * decay_rate * dt / chunk.proper_time
     {
         let dt = globals.dt();
-        let gs = globals.game_speed;
+        let gs = globals.time.game_speed;
         let opt = globals.observer_proper_time;
         for c in state.chunks.iter_mut() {
             c.visuals.radius -= opt * gs * CHUNK_RADIUS_DECAY * dt / c.proper_time;
@@ -616,7 +616,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // --- Spawn explosions from dead projectiles ---
     // Previous explosions → smoke (before overwriting)
-    if globals.smoke_enabled {
+    if globals.visual.smoke_enabled {
         state.smoke.append(&mut state.explosions);
     } else {
         state.explosions.clear();
@@ -640,48 +640,48 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         for obj in &dead_objects {
             let (explo, side_effects) = spawn_explosion_object(
                 obj,
-                globals.flashes_enabled,
-                globals.variable_exposure,
+                globals.visual.flashes_enabled,
+                globals.visual.variable_exposure,
                 FLASHES_SATURATE,
                 FLASHES_EXPLOSION,
                 FLASHES_NORMAL_MASS,
                 &mut state.rng,
             );
             if let Some(ac) = side_effects.add_color {
-                globals.add_color = (
-                    globals.add_color.0 + ac.0,
-                    globals.add_color.1 + ac.1,
-                    globals.add_color.2 + ac.2,
+                globals.exposure.add_color = (
+                    globals.exposure.add_color.0 + ac.0,
+                    globals.exposure.add_color.1 + ac.1,
+                    globals.exposure.add_color.2 + ac.2,
                 );
             }
             if let Some(em) = side_effects.exposure_multiplier {
-                globals.game_exposure *= em;
+                globals.exposure.game_exposure *= em;
             }
             state.smoke.push(explo);
         }
     }
 
     // Chunk explosions (chunks_explo → explosions)
-    if !globals.pause {
+    if !globals.time.pause {
         let explo_chunks: Vec<Entity> = state.chunks_explo.iter()
             .map(|c| {
                 let (explo, se) = spawn_chunk_explosion(
                     c,
-                    globals.flashes_enabled,
+                    globals.visual.flashes_enabled,
                     FLASHES_SATURATE,
                     FLASHES_EXPLOSION,
                     FLASHES_NORMAL_MASS,
                     &mut state.rng,
                 );
                 if let Some(ac) = se.add_color {
-                    globals.add_color = (
-                        globals.add_color.0 + ac.0,
-                        globals.add_color.1 + ac.1,
-                        globals.add_color.2 + ac.2,
+                    globals.exposure.add_color = (
+                        globals.exposure.add_color.0 + ac.0,
+                        globals.exposure.add_color.1 + ac.1,
+                        globals.exposure.add_color.2 + ac.2,
                     );
                 }
                 if let Some(em) = se.exposure_multiplier {
-                    globals.game_exposure *= em;
+                    globals.exposure.game_exposure *= em;
                 }
                 explo
             })
@@ -691,7 +691,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // game_speed slowdown per explosion
     let nb_explo = state.explosions.len();
-    globals.game_speed *= RATIO_TIME_EXPLOSION.powi(nb_explo as i32);
+    globals.time.game_speed *= RATIO_TIME_EXPLOSION.powi(nb_explo as i32);
 
     // --- Projectile inertia ---
     for p in state.projectiles.iter_mut() {
@@ -708,17 +708,17 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         p.health >= 0.0 && {
             let x = p.position.x;
             let y = p.position.y;
-            x >= -globals.phys_width && x <= 2.0 * globals.phys_width
-                && y >= -globals.phys_height && y <= 2.0 * globals.phys_height
+            x >= -globals.render.phys_width && x <= 2.0 * globals.render.phys_width
+                && y >= -globals.render.phys_height && y <= 2.0 * globals.render.phys_height
         }
     });
 
     // --- Cooldown tick ---
     if state.cooldown > 0.0 {
-        state.cooldown -= globals.game_speed * globals.dt();
+        state.cooldown -= globals.time.game_speed * globals.dt();
     }
     if state.cooldown_tp > 0.0 {
-        state.cooldown_tp -= globals.game_speed * globals.dt();
+        state.cooldown_tp -= globals.time.game_speed * globals.dt();
     }
 
     // --- Inertia (position update) ---
@@ -833,9 +833,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         + state.toosmall.iter().filter(|e| is_dead(e)).count()
         + state.toosmall_oos.iter().filter(|e| is_dead(e)).count()
         + state.fragments.iter().filter(|e| is_dead(e)).count();
-    globals.game_speed *= RATIO_TIME_DESTR_ASTEROID.powi(nb_destroyed as i32);
+    globals.time.game_speed *= RATIO_TIME_DESTR_ASTEROID.powi(nb_destroyed as i32);
     state.score += nb_destroyed as i32;
-    globals.shake_score += nb_destroyed as f64;
+    globals.screenshake.shake_score += nb_destroyed as f64;
 
     // === Fragment vs fragment repulsion + promotion ===
     run_fragment_collisions(state, globals);
@@ -857,14 +857,14 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     wrap_entities(&mut state.fragments, globals);
 
     // --- Spawning ---
-    if globals.time_since_last_spawn > TIME_SPAWN_ASTEROID {
-        globals.time_since_last_spawn = 0.0;
+    if globals.spawn.time_since_last_spawn > TIME_SPAWN_ASTEROID {
+        globals.spawn.time_since_last_spawn = 0.0;
 
         let nb_asteroids_stage = ASTEROID_MIN_NB + ASTEROID_STAGE_NB * state.stage;
-        if globals.current_stage_asteroids >= nb_asteroids_stage {
+        if globals.spawn.current_stage_asteroids >= nb_asteroids_stage {
             // Advance to next stage
             state.stage += 1;
-            globals.current_stage_asteroids = 0;
+            globals.spawn.current_stage_asteroids = 0;
 
             // Pick new random stage colors (matches OCaml)
             let new_col = (
@@ -873,15 +873,15 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
                 rand_range(RAND_MIN_LUM, RAND_MAX_LUM, &mut state.rng),
             );
             let new_hdr = hdr(new_col);
-            globals.mul_base = {
+            globals.exposure.mul_base = {
                 let c = saturate(intensify(new_hdr, 1.0), FILTER_SATURATION);
                 (c.r, c.g, c.b)
             };
-            globals.space_color_goal = {
+            globals.visual.space_color_goal = {
                 let c = saturate(intensify(new_hdr, 10.0), SPACE_SATURATION);
                 (c.r, c.g, c.b)
             };
-            globals.star_color_goal = {
+            globals.visual.star_color_goal = {
                 let c = saturate(intensify(new_hdr, 100.0), STAR_SATURATION);
                 (c.r, c.g, c.b)
             };
@@ -890,22 +890,22 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         // Spawn one asteroid
         state.objects_oos.push(spawn_random_asteroid(
             state.stage,
-            globals.phys_width,
-            globals.phys_height,
+            globals.render.phys_width,
+            globals.render.phys_height,
             &mut state.rng,
         ));
-        globals.current_stage_asteroids += 1;
+        globals.spawn.current_stage_asteroids += 1;
     }
 
-    let elapsed = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
-    globals.time_since_last_spawn += elapsed;
+    let elapsed = (globals.time.time_current_frame - globals.time.time_last_frame) * globals.time.game_speed;
+    globals.spawn.time_since_last_spawn += elapsed;
 
     // --- Despawn ---
     despawn(state, globals);
 
     // --- Ship auto-regeneration ---
     if AUTOREGEN && state.ship.health > 0.0 && state.ship.health < SHIP_MAX_HEALTH {
-        state.ship.health += AUTOREGEN_HEALTH * globals.game_speed * globals.dt();
+        state.ship.health += AUTOREGEN_HEALTH * globals.time.game_speed * globals.dt();
         state.ship.health = state.ship.health.min(SHIP_MAX_HEALTH);
     }
 
@@ -917,9 +917,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             state.last_health - target,
             0.5,
             globals.observer_proper_time,
-            globals.game_speed,
-            globals.time_last_frame,
-            globals.time_current_frame,
+            globals.time.game_speed,
+            globals.time.time_last_frame,
+            globals.time.time_current_frame,
             state.ship.proper_time,
         );
     }
@@ -928,11 +928,11 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // Step 1: Detect death entry (first time health < 0, not already in mort() phase)
     if state.ship.health < 0.0 && !state.is_dead {
         state.is_dead = true;
-        globals.time_of_death = globals.time_current_frame;
+        globals.time.time_of_death = globals.time.time_current_frame;
         state.lives -= 1;
 
         // Chunk explosion at death
-        if globals.chunks_enabled {
+        if globals.visual.chunks_enabled {
             let death_color = (1500.0, 400.0, 200.0);
             let new_chunks = spawn_n_chunks(
                 &state.ship,
@@ -944,18 +944,18 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         }
 
         // Death VFX: screenshake + big red flash + game speed slowdown
-        globals.game_screenshake += SCREENSHAKE_DEATH;
-        if globals.flashes_enabled {
+        globals.screenshake.game_screenshake += SCREENSHAKE_DEATH;
+        if globals.visual.flashes_enabled {
             let death_flash = intensify(HdrColor::new(1000.0, 0.0, 0.0), FLASHES_DEATH);
-            globals.add_color = (
-                globals.add_color.0 + death_flash.r,
-                globals.add_color.1 + death_flash.g,
-                globals.add_color.2 + death_flash.b,
+            globals.exposure.add_color = (
+                globals.exposure.add_color.0 + death_flash.r,
+                globals.exposure.add_color.1 + death_flash.g,
+                globals.exposure.add_color.2 + death_flash.b,
             );
         }
-        globals.game_speed *= RATIO_TIME_DEATH;
-        globals.game_speed_target = GAME_SPEED_TARGET_DEATH;
-        globals.game_exposure_target = GAME_EXPOSURE_TARGET_DEATH;
+        globals.time.game_speed *= RATIO_TIME_DEATH;
+        globals.time.game_speed_target = GAME_SPEED_TARGET_DEATH;
+        globals.exposure.game_exposure_target = GAME_EXPOSURE_TARGET_DEATH;
 
         // Clamp health so death entry does not re-trigger
         state.ship.health = -0.1;
@@ -963,15 +963,15 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // Step 2: Per-frame death fire — spawn burning explosion while in mort() phase
     if state.is_dead {
-        let elapsed = (globals.time_current_frame - globals.time_last_frame) * globals.game_speed;
+        let elapsed = (globals.time.time_current_frame - globals.time.time_last_frame) * globals.time.game_speed;
         let death_explo = spawn_explosion_death(&state.ship, elapsed, &mut state.rng);
         state.explosions.push(death_explo);
     }
 
     // Step 3: End the death phase when timer expires or early-exit condition met
     if state.is_dead {
-        let t = globals.time_current_frame;
-        let tod = globals.time_of_death;
+        let t = globals.time.time_current_frame;
+        let tod = globals.time.time_of_death;
         let timer_expired = t > tod + TIME_STAY_DEAD_MAX;
         let early_exit = t > tod + TIME_STAY_DEAD_MIN && state.ship.health < -100.0;
 
@@ -981,12 +981,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             if state.lives <= 0 {
                 // Game over: reset and pause
                 *state = GameState::new(globals);
-                globals.pause = true;
-                globals.game_speed_target = GAME_SPEED_TARGET_BOUCLE;
-                globals.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
+                globals.time.pause = true;
+                globals.time.game_speed_target = GAME_SPEED_TARGET_BOUCLE;
+                globals.exposure.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
             } else {
                 // Second chunk burst
-                if globals.chunks_enabled {
+                if globals.visual.chunks_enabled {
                     let death_color = (1500.0, 400.0, 200.0);
                     let new_chunks = spawn_n_chunks(
                         &state.ship,
@@ -998,21 +998,21 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
                 }
 
                 // Second screenshake + red flash
-                globals.game_screenshake += SCREENSHAKE_DEATH;
-                if globals.flashes_enabled {
+                globals.screenshake.game_screenshake += SCREENSHAKE_DEATH;
+                if globals.visual.flashes_enabled {
                     let death_flash = intensify(HdrColor::new(1000.0, 0.0, 0.0), FLASHES_DEATH);
-                    globals.add_color = (
-                        globals.add_color.0 + death_flash.r,
-                        globals.add_color.1 + death_flash.g,
-                        globals.add_color.2 + death_flash.b,
+                    globals.exposure.add_color = (
+                        globals.exposure.add_color.0 + death_flash.r,
+                        globals.exposure.add_color.1 + death_flash.g,
+                        globals.exposure.add_color.2 + death_flash.b,
                     );
                 }
-                globals.game_speed *= RATIO_TIME_DEATH;
+                globals.time.game_speed *= RATIO_TIME_DEATH;
 
                 // Respawn ship and restore normal targets
                 state.ship = spawn_ship();
-                globals.game_speed_target = GAME_SPEED_TARGET_BOUCLE;
-                globals.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
+                globals.time.game_speed_target = GAME_SPEED_TARGET_BOUCLE;
+                globals.exposure.game_exposure_target = GAME_EXPOSURE_TARGET_BOUCLE;
             }
         }
     }
@@ -1024,7 +1024,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 /// Decay smoke radius and exposure (game-time based half-life).
 /// Ported from OCaml decay_smoke.
 pub fn decay_smoke(smoke: &mut Entity, globals: &Globals) {
-    let dt_game = globals.game_speed * globals.dt();
+    let dt_game = globals.time.game_speed * globals.dt();
     let half_r = SMOKE_HALF_RADIUS * smoke.proper_time;
     let half_c = SMOKE_HALF_COL * smoke.proper_time;
     // exp_decay: n * 2^(-(dt_game) / half_life)
@@ -1047,18 +1047,18 @@ pub fn render_frame(
     let (w, h) = (renderer.width as i32, renderer.height as i32);
 
     // Background
-    if globals.retro {
+    if globals.visual.retro {
         renderer.fill_rect(0, 0, w, h, [0, 0, 0, 255]);
     } else {
         let bg_color = to_rgba(
-            intensify(hdr(globals.space_color), globals.game_exposure),
+            intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure),
             globals,
         );
         renderer.fill_rect(0, 0, w, h, bg_color);
     }
 
     // Stars (not in retro mode)
-    if !globals.retro {
+    if !globals.visual.retro {
         for star in &state.stars {
             render_star_trail(star, renderer, globals, &mut state.rng);
         }
@@ -1103,23 +1103,23 @@ pub fn render_frame(
     }
 
     // HUD overlay — skip when paused (matches OCaml behavior)
-    if !globals.pause {
+    if !globals.time.pause {
         // Extract rng to avoid simultaneous borrow of state fields
         let rng = &mut state.rng as *mut _;
         render_hud(state, globals, renderer, unsafe { &mut *rng });
     }
 
     // Pause title overlay + interactive buttons
-    if globals.pause {
+    if globals.time.pause {
         crate::pause_menu::render_pause_title(state, globals, renderer, mouse_sx, mouse_sy, mouse_down);
     }
 
     // Scanlines effect (rendered last, on top of everything)
-    if globals.scanlines {
-        render_scanlines(globals.scanlines_offset, h, renderer);
+    if globals.visual.scanlines {
+        render_scanlines(globals.visual.scanlines_offset, h, renderer);
         // Advance animation offset each frame
         if ANIMATED_SCANLINES {
-            globals.scanlines_offset = (globals.scanlines_offset + 1) % SCANLINES_PERIOD;
+            globals.visual.scanlines_offset = (globals.visual.scanlines_offset + 1) % SCANLINES_PERIOD;
         }
     }
 }

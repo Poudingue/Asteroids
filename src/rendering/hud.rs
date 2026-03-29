@@ -157,7 +157,7 @@ pub fn render_string(
             (x0 + sx2 + l_char, y0 + sy2 + h_char),
             (x0 + sx3, y0 + sy3 + h_char),
         ];
-        render_char(&encadrement, c, color, renderer, globals.render_scale);
+        render_char(&encadrement, c, color, renderer, globals.render.render_scale);
         x0 += l_char + l_space;
     }
 }
@@ -180,14 +180,14 @@ fn render_bar(
     // relative_poly converts [0,1] coords to pixels: multiply by (width, height)
     // p0=quad[0], p1=quad[1], p2=quad[2], p3=quad[3]
     // For bar: use points p0, p1, lerp_vec(p2,p1,ratio), lerp_vec(p3,p0,ratio)
-    let p0 = (quad[0].0 * globals.phys_width * globals.render_scale,
-              quad[0].1 * globals.phys_height * globals.render_scale);
-    let p1 = (quad[1].0 * globals.phys_width * globals.render_scale,
-              quad[1].1 * globals.phys_height * globals.render_scale);
-    let p2_full = (quad[2].0 * globals.phys_width * globals.render_scale,
-                   quad[2].1 * globals.phys_height * globals.render_scale);
-    let p3_full = (quad[3].0 * globals.phys_width * globals.render_scale,
-                   quad[3].1 * globals.phys_height * globals.render_scale);
+    let p0 = (quad[0].0 * globals.render.phys_width * globals.render.render_scale,
+              quad[0].1 * globals.render.phys_height * globals.render.render_scale);
+    let p1 = (quad[1].0 * globals.render.phys_width * globals.render.render_scale,
+              quad[1].1 * globals.render.phys_height * globals.render.render_scale);
+    let p2_full = (quad[2].0 * globals.render.phys_width * globals.render.render_scale,
+                   quad[2].1 * globals.render.phys_height * globals.render.render_scale);
+    let p3_full = (quad[3].0 * globals.render.phys_width * globals.render.render_scale,
+                   quad[3].1 * globals.render.phys_height * globals.render.render_scale);
 
     // OCaml: lerp_vec p2 p1 ratio = p2*ratio + p1*(1-ratio)
     // ratio=1 → p2_full (full side) → full bar
@@ -253,10 +253,10 @@ fn draw_heart(
 
 /// Render `n` hearts for the lives display. Matches OCaml `draw_n_hearts`.
 fn draw_n_hearts(n: i32, color: [u8; 4], renderer: &mut Renderer2D, globals: &Globals) {
-    let sx = globals.safe_offset_x;
-    let sy = globals.safe_offset_y;
-    let sw = globals.safe_phys_width;
-    let sh = globals.safe_phys_height;
+    let sx = globals.render.safe_offset_x;
+    let sy = globals.render.safe_offset_y;
+    let sw = globals.render.safe_phys_width;
+    let sh = globals.render.safe_phys_height;
     let mut lastx = sx + 0.95 * sw;
     for _ in 0..n {
         draw_heart(
@@ -264,7 +264,7 @@ fn draw_n_hearts(n: i32, color: [u8; 4], renderer: &mut Renderer2D, globals: &Gl
             (lastx,              sy + 0.80 * sh),
             color,
             renderer,
-            globals.render_scale,
+            globals.render.render_scale,
         );
         lastx -= 0.05 * sw;
     }
@@ -280,8 +280,8 @@ fn draw_bar_frame(
 ) {
     let pts: Vec<(i32, i32)> = quad.iter().map(|&(rx, ry)| {
         (
-            (rx * globals.phys_width  * globals.render_scale).round() as i32,
-            (ry * globals.phys_height * globals.render_scale).round() as i32,
+            (rx * globals.render.phys_width  * globals.render.render_scale).round() as i32,
+            (ry * globals.render.phys_height * globals.render.render_scale).round() as i32,
         )
     }).collect();
     renderer.draw_poly(&pts, color, line_width);
@@ -312,7 +312,7 @@ pub fn render_hud(
     rng: &mut impl Rng,
 ) {
     // Skip HUD in retro mode
-    if globals.retro {
+    if globals.visual.retro {
         return;
     }
 
@@ -326,15 +326,15 @@ pub fn render_hud(
     let dark_yellow: [u8; 4] = [32, 16, 0, 255];
     let white : [u8; 4] = [255, 255, 255, 255];
     let frame_color: [u8; 4] = [64, 64, 64, 255];
-    let frame_width: f32 = 10.0 * globals.render_scale as f32;
+    let frame_width: f32 = 10.0 * globals.render.render_scale as f32;
 
     // ----- Safe zone for HUD placement -----
-    let sx = globals.safe_offset_x;
-    let sy = globals.safe_offset_y;
-    let sw = globals.safe_phys_width;
-    let sh = globals.safe_phys_height;
-    let pw = globals.phys_width;
-    let ph = globals.phys_height;
+    let sx = globals.render.safe_offset_x;
+    let sy = globals.render.safe_offset_y;
+    let sw = globals.render.safe_phys_width;
+    let sh = globals.render.safe_phys_height;
+    let pw = globals.render.phys_width;
+    let ph = globals.render.phys_height;
 
     // Helper: convert safe-zone-relative fraction to full-screen fraction for render_bar
     // render_bar quads use fractions of phys_width/phys_height
@@ -379,7 +379,7 @@ pub fn render_hud(
             (sx + 0.72 * sw, sy + 0.7  * sh),
             (sx + 0.7  * sw, sy + 0.7  * sh),
         ];
-        render_char(&encadrement, 'F', cyan, renderer, globals.render_scale);
+        render_char(&encadrement, 'F', cyan, renderer, globals.render.render_scale);
     }
 
     // ----- Weapon cooldown bar -----
@@ -387,7 +387,7 @@ pub fn render_hud(
         (fx(0.95), fy(0.6)),  (fx(0.95), fy(0.55)),
         (fx(0.9),  fy(0.55)), (fx(0.85), fy(0.6)),
     ];
-    let weapon_ratio = ((globals.projectile_cooldown - state.cooldown.max(0.0)) / globals.projectile_cooldown)
+    let weapon_ratio = ((globals.weapon.projectile_cooldown - state.cooldown.max(0.0)) / globals.weapon.projectile_cooldown)
         .min(1.0)
         .max(0.0);
     render_bar(1.0, &weapon_quad, dark_yellow, renderer, globals);
@@ -396,7 +396,7 @@ pub fn render_hud(
 
     // ----- Score -----
     // Color: warm amber/orange, dimmed by shake_score
-    let score_intensity = 1.0 / (1.0 + 10.0 * globals.shake_score);
+    let score_intensity = 1.0 / (1.0 + 10.0 * globals.screenshake.shake_score);
     let score_col = rgb_of_hdr(
         intensify(HdrColor::new(50000.0, 1000.0, 300.0), score_intensity),
         &HdrColor::zero(),
@@ -404,11 +404,11 @@ pub fn render_hud(
         1.0,
     );
     let score_str = format!("SCORE {}", state.score);
-    let shake = globals.shake_score * 7.0;
-    let base_l_char = (1.0 + 0.05 * globals.shake_score) * 0.03 * sw;
-    let base_h_char = (1.0 + 0.05 * globals.shake_score) * 0.08 * sh;
-    let base_l_space = (1.0 + 0.05 * globals.shake_score) * 0.01 * sw;
-    let score_y = sy + 0.82 * sh * (1.0 - 0.05 * globals.shake_score * 0.08);
+    let shake = globals.screenshake.shake_score * 7.0;
+    let base_l_char = (1.0 + 0.05 * globals.screenshake.shake_score) * 0.03 * sw;
+    let base_h_char = (1.0 + 0.05 * globals.screenshake.shake_score) * 0.08 * sh;
+    let base_l_space = (1.0 + 0.05 * globals.screenshake.shake_score) * 0.01 * sw;
+    let score_y = sy + 0.82 * sh * (1.0 - 0.05 * globals.screenshake.shake_score * 0.08);
     render_string(
         &score_str,
         (sx + 0.02 * sw, score_y),
@@ -440,7 +440,7 @@ pub fn render_hud(
     // ----- Death countdown -----
     // Show countdown when ship health <= 0
     if state.ship.health <= 0.0 {
-        let time_until_explo = globals.time_of_death + TIME_STAY_DEAD_MAX - globals.time_current_frame;
+        let time_until_explo = globals.time.time_of_death + TIME_STAY_DEAD_MAX - globals.time.time_current_frame;
         if time_until_explo > 0.0 {
             // Flash: show the integer countdown, alternating on/off at 0.5s boundary
             let frac = time_until_explo - time_until_explo.floor();
@@ -478,14 +478,14 @@ pub fn render_hud(
     let nb_chunks   = state.chunks.len()    + state.chunks_oos.len();
     let nb_chunks_e = state.chunks_explo.len();
 
-    let fps = if globals.time_current_count - globals.time_last_count > 0.0 {
-        (globals.last_count as f64).round() as i32
+    let fps = if globals.framerate.time_current_count - globals.framerate.time_last_count > 0.0 {
+        (globals.framerate.last_count as f64).round() as i32
     } else {
         0
     };
 
-    let peak_fps = if globals.frame_compute_secs > 0.0 {
-        (1.0 / globals.frame_compute_secs).round() as i32
+    let peak_fps = if globals.framerate.frame_compute_secs > 0.0 {
+        (1.0 / globals.framerate.frame_compute_secs).round() as i32
     } else {
         0
     };

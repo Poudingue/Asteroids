@@ -20,13 +20,13 @@ pub fn render_poly(
     renderer: &mut Renderer2D,
     globals: &Globals,
 ) {
-    let affine = polygon_to_cartesian(poly, rotat, globals.render_scale);
+    let affine = polygon_to_cartesian(poly, rotat, globals.render.render_scale);
     let displaced = translate_polygon(&affine, pos);
     let screen_points: Vec<(i32, i32)> = displaced
         .iter()
-        .map(|&p| dither_vec(p, DITHER_AA, globals.current_jitter_double))
+        .map(|&p| dither_vec(p, DITHER_AA, globals.render.current_jitter_double))
         .collect();
-    if globals.retro {
+    if globals.visual.retro {
         renderer.draw_poly(&screen_points, [255, 255, 255, 255], 1.0);
     } else {
         renderer.fill_poly(&screen_points, color);
@@ -63,19 +63,19 @@ pub fn render_visuals(
     let visuals = &entity.visuals;
     let position = scale_vec(
         add_vec(
-            add_vec(entity.position, globals.game_screenshake_pos),
+            add_vec(entity.position, globals.screenshake.game_screenshake_pos),
             offset,
         ),
-        globals.render_scale,
+        globals.render.render_scale,
     );
-    let exposure = globals.game_exposure * entity.hdr_exposure;
+    let exposure = globals.exposure.game_exposure * entity.hdr_exposure;
 
     // Base circle (not in retro mode)
-    if visuals.radius > 0.0 && !globals.retro {
+    if visuals.radius > 0.0 && !globals.visual.retro {
         let color = to_rgba(intensify(hdr(visuals.color), exposure), globals);
-        let (x, y) = dither_vec(position, DITHER_AA, globals.current_jitter_double);
+        let (x, y) = dither_vec(position, DITHER_AA, globals.render.current_jitter_double);
         let r = dither_radius(
-            visuals.radius * globals.render_scale,
+            visuals.radius * globals.render.render_scale,
             DITHER_AA,
             DITHER_POWER_RADIUS,
             rng,
@@ -102,25 +102,25 @@ pub fn render_chunk(
     rng: &mut impl Rng,
 ) {
     let pos = scale_vec(
-        add_vec(entity.position, globals.game_screenshake_pos),
-        globals.render_scale,
+        add_vec(entity.position, globals.screenshake.game_screenshake_pos),
+        globals.render.render_scale,
     );
-    if globals.retro {
-        let (x, y) = dither_vec(pos, DITHER_AA, globals.current_jitter_double);
+    if globals.visual.retro {
+        let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
         renderer.fill_circle(
             x as f64, y as f64,
-            (0.25 * globals.render_scale * entity.visuals.radius).max(1.0),
+            (0.25 * globals.render.render_scale * entity.visuals.radius).max(1.0),
             [128, 128, 128, 255],
         );
     } else {
         let intensity_chunk = 1.0;
         let color = to_rgba(
-            intensify(hdr(entity.visuals.color), intensity_chunk * globals.game_exposure * entity.hdr_exposure),
+            intensify(hdr(entity.visuals.color), intensity_chunk * globals.exposure.game_exposure * entity.hdr_exposure),
             globals,
         );
-        let (x, y) = dither_vec(pos, DITHER_AA, globals.current_jitter_double);
+        let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
         let r = dither_radius(
-            globals.render_scale * entity.visuals.radius,
+            globals.render.render_scale * entity.visuals.radius,
             DITHER_AA, DITHER_POWER_RADIUS, rng,
         );
         renderer.fill_circle(x as f64, y as f64, r.max(1) as f64, color);
@@ -135,24 +135,24 @@ pub fn render_star_trail(
     rng: &mut impl Rng,
 ) {
     let pos1 = scale_vec(
-        add_vec(star.pos, globals.game_screenshake_pos),
-        globals.render_scale,
+        add_vec(star.pos, globals.screenshake.game_screenshake_pos),
+        globals.render.render_scale,
     );
     let last_position = scale_vec(
-        add_vec(star.last_pos, globals.game_screenshake_previous_pos),
-        globals.render_scale,
+        add_vec(star.last_pos, globals.screenshake.game_screenshake_previous_pos),
+        globals.render.render_scale,
     );
     let pos2 = lerp_vec(last_position, pos1, SHUTTER_SPEED);
-    let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.current_jitter_double);
-    let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.current_jitter_double);
+    let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.render.current_jitter_double);
+    let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.render.current_jitter_double);
 
-    let lum = if globals.pause {
+    let lum = if globals.time.pause {
         star.lum + 0.5 * STAR_RAND_LUM
     } else {
         star.lum + rng.gen::<f64>() * STAR_RAND_LUM
     };
 
-    let star_color_tmp = intensify(hdr(globals.star_color), lum * globals.game_exposure);
+    let star_color_tmp = intensify(hdr(globals.visual.star_color), lum * globals.exposure.game_exposure);
 
     if x1 == x2 && y1 == y2 {
         // Static star: render as a cross of pixels
@@ -160,9 +160,9 @@ pub fn render_star_trail(
             intensify(
                 hdr_add(
                     star_color_tmp,
-                    hdr(globals.space_color),
+                    hdr(globals.visual.space_color),
                 ),
-                globals.game_exposure,
+                globals.exposure.game_exposure,
             ),
             globals,
         );
@@ -186,8 +186,8 @@ pub fn render_star_trail(
         let trail_color = hdr_add(
             intensify(star_color_tmp, trail_lum),
             hdr_add(
-                intensify(hdr(globals.space_color), globals.game_exposure),
-                intensify(hdr(globals.add_color), globals.game_exposure),
+                intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure),
+                intensify(hdr(globals.exposure.add_color), globals.exposure.game_exposure),
             ),
         );
         let color = to_rgba(trail_color, globals);
@@ -210,39 +210,39 @@ pub fn render_light_trail(
     renderer: &mut Renderer2D,
     globals: &Globals,
 ) {
-    let pos1 = scale_vec(add_vec(pos, globals.game_screenshake_pos), globals.render_scale);
-    let dt_game = globals.game_speed
-        * (globals.time_current_frame - globals.time_last_frame)
+    let pos1 = scale_vec(add_vec(pos, globals.screenshake.game_screenshake_pos), globals.render.render_scale);
+    let dt_game = globals.time.game_speed
+        * (globals.time.time_current_frame - globals.time.time_last_frame)
             .max(1.0 / FRAMERATE_RENDER);
     let veloc = scale_vec(velocity, -(globals.observer_proper_time / proper_time) * dt_game);
     let last_pos = scale_vec(
-        add_vec(sub_vec(pos, veloc), globals.game_screenshake_previous_pos),
-        globals.render_scale,
+        add_vec(sub_vec(pos, veloc), globals.screenshake.game_screenshake_previous_pos),
+        globals.render.render_scale,
     );
     let pos2 = lerp_vec(last_pos, pos1, SHUTTER_SPEED);
     let dist = magnitude(sub_vec(pos1, pos2));
     let trail_lum = 0.5 * (radius / (radius + dist)).sqrt();
     let color = to_rgba(intensify(hdr_color, trail_lum), globals);
-    let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.current_jitter_double);
-    let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.current_jitter_double);
+    let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.render.current_jitter_double);
+    let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.render.current_jitter_double);
     let line_width = dither_radius(2.0 * radius, DITHER_AA, DITHER_POWER_RADIUS, &mut rand::thread_rng());
     renderer.draw_line(x1, y1, x2, y2, color, line_width.max(1) as f32);
 }
 
 /// Render a projectile as four concentric light trails. Ported from OCaml render_projectile.
 pub fn render_projectile(entity: &Entity, renderer: &mut Renderer2D, globals: &Globals, rng: &mut impl Rng) {
-    let rad = globals.render_scale
+    let rad = globals.render.render_scale
         * rand_range(0.5, 1.0, rng)
         * entity.visuals.radius;
-    if globals.retro {
+    if globals.visual.retro {
         // Retro mode: simple white filled circle at projectile position
-        let pos = scale_vec(entity.position, globals.render_scale);
-        let (x, y) = dither_vec(pos, DITHER_AA, globals.current_jitter_double);
+        let pos = scale_vec(entity.position, globals.render.render_scale);
+        let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
         renderer.fill_circle(x as f64, y as f64, rad.max(1.0), [255, 255, 255, 255]);
     } else {
         let pos = entity.position;
         let vel = entity.velocity;
-        let col = intensify(hdr(entity.visuals.color), entity.hdr_exposure * globals.game_exposure);
+        let col = intensify(hdr(entity.visuals.color), entity.hdr_exposure * globals.exposure.game_exposure);
         let pt = entity.proper_time;
         render_light_trail(rad,        pos, vel, intensify(col, 0.25), pt, renderer, globals);
         render_light_trail(rad * 0.75, pos, vel, intensify(col, 0.5),  pt, renderer, globals);

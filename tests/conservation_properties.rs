@@ -132,7 +132,7 @@ fn test_collision_momentum_conservation() {
         e2.proper_time = 1.0;
         let p_before = add_vec(momentum(&e1), momentum(&e2));
         let mut globals = Globals::new();
-        globals.pause = true; // suppress MIN_REPULSION/MIN_BOUNCE impulses
+        globals.time.pause = true; // suppress MIN_REPULSION/MIN_BOUNCE impulses
         let (new_e1, new_e2) = consequences_collision(e1, e2, &mut globals);
         let p_after = add_vec(momentum(&new_e1), momentum(&new_e2));
         let delta = magnitude(add_vec(p_after, scale_vec(p_before, -1.0)));
@@ -157,7 +157,7 @@ fn test_elastic_bounce_momentum() {
     let p_before = add_vec(momentum(&e1), momentum(&e2));
     assert!(magnitude(p_before) < 1.0, "setup: p_before should be ~zero");
     let mut globals = Globals::new();
-    globals.pause = true;
+    globals.time.pause = true;
     let (new_e1, new_e2) = consequences_collision(e1, e2, &mut globals);
     let p_after = add_vec(momentum(&new_e1), momentum(&new_e2));
     assert!(
@@ -186,7 +186,7 @@ fn test_collision_energy_no_increase() {
         e2.proper_time = 1.0;
         let ke_before = kinetic_energy(&e1) + kinetic_energy(&e2);
         let mut globals = Globals::new();
-        globals.pause = true;
+        globals.time.pause = true;
         let (new_e1, new_e2) = consequences_collision(e1, e2, &mut globals);
         let ke_after = kinetic_energy(&new_e1) + kinetic_energy(&new_e2);
         assert!(
@@ -209,7 +209,7 @@ fn test_collision_energy_with_restitution() {
     light.proper_time = 1.0;
     let ke_before = kinetic_energy(&heavy) + kinetic_energy(&light);
     let mut globals = Globals::new();
-    globals.pause = true;
+    globals.time.pause = true;
     let (new_heavy, new_light) = consequences_collision(heavy, light, &mut globals);
     let ke_after = kinetic_energy(&new_heavy) + kinetic_energy(&new_light);
     assert!(

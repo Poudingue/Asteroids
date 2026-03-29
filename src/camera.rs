@@ -13,7 +13,7 @@ use crate::parameters::*;
 /// `(asteroid_pos - screen_center) * mass / (10 + dist²_from_ship)`.
 /// The resulting vector is in world-space and can be scaled by `CAMERA_RATIO_OBJECTS`.
 fn center_of_attention(objects: &[Entity], ship_pos: Vec2, globals: &Globals) -> Vec2 {
-    let screen_center = Vec2::new(globals.phys_width / 2.0, globals.phys_height / 2.0);
+    let screen_center = Vec2::new(globals.render.phys_width / 2.0, globals.render.phys_height / 2.0);
     objects.iter().fold(Vec2::ZERO, |acc, obj| {
         let rel_pos = sub_vec(obj.position, ship_pos);
         let dist2 = distance_squared(rel_pos, Vec2::ZERO);
@@ -33,10 +33,10 @@ pub fn update_camera(state: &mut crate::game::GameState, globals: &Globals) {
     // 1. Compute camera target (next_x, next_y)
     let facing_offset = from_polar(
         ship.orientation,
-        globals.phys_width * CAMERA_RATIO_VISION,
+        globals.render.phys_width * CAMERA_RATIO_VISION,
     );
 
-    let next = if globals.pause {
+    let next = if globals.time.pause {
         // Paused: just keep ship in view with facing offset, no velocity lookahead
         add_vec(ship.position, facing_offset)
     } else {
@@ -59,10 +59,10 @@ pub fn update_camera(state: &mut crate::game::GameState, globals: &Globals) {
 
     // 2. Compute raw camera displacement via exponential decay
     //    move_camera = (center - next) - abso_exp_decay(center - next, CAMERA_HALF_DEPL)
-    let t0 = globals.time_last_frame;
-    let t1 = globals.time_current_frame;
-    let cx = globals.phys_width / 2.0;
-    let cy = globals.phys_height / 2.0;
+    let t0 = globals.time.time_last_frame;
+    let t1 = globals.time.time_current_frame;
+    let cx = globals.render.phys_width / 2.0;
+    let cy = globals.render.phys_height / 2.0;
     let dx = cx - next.x;
     let dy = cy - next.y;
     let mut movex = dx - abso_exp_decay(dx, CAMERA_HALF_DEPL, t0, t1);
@@ -70,13 +70,13 @@ pub fn update_camera(state: &mut crate::game::GameState, globals: &Globals) {
 
     // 3. Boundary clamping: if ship would go past CAMERA_START_BOUND, push it back
     //    elapsed_time = game_speed * (time_last - time_current)  [OCaml sign convention: t_last - t_current > 0]
-    let elapsed_time = globals.game_speed * (t0 - t1);
+    let elapsed_time = globals.time.game_speed * (t0 - t1);
     let sx = state.ship.position.x;
     let sy = state.ship.position.y;
-    let bound_lo_x = CAMERA_START_BOUND * globals.phys_width;
-    let bound_hi_x = (1.0 - CAMERA_START_BOUND) * globals.phys_width;
-    let bound_lo_y = CAMERA_START_BOUND * globals.phys_height;
-    let bound_hi_y = (1.0 - CAMERA_START_BOUND) * globals.phys_height;
+    let bound_lo_x = CAMERA_START_BOUND * globals.render.phys_width;
+    let bound_hi_x = (1.0 - CAMERA_START_BOUND) * globals.render.phys_width;
+    let bound_lo_y = CAMERA_START_BOUND * globals.render.phys_height;
+    let bound_hi_y = (1.0 - CAMERA_START_BOUND) * globals.render.phys_height;
 
     if sx + movex < bound_lo_x {
         movex -= CAMERA_MAX_FORCE * elapsed_time * (-sx - movex + bound_lo_x);
