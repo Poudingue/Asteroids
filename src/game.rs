@@ -14,7 +14,7 @@ use crate::physics::{
 };
 use crate::rendering::Renderer2D;
 use crate::rendering::world::{render_visuals, render_chunk, render_star_trail, render_projectile};
-use crate::rendering::hud::{render_hud, render_scanlines};
+use crate::rendering::hud::render_hud;
 
 // ============================================================================
 // GameState
@@ -1108,20 +1108,14 @@ pub fn render_frame(
     let (w, h) = (renderer.width as i32, renderer.height as i32);
 
     // Background
-    if globals.visual.retro {
-        renderer.fill_rect(0, 0, w, h, [0.0, 0.0, 0.0, 255.0]);
-    } else {
-        // Emit HDR value (exposure baked in); GPU post-process applies add_color/mul_color/redirect
-        let bg = intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure);
-        let bg_color = [bg.r as f32, bg.g as f32, bg.b as f32, 255.0];
-        renderer.fill_rect(0, 0, w, h, bg_color);
-    }
+    // Emit HDR value (exposure baked in); GPU post-process applies add_color/mul_color/redirect
+    let bg = intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure);
+    let bg_color = [bg.r as f32, bg.g as f32, bg.b as f32, 255.0];
+    renderer.fill_rect(0, 0, w, h, bg_color);
 
-    // Stars (not in retro mode)
-    if !globals.visual.retro {
-        for star in &state.stars {
-            render_star_trail(star, renderer, globals, &mut state.rng);
-        }
+    // Stars
+    for star in &state.stars {
+        render_star_trail(star, renderer, globals, &mut state.rng);
     }
 
     // Smoke — before ship (OCaml order)
@@ -1172,12 +1166,4 @@ pub fn render_frame(
         crate::pause_menu::render_pause_title(&mut state.buttons, globals, renderer, &mut state.rng, mouse_sx, mouse_sy, mouse_down);
     }
 
-    // Scanlines effect (rendered last, on top of everything)
-    if globals.visual.scanlines {
-        render_scanlines(globals.visual.scanlines_offset, h, renderer);
-        // Advance animation offset each frame
-        if ANIMATED_SCANLINES {
-            globals.visual.scanlines_offset = (globals.visual.scanlines_offset + 1) % SCANLINES_PERIOD;
-        }
-    }
 }

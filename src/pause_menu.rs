@@ -59,10 +59,6 @@ pub fn make_buttons(globals: &Globals) -> Vec<ButtonBoolean> {
              7.0,  20.0,  9.0, 22.0, GlobalToggle::Pause),
         btn!("New Game",         "Start a new game with current parameters",
              4.0,  20.0,  6.0, 22.0, GlobalToggle::Restart),
-        btn!("scanlines",        "Imitates the look of old CRT monitors.\nLowers luminosity.",
-             10.0, 12.0, 12.0, 14.0, GlobalToggle::Scanlines),
-        btn!("retro visuals",    "White vectors on black background design",
-             7.0,  12.0,  9.0, 14.0, GlobalToggle::Retro),
         btn!("Advanced hitbox",  "A more precise hitbox.",
              10.0,  9.0, 12.0, 11.0, GlobalToggle::AdvancedHitbox),
         btn!("smoke particles",  "Allows smoke. Disable for better performance.",
@@ -123,21 +119,12 @@ pub fn apply_button(
     // fill_poly rect: bottom-left, bottom-right, top-right, top-left
     let rect_pts = vec![(px1, py1), (px2, py1), (px2, py2), (px1, py2)];
 
-    if globals.visual.retro {
-        // Retro mode: white fill if ON, black fill if OFF
-        let fill_col: [f32; 4] = if on { [255.0, 255.0, 255.0, 255.0] } else { [0.0, 0.0, 0.0, 255.0] };
-        renderer.hud_fill_poly(&rect_pts, fill_col);
-        // White frame
-        renderer.hud_draw_poly(&rect_pts, [255.0, 255.0, 255.0, 255.0], 2.0 * rr as f32);
-    } else {
-        // Normal mode
-        let fill_col: [f32; 4] = if on { [0.0, 128.0, 0.0, 255.0] } else { [128.0, 0.0, 0.0, 255.0] };
-        renderer.hud_fill_poly(&rect_pts, fill_col);
+    let fill_col: [f32; 4] = if on { [0.0, 128.0, 0.0, 255.0] } else { [128.0, 0.0, 0.0, 255.0] };
+    renderer.hud_fill_poly(&rect_pts, fill_col);
 
-        // Border: dark grey, 10 * render_scale px wide
-        let border_w = 10.0 * rr as f32;
-        renderer.hud_draw_poly(&rect_pts, [64.0, 64.0, 64.0, 255.0], border_w);
-    }
+    // Border: dark grey, 10 * render_scale px wide
+    let border_w = 10.0 * rr as f32;
+    renderer.hud_draw_poly(&rect_pts, [64.0, 64.0, 64.0, 255.0], border_w);
 
     // ---- Centered text (both modes) ----
     // Uniform character size based on safe zone (like HUD text), not button dimensions
@@ -149,19 +136,13 @@ pub fn apply_button(
     // Center text in button
     let text_x = x1 + ((x2 - x1) - text_total_w) * 0.5;
     let text_y = y1 + ((y2 - y1) - char_h) * 0.5;
-    let text_col: [f32; 4] = if globals.visual.retro {
-        if on { [0.0, 0.0, 0.0, 255.0] } else { [255.0, 255.0, 255.0, 255.0] }
-    } else {
-        [255.0, 255.0, 255.0, 255.0]
-    };
-    if !globals.visual.retro {
-        // Shadow: offset by -1 phys unit
-        render_string(
-            btn.text, (text_x - 1.0, text_y - 1.0),
-            char_w, char_h, char_sp, 0.0,
-            [0.0, 0.0, 0.0, 255.0], renderer, globals, rng,
-        );
-    }
+    let text_col: [f32; 4] = [255.0, 255.0, 255.0, 255.0];
+    // Shadow: offset by -1 phys unit
+    render_string(
+        btn.text, (text_x - 1.0, text_y - 1.0),
+        char_w, char_h, char_sp, 0.0,
+        [0.0, 0.0, 0.0, 255.0], renderer, globals, rng,
+    );
     render_string(
         btn.text, (text_x, text_y),
         char_w, char_h, char_sp, 0.0,

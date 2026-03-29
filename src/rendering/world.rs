@@ -26,11 +26,7 @@ pub fn render_poly(
         .iter()
         .map(|&p| dither_vec(p, DITHER_AA, globals.render.current_jitter_double))
         .collect();
-    if globals.visual.retro {
-        renderer.draw_poly(&screen_points, [255.0, 255.0, 255.0, 255.0], 1.0);
-    } else {
-        renderer.fill_poly(&screen_points, color);
-    }
+    renderer.fill_poly(&screen_points, color);
 }
 
 /// Render all shape polygons of an entity's visuals
@@ -52,7 +48,7 @@ pub fn render_shapes(
 // Entity rendering
 // ============================================================================
 
-/// Render an entity: base circle (if not retro) + polygon shapes
+/// Render an entity: base circle + polygon shapes
 pub fn render_visuals(
     entity: &Entity,
     offset: Vec2,
@@ -72,7 +68,7 @@ pub fn render_visuals(
 
     // SDF circle for entities with radius but no polygon shapes (smoke, explosions)
     // Entities with shapes (ship, asteroids): only render polygon shapes, no base circle
-    if visuals.radius > 0.0 && !globals.visual.retro && visuals.shapes.is_empty() {
+    if visuals.radius > 0.0 && visuals.shapes.is_empty() {
         let color = to_hdr_rgba(intensify(hdr(visuals.color), exposure));
         let (x, y) = dither_vec(position, DITHER_AA, globals.render.current_jitter_double);
         let r = dither_radius(
@@ -106,25 +102,16 @@ pub fn render_chunk(
         add_vec(entity.position, globals.screenshake.game_screenshake_pos),
         globals.render.render_scale,
     );
-    if globals.visual.retro {
-        let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
-        renderer.fill_circle(
-            x as f64, y as f64,
-            (0.25 * globals.render.render_scale * entity.visuals.radius).max(1.0),
-            [128.0, 128.0, 128.0, 255.0],
-        );
-    } else {
-        let intensity_chunk = 1.0;
-        let color = to_hdr_rgba(
-            intensify(hdr(entity.visuals.color), intensity_chunk * globals.exposure.game_exposure * entity.hdr_exposure),
-        );
-        let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
-        let r = dither_radius(
-            globals.render.render_scale * entity.visuals.radius,
-            DITHER_AA, DITHER_POWER_RADIUS, rng,
-        );
-        renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color);
-    }
+    let intensity_chunk = 1.0;
+    let color = to_hdr_rgba(
+        intensify(hdr(entity.visuals.color), intensity_chunk * globals.exposure.game_exposure * entity.hdr_exposure),
+    );
+    let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
+    let r = dither_radius(
+        globals.render.render_scale * entity.visuals.radius,
+        DITHER_AA, DITHER_POWER_RADIUS, rng,
+    );
+    renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color);
 }
 
 /// Render a star with motion trail
@@ -203,37 +190,30 @@ pub fn render_projectile(entity: &Entity, renderer: &mut Renderer2D, globals: &G
     let rad = globals.render.render_scale
         * rand_range(0.5, 1.0, rng)
         * entity.visuals.radius;
-    if globals.visual.retro {
-        // Retro mode: simple white filled circle at projectile position
-        let pos = scale_vec(entity.position, globals.render.render_scale);
-        let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
-        renderer.push_circle_instance(x as f32, y as f32, rad.max(1.0) as f32, [255.0, 255.0, 255.0, 255.0]);
-    } else {
-        let pos = entity.position;
-        let vel = entity.velocity;
-        let col = intensify(hdr(entity.visuals.color), entity.hdr_exposure * globals.exposure.game_exposure);
+    let pos = entity.position;
+    let vel = entity.velocity;
+    let col = intensify(hdr(entity.visuals.color), entity.hdr_exposure * globals.exposure.game_exposure);
 
-        // Compute trail endpoint using the same motion-blur logic as render_light_trail
-        let pos1 = scale_vec(add_vec(pos, globals.screenshake.game_screenshake_pos), globals.render.render_scale);
-        let dt_game = globals.time.game_speed
-            * (globals.time.time_current_frame - globals.time.time_last_frame)
-                .max(1.0 / FRAMERATE_RENDER);
-        let proper_time = entity.proper_time;
-        let veloc = scale_vec(vel, -(globals.observer_proper_time / proper_time) * dt_game);
-        let last_pos = scale_vec(
-            add_vec(sub_vec(pos, veloc), globals.screenshake.game_screenshake_previous_pos),
-            globals.render.render_scale,
-        );
-        let pos2 = lerp_vec(last_pos, pos1, SHUTTER_SPEED);
+    // Compute trail endpoint using the same motion-blur logic as render_light_trail
+    let pos1 = scale_vec(add_vec(pos, globals.screenshake.game_screenshake_pos), globals.render.render_scale);
+    let dt_game = globals.time.game_speed
+        * (globals.time.time_current_frame - globals.time.time_last_frame)
+            .max(1.0 / FRAMERATE_RENDER);
+    let proper_time = entity.proper_time;
+    let veloc = scale_vec(vel, -(globals.observer_proper_time / proper_time) * dt_game);
+    let last_pos = scale_vec(
+        add_vec(sub_vec(pos, veloc), globals.screenshake.game_screenshake_previous_pos),
+        globals.render.render_scale,
+    );
+    let pos2 = lerp_vec(last_pos, pos1, SHUTTER_SPEED);
 
-        let dist = magnitude(sub_vec(pos1, pos2));
-        let trail_lum = 0.5 * (rad / (rad + dist)).sqrt();
-        let color = to_hdr_rgba(intensify(col, trail_lum));
+    let dist = magnitude(sub_vec(pos1, pos2));
+    let trail_lum = 0.5 * (rad / (rad + dist)).sqrt();
+    let color = to_hdr_rgba(intensify(col, trail_lum));
 
-        let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.render.current_jitter_double);
-        let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.render.current_jitter_double);
-        let radius = dither_radius(rad, DITHER_AA, DITHER_POWER_RADIUS, rng).max(1) as f32;
+    let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.render.current_jitter_double);
+    let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.render.current_jitter_double);
+    let radius = dither_radius(rad, DITHER_AA, DITHER_POWER_RADIUS, rng).max(1) as f32;
 
-        renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, radius, color);
-    }
+    renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, radius, color);
 }

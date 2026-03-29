@@ -291,18 +291,6 @@ fn draw_bar_frame(
 // HUD
 // ============================================================================
 
-/// Render scanlines effect: draw horizontal black lines every SCANLINES_PERIOD pixels
-/// starting at `offset`, across the full screen width.
-/// Imitates old CRT monitors that projected the image line by line.
-pub fn render_scanlines(offset: i32, height: i32, renderer: &mut Renderer2D) {
-    let width = renderer.width as i32;
-    let mut y = offset;
-    while y < height {
-        renderer.hud_fill_rect(0, y, width, 1, [0.0, 0.0, 0.0, 255.0]);
-        y += SCANLINES_PERIOD;
-    }
-}
-
 /// Render the full HUD. Matches OCaml `affiche_hud`.
 /// Called at the END of render_frame (on top of everything).
 pub fn render_hud(
@@ -310,11 +298,6 @@ pub fn render_hud(
     globals: &Globals,
     renderer: &mut Renderer2D,
 ) {
-    // Skip HUD in retro mode
-    if globals.visual.retro {
-        return;
-    }
-
     // ----- Colors -----
     let red   : [f32; 4] = [255.0,  32.0,  32.0, 255.0];
     let orange: [f32; 4] = [255.0, 128.0,   0.0, 255.0];
