@@ -16,6 +16,8 @@ use rand::Rng;
 #[derive(Clone, Debug, PartialEq)]
 pub enum EntityKind {
     Asteroid,
+    /// Chunk particle ejected by explosion (distinct from asteroid, no collision)
+    Chunk,
     Projectile,
     Ship,
     Explosion,
@@ -309,7 +311,7 @@ pub fn spawn_explosion_chunk(
     rng: &mut impl Rng,
 ) -> Entity {
     Entity {
-        kind: EntityKind::Asteroid,
+        kind: EntityKind::Chunk,
         visuals: Visuals {
             color,
             radius: rand_range(CHUNKS_EXPLO_MIN_RADIUS, CHUNKS_EXPLO_MAX_RADIUS, rng),
