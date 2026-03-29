@@ -68,13 +68,75 @@ fn tonemap_faithful(hdr_color: vec3<f32>) -> vec3<f32> {
     return clamp(redirected, vec3<f32>(0.0), vec3<f32>(255.0)) / 255.0;
 }
 
+fn tonemap_spectral_bleed(hdr_color: vec3<f32>) -> vec3<f32> {
+    let add_color = vec3<f32>(uniforms.add_color_r, uniforms.add_color_g, uniforms.add_color_b);
+    let mul_color = vec3<f32>(uniforms.mul_color_r, uniforms.mul_color_g, uniforms.mul_color_b);
+    let with_add = hdr_color + add_color * uniforms.game_exposure;
+    let with_mul = with_add * mul_color;
+
+    var r = with_mul.r;
+    var g = with_mul.g;
+    var b = with_mul.b;
+
+    // Red excess bleeds to green (spectral neighbor: red -> orange -> yellow)
+    let r_excess = max(r - 255.0, 0.0);
+    let r_bleed = smoothstep(0.0, 255.0, r_excess) * r_excess;
+    r = r - r_bleed;
+    g = g + r_bleed * 0.7;
+
+    // Green excess bleeds equally to red and blue (spectral center)
+    let g_excess = max(g - 255.0, 0.0);
+    let g_bleed = smoothstep(0.0, 255.0, g_excess) * g_excess;
+    g = g - g_bleed;
+    r = r + g_bleed * 0.5;
+    b = b + g_bleed * 0.5;
+
+    // Blue excess bleeds to green (spectral neighbor: blue -> cyan -> green)
+    let b_excess = max(b - 255.0, 0.0);
+    let b_bleed = smoothstep(0.0, 255.0, b_excess) * b_excess;
+    b = b - b_bleed;
+    g = g + b_bleed * 0.7;
+
+    return clamp(vec3<f32>(r, g, b), vec3<f32>(0.0), vec3<f32>(255.0)) / 255.0;
+}
+
+fn aces_curve(x: vec3<f32>) -> vec3<f32> {
+    let a = 2.51;
+    let b_c = vec3<f32>(0.03);
+    let c_c = vec3<f32>(2.43);
+    let d = vec3<f32>(0.59);
+    let e = vec3<f32>(0.14);
+    return clamp((x * (a * x + b_c)) / (x * (c_c * x + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn tonemap_aces(hdr_color: vec3<f32>) -> vec3<f32> {
+    let add_color = vec3<f32>(uniforms.add_color_r, uniforms.add_color_g, uniforms.add_color_b);
+    let mul_color = vec3<f32>(uniforms.mul_color_r, uniforms.mul_color_g, uniforms.mul_color_b);
+    let with_add = hdr_color + add_color * uniforms.game_exposure;
+    let with_mul = with_add * mul_color;
+    let linear = with_mul / 255.0;
+    return aces_curve(linear);
+}
+
+fn tonemap_reinhard(hdr_color: vec3<f32>) -> vec3<f32> {
+    let add_color = vec3<f32>(uniforms.add_color_r, uniforms.add_color_g, uniforms.add_color_b);
+    let mul_color = vec3<f32>(uniforms.mul_color_r, uniforms.mul_color_g, uniforms.mul_color_b);
+    let with_add = hdr_color + add_color * uniforms.game_exposure;
+    let with_mul = with_add * mul_color;
+    let lum = dot(with_mul, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let mapped_lum = lum / (1.0 + lum / 255.0);
+    let scale = select(mapped_lum / lum, 0.0, lum < 0.001);
+    return clamp(with_mul * scale / 255.0, vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let hdr_color = textureSample(offscreen_texture, offscreen_sampler, in.uv);
-    if (TONEMAP_VARIANT == 0u) { return hdr_color; }
-    else if (TONEMAP_VARIANT == 1u) {
-        let mapped = tonemap_faithful(hdr_color.rgb);
-        return vec4<f32>(mapped, hdr_color.a);
-    }
-    return hdr_color;
+    var mapped: vec3<f32>;
+    if (TONEMAP_VARIANT == 0u) { mapped = hdr_color.rgb; }
+    else if (TONEMAP_VARIANT == 1u) { mapped = tonemap_faithful(hdr_color.rgb); }
+    else if (TONEMAP_VARIANT == 2u) { mapped = tonemap_spectral_bleed(hdr_color.rgb); }
+    else if (TONEMAP_VARIANT == 3u) { mapped = tonemap_aces(hdr_color.rgb); }
+    else { mapped = tonemap_reinhard(hdr_color.rgb); }
+    return vec4<f32>(mapped, hdr_color.a);
 }
