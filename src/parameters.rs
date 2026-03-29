@@ -307,6 +307,18 @@ pub const FIRE_MAX_SPEED: f64 = 2000.0;
 pub const FIRE_RATIO_RADIUS: f64 = 1.4;
 
 // ============================================================================
+// Particle Budget Constants
+// ============================================================================
+
+pub const PARTICLE_BUDGET_SMOKE: usize = 2048;
+pub const PARTICLE_BUDGET_FIRE: usize = 512;
+pub const PARTICLE_BUDGET_CHUNKS: usize = 512;
+pub const PARTICLE_BUDGET_EXPLOSIONS: usize = 256;
+pub const PARTICLE_BUDGET_PROJECTILES: usize = 256;
+pub const PARTICLE_DEGRADATION_THRESHOLD: f64 = 0.9;
+pub const PARTICLE_DEGRADATION_FADE_MULTIPLIER: f64 = 3.0;
+
+// ============================================================================
 // Constants (Smoke Parameters)
 // ============================================================================
 

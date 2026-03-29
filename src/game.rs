@@ -581,8 +581,16 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     globals.observer_proper_time = state.ship.proper_time;  // observer_proper_time stays top-level
 
     // --- Smoke & chunk decay ---
-    for s in state.smoke.iter_mut() { decay_smoke(s, globals); }
-    for s in state.smoke_oos.iter_mut() { decay_smoke(s, globals); }
+    {
+        let smoke_load = state.smoke.len() as f64 / PARTICLE_BUDGET_SMOKE as f64;
+        let fade_multiplier = if smoke_load > PARTICLE_DEGRADATION_THRESHOLD {
+            PARTICLE_DEGRADATION_FADE_MULTIPLIER
+        } else {
+            1.0
+        };
+        for s in state.smoke.iter_mut() { decay_smoke_multiplied(s, globals, fade_multiplier); }
+        for s in state.smoke_oos.iter_mut() { decay_smoke_multiplied(s, globals, fade_multiplier); }
+    }
 
     // --- Decay chunks (radius shrink) ---
     // OCaml formula: radius -= observer_proper_time * game_speed * decay_rate * dt / chunk.proper_time
@@ -590,11 +598,17 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         let dt = globals.dt();
         let gs = globals.time.game_speed;
         let opt = globals.observer_proper_time;
+        let chunk_load = state.chunks.len() as f64 / PARTICLE_BUDGET_CHUNKS as f64;
+        let chunk_fade_multiplier = if chunk_load > PARTICLE_DEGRADATION_THRESHOLD {
+            PARTICLE_DEGRADATION_FADE_MULTIPLIER
+        } else {
+            1.0
+        };
         for c in state.chunks.iter_mut() {
-            c.visuals.radius -= opt * gs * CHUNK_RADIUS_DECAY * dt / c.proper_time;
+            c.visuals.radius -= opt * gs * CHUNK_RADIUS_DECAY * dt * chunk_fade_multiplier / c.proper_time;
         }
         for c in state.chunks_oos.iter_mut() {
-            c.visuals.radius -= opt * gs * CHUNK_RADIUS_DECAY * dt / c.proper_time;
+            c.visuals.radius -= opt * gs * CHUNK_RADIUS_DECAY * dt * chunk_fade_multiplier / c.proper_time;
         }
         for c in state.chunks_explo.iter_mut() {
             c.visuals.radius -= opt * gs * CHUNK_EXPLO_RADIUS_DECAY * dt / c.proper_time;
@@ -1008,8 +1022,64 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         }
     }
 
+    // --- Particle budget enforcement ---
+    enforce_particle_budgets(state);
+
     // --- Camera update: translate all entities to keep ship centred ---
     crate::camera::update_camera(state, globals);
+}
+
+/// Enforce per-collection particle caps, removing oldest/smallest particles first.
+pub fn enforce_particle_budgets(state: &mut GameState) {
+    // Smoke: oldest-first (front of Vec is oldest)
+    if state.smoke.len() > PARTICLE_BUDGET_SMOKE {
+        let excess = state.smoke.len() - PARTICLE_BUDGET_SMOKE;
+        state.smoke.drain(0..excess);
+    }
+    if state.smoke_oos.len() > PARTICLE_BUDGET_SMOKE {
+        let excess = state.smoke_oos.len() - PARTICLE_BUDGET_SMOKE;
+        state.smoke_oos.drain(0..excess);
+    }
+    // Chunks: lowest-radius first (proxy for most-faded)
+    if state.chunks.len() > PARTICLE_BUDGET_CHUNKS {
+        state.chunks.sort_by(|a, b| {
+            a.visuals.radius.partial_cmp(&b.visuals.radius).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let excess = state.chunks.len() - PARTICLE_BUDGET_CHUNKS;
+        state.chunks.drain(0..excess);
+    }
+    if state.chunks_oos.len() > PARTICLE_BUDGET_CHUNKS {
+        state.chunks_oos.sort_by(|a, b| {
+            a.visuals.radius.partial_cmp(&b.visuals.radius).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let excess = state.chunks_oos.len() - PARTICLE_BUDGET_CHUNKS;
+        state.chunks_oos.drain(0..excess);
+    }
+    if state.chunks_explo.len() > PARTICLE_BUDGET_CHUNKS {
+        state.chunks_explo.sort_by(|a, b| {
+            a.visuals.radius.partial_cmp(&b.visuals.radius).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let excess = state.chunks_explo.len() - PARTICLE_BUDGET_CHUNKS;
+        state.chunks_explo.drain(0..excess);
+    }
+    // Explosions: oldest-first
+    if state.explosions.len() > PARTICLE_BUDGET_EXPLOSIONS {
+        let excess = state.explosions.len() - PARTICLE_BUDGET_EXPLOSIONS;
+        state.explosions.drain(0..excess);
+    }
+}
+
+/// Decay smoke radius and exposure with an optional fade multiplier for graceful degradation.
+pub fn decay_smoke_multiplied(smoke: &mut Entity, globals: &Globals, fade_multiplier: f64) {
+    let dt_game = globals.time.game_speed * globals.dt() * fade_multiplier;
+    let half_r = SMOKE_HALF_RADIUS * smoke.proper_time;
+    let half_c = SMOKE_HALF_COL * smoke.proper_time;
+    // exp_decay: n * 2^(-(dt_game) / half_life)
+    smoke.visuals.radius = smoke.visuals.radius * (2.0_f64).powf(-dt_game / half_r)
+        - SMOKE_RADIUS_DECAY * dt_game * globals.observer_proper_time / smoke.proper_time;
+    if smoke.hdr_exposure > 0.001 {
+        smoke.hdr_exposure *= (2.0_f64).powf(-dt_game / half_c);
+    }
 }
 
 /// Decay smoke radius and exposure (game-time based half-life).
