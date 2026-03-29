@@ -264,14 +264,9 @@ pub fn render_pause_title(
     }
 
     // Phase 2: render tooltips on top of all buttons
-    // We can't borrow `buttons` as immutable here while `rng` is already borrowed,
-    // but since `rng` is passed separately there's no conflict — use index loop.
-    let btn_count = buttons.len();
-    for i in 0..btn_count {
-        // SAFETY: indices are in-bounds, no overlapping mutable borrows.
-        // We borrow buttons[i] immutably and rng separately.
+    for btn in buttons.iter() {
         render_button_tooltip(
-            &buttons[i],
+            btn,
             globals,
             renderer,
             rng,
