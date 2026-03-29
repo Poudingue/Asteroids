@@ -116,7 +116,6 @@ pub fn from_i32_tuple(v: (i32, i32)) -> Vec2 {
     Vec2::new(v.0 as f64, v.1 as f64)
 }
 
-
 /// Apply dithering to a radius value before converting to int
 ///
 /// # Arguments
@@ -170,7 +169,6 @@ pub fn from_polar_tuple(polar: (f64, f64)) -> Vec2 {
     from_polar(polar.0, polar.1)
 }
 
-
 /// Convert Cartesian coordinates (x, y) to polar coordinates (angle, magnitude)
 pub fn to_polar(v: Vec2) -> Vec2 {
     let r = magnitude(v);
@@ -205,10 +203,7 @@ pub fn wrap_float(value: f64, modulo: f64) -> f64 {
 /// * `phys_width` - Physical width of game space
 /// * `phys_height` - Physical height of game space
 pub fn wrap_single(v: Vec2, phys_width: f64, phys_height: f64) -> Vec2 {
-    Vec2::new(
-        wrap_float(v.x, phys_width),
-        wrap_float(v.y, phys_height),
-    )
+    Vec2::new(wrap_float(v.x, phys_width), wrap_float(v.y, phys_height))
 }
 
 /// Modulo operation for 3x3 resolution wrapping (for objects wrapping around edges)
@@ -224,7 +219,6 @@ pub fn wrap_toroidal(v: Vec2, phys_width: f64, phys_height: f64) -> Vec2 {
         wrap_float(v.y + phys_height, phys_height * 3.0) - phys_height,
     )
 }
-
 
 /// Convert a polar polygon to affine (cartesian) coordinates with rotation and scale.
 pub fn polygon_to_cartesian(poly: &[(f64, f64)], rotat: f64, scale: f64) -> Vec<Vec2> {

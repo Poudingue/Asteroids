@@ -6,15 +6,12 @@ use crate::objects::*;
 use crate::parameters::*;
 pub use crate::physics::{collision_circles, collision_point};
 use crate::physics::{
-    collision_entities,
-    consequences_collision, consequences_collision_frags,
-    damage,
-    CollisionGrid, GridEntry,
-    make_grid, insert_into_grid,
+    collision_entities, consequences_collision, consequences_collision_frags, damage,
+    insert_into_grid, make_grid, CollisionGrid, GridEntry,
 };
-use crate::rendering::Renderer2D;
-use crate::rendering::world::{render_visuals, render_chunk, render_star_trail, render_projectile};
 use crate::rendering::hud::render_hud;
+use crate::rendering::world::{render_chunk, render_projectile, render_star_trail, render_visuals};
+use crate::rendering::Renderer2D;
 
 // ============================================================================
 // GamepadState
@@ -58,6 +55,12 @@ impl GamepadState {
     }
 }
 
+impl Default for GamepadState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ============================================================================
 // GameState
 // ============================================================================
@@ -70,8 +73,8 @@ pub struct GameState {
     pub cooldown_tp: f64,
     pub last_health: f64,
     // Death / respawn state
-    pub is_dead: bool,         // true while in mort() loop
-    pub time_of_death: f64,   // wall-clock time when ship died
+    pub is_dead: bool,      // true while in mort() loop
+    pub time_of_death: f64, // wall-clock time when ship died
     pub ship: Entity,
     pub objects: Vec<Entity>,
     pub objects_oos: Vec<Entity>,
@@ -102,7 +105,10 @@ impl GameState {
     pub fn new(globals: &Globals) -> Self {
         let mut rng = thread_rng();
         let mut ship = spawn_ship();
-        ship.position = Vec2::new(globals.render.phys_width / 2.0, globals.render.phys_height / 2.0);
+        ship.position = Vec2::new(
+            globals.render.phys_width / 2.0,
+            globals.render.phys_height / 2.0,
+        );
 
         Self {
             score: 0,
@@ -174,7 +180,8 @@ pub(crate) fn to_hdr_rgba(color: HdrColor) -> [f32; 4] {
 
 /// Displace an object by a velocity vector, scaled by dt * game_speed * observer/proper time
 pub fn move_entity(entity: &mut Entity, vel: Vec2, globals: &Globals) {
-    let time_factor = globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
+    let time_factor =
+        globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.position = proj(entity.position, vel, time_factor);
 }
 
@@ -186,7 +193,8 @@ pub fn apply_inertia(entity: &mut Entity, globals: &Globals) {
 
 /// Accelerate an object (velocity += accel * dt * ...)
 pub fn accelerate_entity(entity: &mut Entity, accel: Vec2, globals: &Globals) {
-    let time_factor = globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
+    let time_factor =
+        globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.velocity = proj(entity.velocity, accel, time_factor);
 }
 
@@ -197,7 +205,8 @@ pub fn boost_entity(entity: &mut Entity, boost: Vec2) {
 
 /// Timed rotation (orientation += rotation * dt * ...)
 pub fn rotate_entity(entity: &mut Entity, rotation: f64, globals: &Globals) {
-    let time_factor = globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
+    let time_factor =
+        globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.orientation += rotation * time_factor;
 }
 
@@ -208,7 +217,8 @@ pub fn turn_entity(entity: &mut Entity, rotation: f64) {
 
 /// Angular acceleration (moment += momentum * dt * ...)
 pub fn apply_torque(entity: &mut Entity, momentum: f64, globals: &Globals) {
-    let time_factor = globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
+    let time_factor =
+        globals.dt() * globals.time.game_speed * OBSERVER_PROPER_TIME / entity.proper_time;
     entity.moment += momentum * time_factor;
 }
 
@@ -244,7 +254,11 @@ pub fn apply_angular_momentum_all(entities: &mut [Entity], globals: &Globals) {
 
 /// Wrap entity position using 3x-resolution modulo (toroidal world)
 pub fn wrap_entity(entity: &mut Entity, globals: &Globals) {
-    entity.position = wrap_toroidal(entity.position, globals.render.phys_width, globals.render.phys_height);
+    entity.position = wrap_toroidal(
+        entity.position,
+        globals.render.phys_width,
+        globals.render.phys_height,
+    );
 }
 
 /// Wrap all entities' positions (toroidal world)
@@ -253,7 +267,6 @@ pub fn wrap_entities(entities: &mut [Entity], globals: &Globals) {
         wrap_entity(e, globals);
     }
 }
-
 
 // --- Entity predicates ---
 
@@ -268,7 +281,6 @@ fn is_dead(entity: &Entity) -> bool {
 fn ischunk(entity: &Entity) -> bool {
     entity.hitbox.int_radius < CHUNK_MAX_SIZE
 }
-
 
 fn big_enough(entity: &Entity) -> bool {
     entity.hitbox.int_radius >= ASTEROID_MIN_SIZE
@@ -287,16 +299,14 @@ fn checkspawn_objet(entity: &Entity, globals: &Globals) -> bool {
     let x = entity.position.x;
     let y = entity.position.y;
     let rad = entity.hitbox.ext_radius;
-    (x - rad < globals.render.phys_width) && (x + rad > 0.0)
-        && (y - rad < globals.render.phys_height) && (y + rad > 0.0)
+    (x - rad < globals.render.phys_width)
+        && (x + rad > 0.0)
+        && (y - rad < globals.render.phys_height)
+        && (y + rad > 0.0)
 }
 
 /// Transfer entities between on-screen and off-screen lists.
-fn transfer_oos(
-    onscreen: &mut Vec<Entity>,
-    oos: &mut Vec<Entity>,
-    globals: &Globals,
-) {
+fn transfer_oos(onscreen: &mut Vec<Entity>, oos: &mut Vec<Entity>, globals: &Globals) {
     let mut going_out: Vec<Entity> = Vec::new();
     let mut staying_in: Vec<Entity> = Vec::new();
     for e in onscreen.drain(..) {
@@ -323,17 +333,31 @@ fn transfer_oos(
     oos.extend(going_out);
 }
 
-
 /// Remove dead entities, transfer chunk-sized asteroids to chunks list, and remove zero-radius debris.
 /// Matches OCaml despawn: collects ischunk from all asteroid lists before filtering notchunk.
 fn despawn(state: &mut GameState, globals: &Globals) {
     if globals.visual.chunks_enabled {
         // Collect chunk-sized asteroids from all asteroid lists (OCaml: ischunk filter then append to ref_chunks)
-        let new_from_objects      = state.objects.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
-        let new_from_objects_oos  = state.objects_oos.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
-        let new_from_toosmall     = state.toosmall.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
-        let new_from_toosmall_oos = state.toosmall_oos.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
-        let new_from_fragments    = state.fragments.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
+        let new_from_objects = state
+            .objects
+            .extract_if(.., |e| ischunk(e))
+            .collect::<Vec<_>>();
+        let new_from_objects_oos = state
+            .objects_oos
+            .extract_if(.., |e| ischunk(e))
+            .collect::<Vec<_>>();
+        let new_from_toosmall = state
+            .toosmall
+            .extract_if(.., |e| ischunk(e))
+            .collect::<Vec<_>>();
+        let new_from_toosmall_oos = state
+            .toosmall_oos
+            .extract_if(.., |e| ischunk(e))
+            .collect::<Vec<_>>();
+        let new_from_fragments = state
+            .fragments
+            .extract_if(.., |e| ischunk(e))
+            .collect::<Vec<_>>();
 
         state.chunks.extend(new_from_objects);
         state.chunks.extend(new_from_objects_oos);
@@ -371,7 +395,11 @@ pub fn move_star(star: &mut Star, velocity: Vec2, globals: &Globals) {
     let next = add_vec(star.pos, scale_vec(velocity, star.proximity));
     star.pos = wrap_single(next, globals.render.phys_width, globals.render.phys_height);
     // Avoid incorrect motion blur from screen-edge teleport
-    if next.x > globals.render.phys_width || next.x < 0.0 || next.y > globals.render.phys_height || next.y < 0.0 {
+    if next.x > globals.render.phys_width
+        || next.x < 0.0
+        || next.y > globals.render.phys_height
+        || next.y < 0.0
+    {
         star.last_pos = star.pos;
     }
 }
@@ -419,13 +447,22 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
         );
 
         // Screenshake decay
-        globals.screenshake.game_screenshake =
-            abso_exp_decay(globals.screenshake.game_screenshake, SCREENSHAKE_HALF_LIFE, t0, t1);
+        globals.screenshake.game_screenshake = abso_exp_decay(
+            globals.screenshake.game_screenshake,
+            SCREENSHAKE_HALF_LIFE,
+            t0,
+            t1,
+        );
 
         // Score shake decay
-        globals.screenshake.shake_score =
-            abso_exp_decay(globals.screenshake.shake_score, SHAKE_SCORE_HALF_LIFE, t0, t1);
-        globals.screenshake.game_screenshake_previous_pos = globals.screenshake.game_screenshake_pos;
+        globals.screenshake.shake_score = abso_exp_decay(
+            globals.screenshake.shake_score,
+            SHAKE_SCORE_HALF_LIFE,
+            t0,
+            t1,
+        );
+        globals.screenshake.game_screenshake_previous_pos =
+            globals.screenshake.game_screenshake_pos;
         if globals.visual.screenshake_enabled {
             globals.screenshake.game_screenshake_pos = scale_vec(
                 Vec2::new(rng.gen::<f64>() * 2.0 - 1.0, rng.gen::<f64>() * 2.0 - 1.0),
@@ -446,15 +483,30 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
         if globals.visual.dyn_color {
             let dt = t1 - t0;
             globals.exposure.mul_color = {
-                let c = half_color(hdr(globals.exposure.mul_color), hdr(globals.exposure.mul_base), FILTER_HALF_LIFE, dt);
+                let c = half_color(
+                    hdr(globals.exposure.mul_color),
+                    hdr(globals.exposure.mul_base),
+                    FILTER_HALF_LIFE,
+                    dt,
+                );
                 (c.r, c.g, c.b)
             };
             globals.visual.space_color = {
-                let c = half_color(hdr(globals.visual.space_color), hdr(globals.visual.space_color_goal), SPACE_HALF_LIFE, dt);
+                let c = half_color(
+                    hdr(globals.visual.space_color),
+                    hdr(globals.visual.space_color_goal),
+                    SPACE_HALF_LIFE,
+                    dt,
+                );
                 (c.r, c.g, c.b)
             };
             globals.visual.star_color = {
-                let c = half_color(hdr(globals.visual.star_color), hdr(globals.visual.star_color_goal), SPACE_HALF_LIFE, dt);
+                let c = half_color(
+                    hdr(globals.visual.star_color),
+                    hdr(globals.visual.star_color_goal),
+                    SPACE_HALF_LIFE,
+                    dt,
+                );
                 (c.r, c.g, c.b)
             };
         }
@@ -474,23 +526,23 @@ pub fn update_frame(globals: &mut Globals, rng: &mut impl Rng) {
 
 fn get_entity(state: &GameState, entry: GridEntry) -> &Entity {
     match entry {
-        GridEntry::Object(i)      => &state.objects[i],
-        GridEntry::ObjectOos(i)   => &state.objects_oos[i],
-        GridEntry::TooSmall(i)    => &state.toosmall[i],
+        GridEntry::Object(i) => &state.objects[i],
+        GridEntry::ObjectOos(i) => &state.objects_oos[i],
+        GridEntry::TooSmall(i) => &state.toosmall[i],
         GridEntry::TooSmallOos(i) => &state.toosmall_oos[i],
-        GridEntry::Fragment(i)    => &state.fragments[i],
-        GridEntry::Ship           => &state.ship,
+        GridEntry::Fragment(i) => &state.fragments[i],
+        GridEntry::Ship => &state.ship,
     }
 }
 
 fn get_entity_mut(state: &mut GameState, entry: GridEntry) -> &mut Entity {
     match entry {
-        GridEntry::Object(i)      => &mut state.objects[i],
-        GridEntry::ObjectOos(i)   => &mut state.objects_oos[i],
-        GridEntry::TooSmall(i)    => &mut state.toosmall[i],
+        GridEntry::Object(i) => &mut state.objects[i],
+        GridEntry::ObjectOos(i) => &mut state.objects_oos[i],
+        GridEntry::TooSmall(i) => &mut state.toosmall[i],
         GridEntry::TooSmallOos(i) => &mut state.toosmall_oos[i],
-        GridEntry::Fragment(i)    => &mut state.fragments[i],
-        GridEntry::Ship           => &mut state.ship,
+        GridEntry::Fragment(i) => &mut state.fragments[i],
+        GridEntry::Ship => &mut state.ship,
     }
 }
 
@@ -513,7 +565,8 @@ fn collect_pairs_for_cell(
             }
             let ent1 = get_entity(state, e1);
             let ent2 = get_entity(state, e2);
-            if collision_entities(ent1, ent2, precis, globals.advanced_hitbox) {  // advanced_hitbox stays top-level
+            if collision_entities(ent1, ent2, precis, globals.advanced_hitbox) {
+                // advanced_hitbox stays top-level
                 pairs.push((e1, e2));
             }
         }
@@ -562,12 +615,33 @@ fn calculate_collision_tables(
         for x in 0..w - 1 {
             for y in 0..h - 1 {
                 let base = x * h + y;
-                let right = base + h;      // x+1, y
-                let down  = base + 1;      // x, y+1
-                let diag  = base + h + 1;  // x+1, y+1
-                collect_pairs_for_cell(&grid1[base], &grid2[down],  state, false, globals, &mut pairs);
-                collect_pairs_for_cell(&grid1[base], &grid2[right], state, false, globals, &mut pairs);
-                collect_pairs_for_cell(&grid1[base], &grid2[diag],  state, false, globals, &mut pairs);
+                let right = base + h; // x+1, y
+                let down = base + 1; // x, y+1
+                let diag = base + h + 1; // x+1, y+1
+                collect_pairs_for_cell(
+                    &grid1[base],
+                    &grid2[down],
+                    state,
+                    false,
+                    globals,
+                    &mut pairs,
+                );
+                collect_pairs_for_cell(
+                    &grid1[base],
+                    &grid2[right],
+                    state,
+                    false,
+                    globals,
+                    &mut pairs,
+                );
+                collect_pairs_for_cell(
+                    &grid1[base],
+                    &grid2[diag],
+                    state,
+                    false,
+                    globals,
+                    &mut pairs,
+                );
             }
         }
     }
@@ -586,7 +660,13 @@ fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
     let mut pairs: Vec<(usize, usize)> = Vec::new();
     for i in 0..n {
         for j in (i + 1)..n {
-            if collision_entities(&state.fragments[i], &state.fragments[j], false, globals.advanced_hitbox) {  // advanced_hitbox stays top-level
+            if collision_entities(
+                &state.fragments[i],
+                &state.fragments[j],
+                false,
+                globals.advanced_hitbox,
+            ) {
+                // advanced_hitbox stays top-level
                 pairs.push((i, j));
                 involved[i] = true;
                 involved[j] = true;
@@ -617,13 +697,11 @@ fn run_fragment_collisions(state: &mut GameState, globals: &Globals) {
     state.objects.extend(settled);
 }
 
-
-
 /// Main game update: movement, transfers, collisions, spawning, despawn.
 /// Called each frame when not paused.
 pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // Update observer proper time (for time dilation)
-    globals.observer_proper_time = state.ship.proper_time;  // observer_proper_time stays top-level
+    globals.observer_proper_time = state.ship.proper_time; // observer_proper_time stays top-level
 
     // --- Smoke & chunk decay ---
     {
@@ -633,8 +711,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         } else {
             1.0
         };
-        for s in state.smoke.iter_mut() { decay_smoke_multiplied(s, globals, fade_multiplier); }
-        for s in state.smoke_oos.iter_mut() { decay_smoke_multiplied(s, globals, fade_multiplier); }
+        for s in state.smoke.iter_mut() {
+            decay_smoke_multiplied(s, globals, fade_multiplier);
+        }
+        for s in state.smoke_oos.iter_mut() {
+            decay_smoke_multiplied(s, globals, fade_multiplier);
+        }
     }
 
     // --- Decay chunks (radius shrink) ---
@@ -650,10 +732,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             1.0
         };
         for c in state.chunks.iter_mut() {
-            c.visuals.radius -= opt * gs * CHUNK_RADIUS_DECAY * dt * chunk_fade_multiplier / c.proper_time;
+            c.visuals.radius -=
+                opt * gs * CHUNK_RADIUS_DECAY * dt * chunk_fade_multiplier / c.proper_time;
         }
         for c in state.chunks_oos.iter_mut() {
-            c.visuals.radius -= opt * gs * CHUNK_RADIUS_DECAY * dt * chunk_fade_multiplier / c.proper_time;
+            c.visuals.radius -=
+                opt * gs * CHUNK_RADIUS_DECAY * dt * chunk_fade_multiplier / c.proper_time;
         }
         for c in state.chunks_explo.iter_mut() {
             c.visuals.radius -= opt * gs * CHUNK_EXPLO_RADIUS_DECAY * dt / c.proper_time;
@@ -661,8 +745,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     }
 
     // Remove dead/negative-radius smoke
-    state.smoke.retain(|s| s.visuals.radius > 0.0 && s.hdr_exposure > 0.001);
-    state.smoke_oos.retain(|s| s.visuals.radius > 0.0 && s.hdr_exposure > 0.001);
+    state
+        .smoke
+        .retain(|s| s.visuals.radius > 0.0 && s.hdr_exposure > 0.001);
+    state
+        .smoke_oos
+        .retain(|s| s.visuals.radius > 0.0 && s.hdr_exposure > 0.001);
 
     // --- Spawn explosions from dead projectiles ---
     // Previous explosions → smoke (before overwriting)
@@ -673,7 +761,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     }
 
     // Spawn new explosions from dead projectiles (health < 0)
-    let dead_projectile_explosions: Vec<Entity> = state.projectiles.iter()
+    let dead_projectile_explosions: Vec<Entity> = state
+        .projectiles
+        .iter()
         .filter(|p| p.health < 0.0)
         .map(|p| spawn_explosion(p, &mut state.rng))
         .collect();
@@ -681,8 +771,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // Spawn explosions from dead asteroids/toosmall/fragments → add to smoke list
     {
-        let dead_objects: Vec<Entity> = state.objects.iter().chain(state.objects_oos.iter())
-            .chain(state.toosmall.iter()).chain(state.toosmall_oos.iter())
+        let dead_objects: Vec<Entity> = state
+            .objects
+            .iter()
+            .chain(state.objects_oos.iter())
+            .chain(state.toosmall.iter())
+            .chain(state.toosmall_oos.iter())
             .chain(state.fragments.iter())
             .filter(|e| is_dead(e))
             .cloned()
@@ -713,7 +807,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // Chunk explosions (chunks_explo → explosions)
     if !globals.time.pause {
-        let explo_chunks: Vec<Entity> = state.chunks_explo.iter()
+        let explo_chunks: Vec<Entity> = state
+            .chunks_explo
+            .iter()
             .map(|c| {
                 let (explo, se) = spawn_chunk_explosion(
                     c,
@@ -758,8 +854,10 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         p.health >= 0.0 && {
             let x = p.position.x;
             let y = p.position.y;
-            x >= -globals.render.phys_width && x <= 2.0 * globals.render.phys_width
-                && y >= -globals.render.phys_height && y <= 2.0 * globals.render.phys_height
+            x >= -globals.render.phys_width
+                && x <= 2.0 * globals.render.phys_width
+                && y >= -globals.render.phys_height
+                && y <= 2.0 * globals.render.phys_height
         }
     });
 
@@ -791,9 +889,15 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     apply_angular_momentum_all(&mut state.fragments, globals);
 
     // --- Size classification: move too-small asteroids ---
-    let small_objs = state.objects.extract_if(.., |e| too_small(e)).collect::<Vec<_>>();
+    let small_objs = state
+        .objects
+        .extract_if(.., |e| too_small(e))
+        .collect::<Vec<_>>();
     state.toosmall.extend(small_objs);
-    let small_frags = state.fragments.extract_if(.., |e| too_small(e)).collect::<Vec<_>>();
+    let small_frags = state
+        .fragments
+        .extract_if(.., |e| too_small(e))
+        .collect::<Vec<_>>();
     state.toosmall.extend(small_frags);
 
     // --- OOS transfers ---
@@ -802,48 +906,92 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     transfer_oos(&mut state.chunks, &mut state.chunks_oos, globals);
 
     // === Collision grids ===
-    let mut grid_objects  = make_grid();
+    let mut grid_objects = make_grid();
     let mut grid_toosmall = make_grid();
-    let mut grid_other    = make_grid();
-    let mut grid_frag     = make_grid();
+    let mut grid_other = make_grid();
+    let mut grid_frag = make_grid();
 
-    let mut entries_obj: Vec<(GridEntry, Vec2)> = state.objects
-        .iter().enumerate().map(|(i, e)| (GridEntry::Object(i), e.position)).collect();
-    entries_obj.extend(state.objects_oos
-        .iter().enumerate().map(|(i, e)| (GridEntry::ObjectOos(i), e.position)));
+    let mut entries_obj: Vec<(GridEntry, Vec2)> = state
+        .objects
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (GridEntry::Object(i), e.position))
+        .collect();
+    entries_obj.extend(
+        state
+            .objects_oos
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (GridEntry::ObjectOos(i), e.position)),
+    );
 
-    let mut entries_small: Vec<(GridEntry, Vec2)> = state.toosmall
-        .iter().enumerate().map(|(i, e)| (GridEntry::TooSmall(i), e.position)).collect();
-    entries_small.extend(state.toosmall_oos
-        .iter().enumerate().map(|(i, e)| (GridEntry::TooSmallOos(i), e.position)));
+    let mut entries_small: Vec<(GridEntry, Vec2)> = state
+        .toosmall
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (GridEntry::TooSmall(i), e.position))
+        .collect();
+    entries_small.extend(
+        state
+            .toosmall_oos
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (GridEntry::TooSmallOos(i), e.position)),
+    );
 
     // Note: explosions live exactly one frame; we include them in grid_other for collision
     // but they're not tracked by GridEntry index (they can't be mutated via get_entity_mut).
     // OCaml: other_ref = ship :: explosions @ projectiles — explosions damage via mass.
     // We handle explosion→asteroid damage separately below after grid collision.
-    let entries_other: Vec<(GridEntry, Vec2)> = vec![
-        (GridEntry::Ship, state.ship.position),
-    ];
+    let entries_other: Vec<(GridEntry, Vec2)> = vec![(GridEntry::Ship, state.ship.position)];
 
-    let entries_frag: Vec<(GridEntry, Vec2)> = state.fragments
-        .iter().enumerate().map(|(i, e)| (GridEntry::Fragment(i), e.position)).collect();
+    let entries_frag: Vec<(GridEntry, Vec2)> = state
+        .fragments
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (GridEntry::Fragment(i), e.position))
+        .collect();
 
-    insert_into_grid(&entries_obj,   &mut grid_objects,  globals);
+    insert_into_grid(&entries_obj, &mut grid_objects, globals);
     insert_into_grid(&entries_small, &mut grid_toosmall, globals);
-    insert_into_grid(&entries_other, &mut grid_other,    globals);
-    insert_into_grid(&entries_frag,  &mut grid_frag,     globals);
+    insert_into_grid(&entries_other, &mut grid_other, globals);
+    insert_into_grid(&entries_frag, &mut grid_frag, globals);
 
     // === Collision detection ===
     // Asteroid vs asteroid (extend=true)
     calculate_collision_tables(&grid_objects, &grid_objects, true, state, globals);
     // Asteroid vs toosmall (extend=false)
-    calculate_collision_tables(&grid_objects.clone(), &grid_toosmall.clone(), false, state, globals);
+    calculate_collision_tables(
+        &grid_objects.clone(),
+        &grid_toosmall.clone(),
+        false,
+        state,
+        globals,
+    );
     // Ship/other vs asteroid (extend=true)
-    calculate_collision_tables(&grid_other.clone(), &grid_objects.clone(), true, state, globals);
+    calculate_collision_tables(
+        &grid_other.clone(),
+        &grid_objects.clone(),
+        true,
+        state,
+        globals,
+    );
     // Ship/other vs toosmall (extend=true)
-    calculate_collision_tables(&grid_other.clone(), &grid_toosmall.clone(), true, state, globals);
+    calculate_collision_tables(
+        &grid_other.clone(),
+        &grid_toosmall.clone(),
+        true,
+        state,
+        globals,
+    );
     // Ship/other vs fragment (extend=true)
-    calculate_collision_tables(&grid_other.clone(), &grid_frag.clone(), true, state, globals);
+    calculate_collision_tables(
+        &grid_other.clone(),
+        &grid_frag.clone(),
+        true,
+        state,
+        globals,
+    );
 
     // === Explosion damage to asteroids ===
     // Explosions are one-frame entities; we do a simple O(n*m) check here.
@@ -851,8 +999,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         let explo_pos = explo.position;
         let explo_rad = explo.hitbox.ext_radius;
         let explo_mass = explo.mass;
-        for obj in state.objects.iter_mut().chain(state.objects_oos.iter_mut())
-            .chain(state.toosmall.iter_mut()).chain(state.toosmall_oos.iter_mut())
+        for obj in state
+            .objects
+            .iter_mut()
+            .chain(state.objects_oos.iter_mut())
+            .chain(state.toosmall.iter_mut())
+            .chain(state.toosmall_oos.iter_mut())
         {
             if collision_circles(explo_pos, explo_rad, obj.position, obj.hitbox.int_radius) {
                 damage(obj, explo_mass, globals);
@@ -865,8 +1017,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         let proj_pos = proj.position;
         let proj_rad = proj.hitbox.ext_radius;
         let mut hit = false;
-        for obj in state.objects.iter_mut().chain(state.objects_oos.iter_mut())
-            .chain(state.toosmall.iter_mut()).chain(state.toosmall_oos.iter_mut())
+        for obj in state
+            .objects
+            .iter_mut()
+            .chain(state.objects_oos.iter_mut())
+            .chain(state.toosmall.iter_mut())
+            .chain(state.toosmall_oos.iter_mut())
         {
             if collision_circles(proj_pos, proj_rad, obj.position, obj.hitbox.int_radius) {
                 hit = true;
@@ -891,12 +1047,30 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     run_fragment_collisions(state, globals);
 
     // --- Fragmentation (spawn fragments from dead entities) ---
-    spawn_fragments(&state.objects.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
-    spawn_fragments(&state.toosmall.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
-    spawn_fragments(&state.fragments.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
+    spawn_fragments(
+        &state.objects.clone(),
+        &mut state.fragments,
+        FRAGMENT_NUMBER,
+        &mut state.rng,
+    );
+    spawn_fragments(
+        &state.toosmall.clone(),
+        &mut state.fragments,
+        FRAGMENT_NUMBER,
+        &mut state.rng,
+    );
+    spawn_fragments(
+        &state.fragments.clone(),
+        &mut state.fragments,
+        FRAGMENT_NUMBER,
+        &mut state.rng,
+    );
 
     // --- Move chunks out of fragments ---
-    let new_chunks = state.fragments.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
+    let new_chunks = state
+        .fragments
+        .extract_if(.., |e| ischunk(e))
+        .collect::<Vec<_>>();
     state.chunks.extend(new_chunks);
 
     // --- Recenter (wrap positions) ---
@@ -947,7 +1121,8 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         globals.spawn.current_stage_asteroids += 1;
     }
 
-    let elapsed = (globals.time.time_current_frame - globals.time.time_last_frame) * globals.time.game_speed;
+    let elapsed =
+        (globals.time.time_current_frame - globals.time.time_last_frame) * globals.time.game_speed;
     globals.spawn.time_since_last_spawn += elapsed;
 
     // --- Despawn ---
@@ -963,15 +1138,16 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // Exponential lag: last_health chases ship.health (matches OCaml affiche_hud line 769)
     {
         let target = state.ship.health.max(0.0);
-        state.last_health = target + exp_decay(
-            state.last_health - target,
-            0.5,
-            globals.observer_proper_time,
-            globals.time.game_speed,
-            globals.time.time_last_frame,
-            globals.time.time_current_frame,
-            state.ship.proper_time,
-        );
+        state.last_health = target
+            + exp_decay(
+                state.last_health - target,
+                0.5,
+                globals.observer_proper_time,
+                globals.time.game_speed,
+                globals.time.time_last_frame,
+                globals.time.time_current_frame,
+                state.ship.proper_time,
+            );
     }
 
     // --- Ship death handling ---
@@ -984,12 +1160,8 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         // Chunk explosion at death
         if globals.visual.chunks_enabled {
             let death_color = (1500.0, 400.0, 200.0);
-            let new_chunks = spawn_n_chunks(
-                &state.ship,
-                NB_CHUNKS_EXPLO,
-                death_color,
-                &mut state.rng,
-            );
+            let new_chunks =
+                spawn_n_chunks(&state.ship, NB_CHUNKS_EXPLO, death_color, &mut state.rng);
             state.chunks_explo.extend(new_chunks);
         }
 
@@ -1013,7 +1185,8 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // Step 2: Per-frame death fire — spawn burning explosion while in mort() phase
     if state.is_dead {
-        let elapsed = (globals.time.time_current_frame - globals.time.time_last_frame) * globals.time.game_speed;
+        let elapsed = (globals.time.time_current_frame - globals.time.time_last_frame)
+            * globals.time.game_speed;
         let death_explo = spawn_explosion_death(&state.ship, elapsed, &mut state.rng);
         state.explosions.push(death_explo);
     }
@@ -1038,12 +1211,8 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
                 // Second chunk burst
                 if globals.visual.chunks_enabled {
                     let death_color = (1500.0, 400.0, 200.0);
-                    let new_chunks = spawn_n_chunks(
-                        &state.ship,
-                        NB_CHUNKS_EXPLO,
-                        death_color,
-                        &mut state.rng,
-                    );
+                    let new_chunks =
+                        spawn_n_chunks(&state.ship, NB_CHUNKS_EXPLO, death_color, &mut state.rng);
                     state.chunks_explo.extend(new_chunks);
                 }
 
@@ -1085,8 +1254,12 @@ pub fn update_visual_aim(gamepad: &mut GamepadState, target: f64, dt: f64) {
     use std::f64::consts::PI;
     let mut diff = target - gamepad.visual_aim_angle;
     // Wrap to [-PI, PI]
-    while diff > PI { diff -= 2.0 * PI; }
-    while diff < -PI { diff += 2.0 * PI; }
+    while diff > PI {
+        diff -= 2.0 * PI;
+    }
+    while diff < -PI {
+        diff += 2.0 * PI;
+    }
 
     if AIM_VISUAL_SMOOTHING <= 0.0 {
         gamepad.visual_aim_angle = target;
@@ -1110,21 +1283,30 @@ pub fn enforce_particle_budgets(state: &mut GameState) {
     // Chunks: lowest-radius first (proxy for most-faded)
     if state.chunks.len() > PARTICLE_BUDGET_CHUNKS {
         state.chunks.sort_by(|a, b| {
-            a.visuals.radius.partial_cmp(&b.visuals.radius).unwrap_or(std::cmp::Ordering::Equal)
+            a.visuals
+                .radius
+                .partial_cmp(&b.visuals.radius)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         let excess = state.chunks.len() - PARTICLE_BUDGET_CHUNKS;
         state.chunks.drain(0..excess);
     }
     if state.chunks_oos.len() > PARTICLE_BUDGET_CHUNKS {
         state.chunks_oos.sort_by(|a, b| {
-            a.visuals.radius.partial_cmp(&b.visuals.radius).unwrap_or(std::cmp::Ordering::Equal)
+            a.visuals
+                .radius
+                .partial_cmp(&b.visuals.radius)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         let excess = state.chunks_oos.len() - PARTICLE_BUDGET_CHUNKS;
         state.chunks_oos.drain(0..excess);
     }
     if state.chunks_explo.len() > PARTICLE_BUDGET_CHUNKS {
         state.chunks_explo.sort_by(|a, b| {
-            a.visuals.radius.partial_cmp(&b.visuals.radius).unwrap_or(std::cmp::Ordering::Equal)
+            a.visuals
+                .radius
+                .partial_cmp(&b.visuals.radius)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         let excess = state.chunks_explo.len() - PARTICLE_BUDGET_CHUNKS;
         state.chunks_explo.drain(0..excess);
@@ -1176,7 +1358,10 @@ pub fn render_frame(
 
     // Background
     // Emit HDR value (exposure baked in); GPU post-process applies add_color/mul_color/redirect
-    let bg = intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure);
+    let bg = intensify(
+        hdr(globals.visual.space_color),
+        globals.exposure.game_exposure,
+    );
     let bg_color = [bg.r as f32, bg.g as f32, bg.b as f32, 255.0];
     renderer.fill_rect(0, 0, w, h, bg_color);
 
@@ -1233,7 +1418,14 @@ pub fn render_frame(
 
     // Pause title overlay + interactive buttons
     if globals.time.pause {
-        crate::pause_menu::render_pause_title(&mut state.buttons, globals, renderer, &mut state.rng, mouse_sx, mouse_sy, mouse_down);
+        crate::pause_menu::render_pause_title(
+            &mut state.buttons,
+            globals,
+            renderer,
+            &mut state.rng,
+            mouse_sx,
+            mouse_sy,
+            mouse_down,
+        );
     }
-
 }

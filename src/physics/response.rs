@@ -15,7 +15,14 @@ pub fn damage(entity: &mut Entity, amount: f64, globals: &mut Globals) {
         globals.exposure.game_exposure *= EXPOSURE_RATIO_DAMAGE;
     }
     if globals.visual.flashes_enabled {
-        let flash = intensify(HdrColor { r: 1.0, g: 0.7, b: 0.5 }, amount * FLASHES_DAMAGE);
+        let flash = intensify(
+            HdrColor {
+                r: 1.0,
+                g: 0.7,
+                b: 0.5,
+            },
+            amount * FLASHES_DAMAGE,
+        );
         globals.exposure.add_color = (
             globals.exposure.add_color.0 + flash.r,
             globals.exposure.add_color.1 + flash.g,
@@ -58,14 +65,18 @@ pub fn consequences_collision(
         e1.proper_time,
     );
     e2.velocity = scale_vec(
-        add_vec(moy_vel, from_polar(angle2, total_mass / (e2.mass * e2.proper_time))),
+        add_vec(
+            moy_vel,
+            from_polar(angle2, total_mass / (e2.mass * e2.proper_time)),
+        ),
         e2.proper_time,
     );
 
     if !globals.time.pause {
         // Note: unlike OCaml, we scale by game_speed so repulsion stays proportional
         // to simulated time during slowdown events.
-        let dt = (globals.time.time_current_frame - globals.time.time_last_frame) * globals.time.game_speed;
+        let dt = (globals.time.time_current_frame - globals.time.time_last_frame)
+            * globals.time.game_speed;
         // Positional repulsion to separate overlapping entities
         e1.position = add_vec(e1.position, from_polar(angle1, MIN_REPULSION * dt));
         e2.position = add_vec(e2.position, from_polar(angle2, MIN_REPULSION * dt));
@@ -75,8 +86,16 @@ pub fn consequences_collision(
         // Physical damage proportional to velocity change²
         let g1 = magnitude(sub_vec(old_vel1, e1.velocity));
         let g2 = magnitude(sub_vec(old_vel2, e2.velocity));
-        phys_damage(&mut e1, globals.weapon.physics_damage_ratio * squared(g1), globals);
-        phys_damage(&mut e2, globals.weapon.physics_damage_ratio * squared(g2), globals);
+        phys_damage(
+            &mut e1,
+            globals.weapon.physics_damage_ratio * squared(g1),
+            globals,
+        );
+        phys_damage(
+            &mut e2,
+            globals.weapon.physics_damage_ratio * squared(g2),
+            globals,
+        );
     }
     (e1, e2)
 }
@@ -91,7 +110,8 @@ pub fn consequences_collision_frags(
     let angle2 = to_polar(sub_vec(f2.position, f1.position)).x;
     // Note: unlike OCaml, we scale by game_speed so repulsion stays proportional
     // to simulated time during slowdown events.
-    let dt = (globals.time.time_current_frame - globals.time.time_last_frame) * globals.time.game_speed;
+    let dt =
+        (globals.time.time_current_frame - globals.time.time_last_frame) * globals.time.game_speed;
     f1.position = add_vec(f1.position, from_polar(angle1, dt * FRAGMENT_MIN_REPULSION));
     f2.position = add_vec(f2.position, from_polar(angle2, dt * FRAGMENT_MIN_REPULSION));
     f1.velocity = add_vec(f1.velocity, from_polar(angle1, dt * FRAGMENT_MIN_BOUNCE));

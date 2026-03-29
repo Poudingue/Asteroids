@@ -1,9 +1,9 @@
-use std::f64::consts::PI;
-use crate::parameters::*;
 use crate::math_utils::{
-    add_vec, squared, magnitude, scale_vec, from_polar, rand_range, sub_vec, Vec2,
+    add_vec, from_polar, magnitude, rand_range, scale_vec, squared, sub_vec, Vec2,
 };
+use crate::parameters::*;
 use rand::Rng;
+use std::f64::consts::PI;
 
 // ============================================================================
 // Types
@@ -84,10 +84,7 @@ pub fn spawn_ship() -> Entity {
         .collect();
 
     let shapes = vec![
-        (
-            (1000.0, 100.0, 25.0),
-            Polygon(circle_poly),
-        ),
+        ((1000.0, 100.0, 25.0), Polygon(circle_poly)),
         (
             (200.0, 20.0, 20.0),
             Polygon(vec![
@@ -580,8 +577,10 @@ pub fn spawn_fire(ship: &Entity, rng: &mut impl Rng) -> Entity {
         ),
         velocity: {
             // Backward kick scales with ship speed so fire always ejects visually
-            let ship_speed = (ship.velocity.x * ship.velocity.x + ship.velocity.y * ship.velocity.y).sqrt();
-            let kick = ship_speed + FIRE_MIN_SPEED + rng.gen::<f64>() * (FIRE_MAX_SPEED - FIRE_MIN_SPEED);
+            let ship_speed =
+                (ship.velocity.x * ship.velocity.x + ship.velocity.y * ship.velocity.y).sqrt();
+            let kick =
+                ship_speed + FIRE_MIN_SPEED + rng.gen::<f64>() * (FIRE_MAX_SPEED - FIRE_MIN_SPEED);
             add_vec(
                 ship.velocity,
                 add_vec(
@@ -635,7 +634,8 @@ pub fn spawn_asteroid(pos: Vec2, vel: Vec2, radius: f64, rng: &mut impl Rng) -> 
             points: shape,
         },
         mass: PI * squared(radius) * ASTEROID_DENSITY,
-        health: ASTEROID_MASS_HEALTH * PI * squared(radius) * ASTEROID_DENSITY + ASTEROID_MIN_HEALTH,
+        health: ASTEROID_MASS_HEALTH * PI * squared(radius) * ASTEROID_DENSITY
+            + ASTEROID_MIN_HEALTH,
         max_health: ASTEROID_MASS_HEALTH * PI * squared(radius) * ASTEROID_DENSITY
             + ASTEROID_MIN_HEALTH,
         dam_res: ASTEROID_DAM_RES,
@@ -676,8 +676,8 @@ pub fn fragment_asteroid(parent: &Entity, rng: &mut impl Rng) -> Entity {
     );
 
     let orientation = rng.gen::<f64>() * 2.0 * PI;
-    let new_radius = rand_range(FRAGMENT_MIN_SIZE, FRAGMENT_MAX_SIZE, rng)
-        * fragment.hitbox.int_radius;
+    let new_radius =
+        rand_range(FRAGMENT_MIN_SIZE, FRAGMENT_MAX_SIZE, rng) * fragment.hitbox.int_radius;
 
     // Regenerate polygon for new size
     let new_shape = generate_asteroid_polygon(new_radius, rng);
@@ -733,7 +733,12 @@ pub fn spawn_fragments(
     }
 }
 
-pub fn random_offscreen_position(radius: f64, phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Vec2 {
+pub fn random_offscreen_position(
+    radius: f64,
+    phys_w: f64,
+    phys_h: f64,
+    rng: &mut impl Rng,
+) -> Vec2 {
     loop {
         let x = rng.gen::<f64>() * 3.0 * phys_w - phys_w;
         let y = rng.gen::<f64>() * 3.0 * phys_h - phys_h;

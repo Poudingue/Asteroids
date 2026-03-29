@@ -102,8 +102,8 @@ pub const STAR_SATURATION: f64 = 8.0;
 pub const MSAA_SAMPLE_COUNT: u32 = 4;
 
 // Button colors (stored as u32: (r << 16) | (g << 8) | b)
-pub const TRUECOLOR: u32 = (0 << 16) | (128 << 8) | 0; // rgb 0 128 0
-pub const FALSECOLOR: u32 = (128 << 16) | (0 << 8) | 0; // rgb 128 0 0
+pub const TRUECOLOR: u32 = 128 << 8; // rgb 0 128 0
+pub const FALSECOLOR: u32 = 128 << 16; // rgb 128 0 0
 pub const SLIDERCOLOR: u32 = (128 << 16) | (128 << 8) | 128; // rgb 128 128 128
 pub const BUTTONFRAME: u32 = (64 << 16) | (64 << 8) | 64; // rgb 64 64 64
 
@@ -573,7 +573,7 @@ impl Globals {
                 render_scale,
                 phys_width,
                 phys_height,
-                safe_phys_width: phys_width,   // updated by recompute_for_resolution
+                safe_phys_width: phys_width, // updated by recompute_for_resolution
                 safe_phys_height: phys_height,
                 safe_offset_x: 0.0,
                 safe_offset_y: 0.0,
@@ -617,7 +617,15 @@ impl Globals {
             observer_proper_time: 1.0,
         }
     }
+}
 
+impl Default for Globals {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Globals {
     /// Recompute rendering scale and physics dimensions for a given screen resolution.
     ///
     /// Uses a 16:9 safe zone inscribed in the actual screen, preserving GAME_SURFACE density.
@@ -638,11 +646,11 @@ impl Globals {
         };
 
         self.render.render_scale = (safe_w * safe_h / (GAME_SURFACE * 1_000_000.0)).sqrt();
-        self.render.phys_width  = sw / self.render.render_scale;
+        self.render.phys_width = sw / self.render.render_scale;
         self.render.phys_height = sh / self.render.render_scale;
-        self.render.safe_phys_width  = safe_w / self.render.render_scale;
+        self.render.safe_phys_width = safe_w / self.render.render_scale;
         self.render.safe_phys_height = safe_h / self.render.render_scale;
-        self.render.safe_offset_x = (self.render.phys_width  - self.render.safe_phys_width)  / 2.0;
+        self.render.safe_offset_x = (self.render.phys_width - self.render.safe_phys_width) / 2.0;
         self.render.safe_offset_y = (self.render.phys_height - self.render.safe_phys_height) / 2.0;
     }
 
@@ -654,30 +662,30 @@ impl Globals {
     /// Get the value of a boolean global by toggle enum.
     pub fn get_toggle(&self, t: &GlobalToggle) -> bool {
         match t {
-            GlobalToggle::Quit           => self.time.quit,
-            GlobalToggle::Pause          => self.time.pause,
-            GlobalToggle::Restart        => self.time.restart,
+            GlobalToggle::Quit => self.time.quit,
+            GlobalToggle::Pause => self.time.pause,
+            GlobalToggle::Restart => self.time.restart,
             GlobalToggle::AdvancedHitbox => self.advanced_hitbox,
-            GlobalToggle::Smoke          => self.visual.smoke_enabled,
-            GlobalToggle::Screenshake    => self.visual.screenshake_enabled,
-            GlobalToggle::Flashes        => self.visual.flashes_enabled,
-            GlobalToggle::Chunks         => self.visual.chunks_enabled,
-            GlobalToggle::DynColor       => self.visual.dyn_color,
+            GlobalToggle::Smoke => self.visual.smoke_enabled,
+            GlobalToggle::Screenshake => self.visual.screenshake_enabled,
+            GlobalToggle::Flashes => self.visual.flashes_enabled,
+            GlobalToggle::Chunks => self.visual.chunks_enabled,
+            GlobalToggle::DynColor => self.visual.dyn_color,
         }
     }
 
     /// Set the value of a boolean global by toggle enum.
     pub fn set_toggle(&mut self, t: &GlobalToggle, val: bool) {
         match t {
-            GlobalToggle::Quit           => self.time.quit            = val,
-            GlobalToggle::Pause          => self.time.pause           = val,
-            GlobalToggle::Restart        => self.time.restart         = val,
-            GlobalToggle::AdvancedHitbox => self.advanced_hitbox      = val,
-            GlobalToggle::Smoke          => self.visual.smoke_enabled = val,
-            GlobalToggle::Screenshake    => self.visual.screenshake_enabled = val,
-            GlobalToggle::Flashes        => self.visual.flashes_enabled = val,
-            GlobalToggle::Chunks         => self.visual.chunks_enabled = val,
-            GlobalToggle::DynColor       => self.visual.dyn_color     = val,
+            GlobalToggle::Quit => self.time.quit = val,
+            GlobalToggle::Pause => self.time.pause = val,
+            GlobalToggle::Restart => self.time.restart = val,
+            GlobalToggle::AdvancedHitbox => self.advanced_hitbox = val,
+            GlobalToggle::Smoke => self.visual.smoke_enabled = val,
+            GlobalToggle::Screenshake => self.visual.screenshake_enabled = val,
+            GlobalToggle::Flashes => self.visual.flashes_enabled = val,
+            GlobalToggle::Chunks => self.visual.chunks_enabled = val,
+            GlobalToggle::DynColor => self.visual.dyn_color = val,
         }
     }
 }

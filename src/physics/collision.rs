@@ -13,7 +13,9 @@ pub fn collision_point(pos_point: Vec2, pos_circle: Vec2, radius: f64) -> bool {
 }
 
 pub fn collisions_points(points: &[Vec2], pos_circle: Vec2, radius: f64) -> bool {
-    points.iter().any(|&p| collision_point(p, pos_circle, radius))
+    points
+        .iter()
+        .any(|&p| collision_point(p, pos_circle, radius))
 }
 
 pub fn collision_poly(

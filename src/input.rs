@@ -12,10 +12,11 @@ use crate::parameters::*;
 
 /// Aim the ship at the mouse position (screen coords → phys coords → atan2)
 pub fn aim_at_mouse(ship: &mut Entity, mouse_x: i32, mouse_y: i32, globals: &Globals) {
-        // Flip SDL2 Y-down to renderer Y-up coordinates
+    // Flip SDL2 Y-down to renderer Y-up coordinates
     let mouse_phys = Vec2::new(
         mouse_x as f64 / globals.render.render_scale,
-        (globals.render.phys_height * globals.render.render_scale - mouse_y as f64) / globals.render.render_scale,
+        (globals.render.phys_height * globals.render.render_scale - mouse_y as f64)
+            / globals.render.render_scale,
     );
     let polar = to_polar(sub_vec(mouse_phys, ship.position));
     let theta = polar.x;
@@ -24,13 +25,25 @@ pub fn aim_at_mouse(ship: &mut Entity, mouse_x: i32, mouse_y: i32, globals: &Glo
 
 /// World-space keyboard thrust: WASD = cardinal directions, diagonal normalized.
 /// Movement is decoupled from aim (ship.orientation).
-pub fn world_space_thrust_keyboard(state: &mut GameState, globals: &Globals, keys_pressed: [bool; 4]) {
+pub fn world_space_thrust_keyboard(
+    state: &mut GameState,
+    globals: &Globals,
+    keys_pressed: [bool; 4],
+) {
     let [w, a, s, d] = keys_pressed;
     let mut dir = Vec2::new(0.0, 0.0);
-    if w { dir.y += 1.0; } // Y-up in physics space
-    if s { dir.y -= 1.0; }
-    if a { dir.x -= 1.0; }
-    if d { dir.x += 1.0; }
+    if w {
+        dir.y += 1.0;
+    } // Y-up in physics space
+    if s {
+        dir.y -= 1.0;
+    }
+    if a {
+        dir.x -= 1.0;
+    }
+    if d {
+        dir.x += 1.0;
+    }
     let mag = (dir.x * dir.x + dir.y * dir.y).sqrt();
     if mag > 0.0 {
         let normalized = Vec2::new(dir.x / mag, dir.y / mag);
@@ -80,8 +93,12 @@ pub fn teleport(state: &mut GameState, globals: &mut Globals) {
 
         // Angular difference (wrapped to [-PI, PI])
         let mut angle_diff = angle_to - aim_angle;
-        while angle_diff > PI { angle_diff -= 2.0 * PI; }
-        while angle_diff < -PI { angle_diff += 2.0 * PI; }
+        while angle_diff > PI {
+            angle_diff -= 2.0 * PI;
+        }
+        while angle_diff < -PI {
+            angle_diff += 2.0 * PI;
+        }
 
         // Effective cone: widen by the asteroid's angular radius
         let angular_radius = (asteroid.hitbox.int_radius / distance).asin().abs();
@@ -125,7 +142,14 @@ pub fn teleport(state: &mut GameState, globals: &mut Globals) {
 
         // Visual flash (blue for teleport)
         if globals.visual.flashes_enabled {
-            let flash = intensify(HdrColor { r: 0.0, g: 4.0, b: 40.0 }, 1.0);
+            let flash = intensify(
+                HdrColor {
+                    r: 0.0,
+                    g: 4.0,
+                    b: 40.0,
+                },
+                1.0,
+            );
             globals.exposure.add_color = (
                 globals.exposure.add_color.0 + flash.r,
                 globals.exposure.add_color.1 + flash.g,
@@ -186,7 +210,10 @@ pub fn fire(state: &mut GameState, globals: &mut Globals) {
         state.cooldown += globals.weapon.projectile_cooldown;
 
         // Recoil
-        let recoil = from_polar(state.ship.orientation + PI, globals.weapon.projectile_recoil);
+        let recoil = from_polar(
+            state.ship.orientation + PI,
+            globals.weapon.projectile_recoil,
+        );
         state.ship.velocity = add_vec(state.ship.velocity, recoil);
     }
 }
@@ -205,7 +232,8 @@ pub fn process_stick_axis(raw: f64, center_offset: f64) -> f64 {
     if abs_val > STICK_DEAD_ZONE_OUTER {
         return adjusted.signum();
     }
-    let remapped = (abs_val - STICK_DEAD_ZONE_INNER) / (STICK_DEAD_ZONE_OUTER - STICK_DEAD_ZONE_INNER);
+    let remapped =
+        (abs_val - STICK_DEAD_ZONE_INNER) / (STICK_DEAD_ZONE_OUTER - STICK_DEAD_ZONE_INNER);
     remapped * adjusted.signum()
 }
 

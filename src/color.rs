@@ -184,7 +184,7 @@ pub fn rgb_of_hdr(
     ));
 
     let normal_color = |fl: f64| -> u8 {
-        let clamped = fl.max(0.0).min(255.0);
+        let clamped = fl.clamp(0.0, 255.0);
         clamped as u8
     };
 
@@ -211,35 +211,55 @@ pub fn saturate(hdr_in: HdrColor, i: f64) -> HdrColor {
 impl std::ops::Add for HdrColor {
     type Output = HdrColor;
     fn add(self, rhs: HdrColor) -> HdrColor {
-        HdrColor { r: self.r + rhs.r, g: self.g + rhs.g, b: self.b + rhs.b }
+        HdrColor {
+            r: self.r + rhs.r,
+            g: self.g + rhs.g,
+            b: self.b + rhs.b,
+        }
     }
 }
 
 impl std::ops::Sub for HdrColor {
     type Output = HdrColor;
     fn sub(self, rhs: HdrColor) -> HdrColor {
-        HdrColor { r: self.r - rhs.r, g: self.g - rhs.g, b: self.b - rhs.b }
+        HdrColor {
+            r: self.r - rhs.r,
+            g: self.g - rhs.g,
+            b: self.b - rhs.b,
+        }
     }
 }
 
 impl std::ops::Mul for HdrColor {
     type Output = HdrColor;
     fn mul(self, rhs: HdrColor) -> HdrColor {
-        HdrColor { r: self.r * rhs.r, g: self.g * rhs.g, b: self.b * rhs.b }
+        HdrColor {
+            r: self.r * rhs.r,
+            g: self.g * rhs.g,
+            b: self.b * rhs.b,
+        }
     }
 }
 
 impl std::ops::Mul<f64> for HdrColor {
     type Output = HdrColor;
     fn mul(self, rhs: f64) -> HdrColor {
-        HdrColor { r: self.r * rhs, g: self.g * rhs, b: self.b * rhs }
+        HdrColor {
+            r: self.r * rhs,
+            g: self.g * rhs,
+            b: self.b * rhs,
+        }
     }
 }
 
 impl std::ops::Mul<HdrColor> for f64 {
     type Output = HdrColor;
     fn mul(self, rhs: HdrColor) -> HdrColor {
-        HdrColor { r: self * rhs.r, g: self * rhs.g, b: self * rhs.b }
+        HdrColor {
+            r: self * rhs.r,
+            g: self * rhs.g,
+            b: self * rhs.b,
+        }
     }
 }
 

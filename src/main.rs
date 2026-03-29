@@ -4,13 +4,16 @@ use std::time::Instant;
 
 use parameters::{Globals, MAX_DT};
 use rendering::Renderer2D;
+use sdl2::controller::{Axis, Button};
 use sdl2::keyboard::Scancode;
 
 fn main() {
     // SDL2 init
     let sdl_context = sdl2::init().expect("Failed to init SDL2");
     let video_subsystem = sdl_context.video().expect("Failed to init video");
-    let game_controller_subsystem = sdl_context.game_controller().expect("Failed to init game controller");
+    let game_controller_subsystem = sdl_context
+        .game_controller()
+        .expect("Failed to init game controller");
 
     // Start borderless fullscreen at desktop resolution
     let mut window = video_subsystem
@@ -181,7 +184,7 @@ fn main() {
                     repeat: false,
                     ..
                 } if keymod.contains(sdl2::keyboard::Mod::LALTMOD)
-                  || keymod.contains(sdl2::keyboard::Mod::RALTMOD) =>
+                    || keymod.contains(sdl2::keyboard::Mod::RALTMOD) =>
                 {
                     use sdl2::video::FullscreenType;
                     if is_fullscreen {
@@ -209,6 +212,7 @@ fn main() {
                     renderer.resize(&device, &queue, new_w, new_h);
                     globals.recompute_for_resolution(new_w, new_h);
                 }
+                // `which` here is the device index (not instance ID) — used to open the controller
                 Event::ControllerDeviceAdded { which, .. } => {
                     if active_controller.is_none() {
                         match game_controller_subsystem.open(which) {
@@ -223,6 +227,7 @@ fn main() {
                         }
                     }
                 }
+                // `which` here is the joystick instance ID (not device index) — matches c.instance_id()
                 Event::ControllerDeviceRemoved { which, .. } => {
                     if let Some(ref c) = active_controller {
                         if c.instance_id() == which {
@@ -236,10 +241,9 @@ fn main() {
                 }
                 Event::ControllerAxisMotion { axis, value, .. } => {
                     let normalized = value as f64 / 32767.0;
-                    use sdl2::controller::Axis;
                     match axis {
-                        Axis::LeftX  => state.gamepad.left_stick_raw.x = normalized,
-                        Axis::LeftY  => state.gamepad.left_stick_raw.y = -normalized,
+                        Axis::LeftX => state.gamepad.left_stick_raw.x = normalized,
+                        Axis::LeftY => state.gamepad.left_stick_raw.y = -normalized,
                         Axis::RightX => state.gamepad.right_stick_raw.x = normalized,
                         Axis::RightY => state.gamepad.right_stick_raw.y = -normalized,
                         Axis::TriggerLeft => {
@@ -253,17 +257,14 @@ fn main() {
                         _ => {}
                     }
                 }
-                Event::ControllerButtonDown { button, .. } => {
-                    use sdl2::controller::Button;
-                    match button {
-                        Button::B => {
-                            state.gamepad.any_button_pressed = true;
-                            input::teleport(&mut state, &mut globals);
-                        }
-                        Button::Start => globals.time.pause = !globals.time.pause,
-                        _ => state.gamepad.any_button_pressed = true,
+                Event::ControllerButtonDown { button, .. } => match button {
+                    Button::B => {
+                        state.gamepad.any_button_pressed = true;
+                        input::teleport(&mut state, &mut globals);
                     }
-                }
+                    Button::Start => globals.time.pause = !globals.time.pause,
+                    _ => state.gamepad.any_button_pressed = true,
+                },
                 Event::ControllerButtonUp { .. } => {
                     state.gamepad.any_button_pressed = false;
                 }
@@ -326,11 +327,9 @@ fn main() {
 
                 // Fire on A button held or right trigger
                 if let Some(ref controller) = active_controller {
-                    use sdl2::controller::Button;
                     if controller.button(Button::A) {
                         input::fire(&mut state, &mut globals);
                     }
-                    use sdl2::controller::Axis;
                     let rt = controller.axis(Axis::TriggerRight) as f64 / 32767.0;
                     if rt > 0.5 {
                         input::fire(&mut state, &mut globals);
@@ -389,18 +388,28 @@ fn main() {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        renderer.update_postprocess_uniforms(&queue, &rendering::PostProcessUniforms {
-            game_exposure: globals.exposure.game_exposure as f32,
-            add_color_r: globals.exposure.add_color.0 as f32,
-            add_color_g: globals.exposure.add_color.1 as f32,
-            add_color_b: globals.exposure.add_color.2 as f32,
-            mul_color_r: globals.exposure.mul_color.0 as f32,
-            mul_color_g: globals.exposure.mul_color.1 as f32,
-            mul_color_b: globals.exposure.mul_color.2 as f32,
-            _padding: 0.0,
-        });
+        renderer.update_postprocess_uniforms(
+            &queue,
+            &rendering::PostProcessUniforms {
+                game_exposure: globals.exposure.game_exposure as f32,
+                add_color_r: globals.exposure.add_color.0 as f32,
+                add_color_g: globals.exposure.add_color.1 as f32,
+                add_color_b: globals.exposure.add_color.2 as f32,
+                mul_color_r: globals.exposure.mul_color.0 as f32,
+                mul_color_g: globals.exposure.mul_color.1 as f32,
+                mul_color_b: globals.exposure.mul_color.2 as f32,
+                _padding: 0.0,
+            },
+        );
         renderer.begin_frame();
-        game::render_frame(&mut state, &mut globals, &mut renderer, mouse_x_snap, mouse_y_snap, mouse_left_snap);
+        game::render_frame(
+            &mut state,
+            &mut globals,
+            &mut renderer,
+            mouse_x_snap,
+            mouse_y_snap,
+            mouse_left_snap,
+        );
         renderer.end_frame(&device, &queue, &view, [0.0, 0.0, 0.0, 1.0]);
         globals.framerate.frame_compute_secs = frame_start.elapsed().as_secs_f64();
         output.present();

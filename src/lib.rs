@@ -1,11 +1,11 @@
 pub mod camera;
-pub mod physics;
 pub mod color;
-pub mod math;
 pub mod game;
 pub mod input;
+pub mod math;
 pub mod math_utils;
 pub mod objects;
 pub mod parameters;
 pub mod pause_menu;
+pub mod physics;
 pub mod rendering;

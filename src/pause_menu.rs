@@ -1,9 +1,9 @@
 use rand::prelude::*;
 
-use rand::rngs::ThreadRng;
-use crate::rendering::hud::render_string;
 use crate::parameters::{GlobalToggle, Globals};
+use crate::rendering::hud::render_string;
 use crate::rendering::Renderer2D;
+use rand::rngs::ThreadRng;
 
 // ============================================================================
 // Pause menu button system
@@ -53,24 +53,87 @@ pub fn make_buttons(globals: &Globals) -> Vec<ButtonBoolean> {
         };
     }
     vec![
-        btn!("quit",             "Quit the game and go outside",
-             10.0, 20.0, 12.0, 22.0, GlobalToggle::Quit),
-        btn!("resume",           "Resume current game",
-             7.0,  20.0,  9.0, 22.0, GlobalToggle::Pause),
-        btn!("New Game",         "Start a new game with current parameters",
-             4.0,  20.0,  6.0, 22.0, GlobalToggle::Restart),
-        btn!("Advanced hitbox",  "A more precise hitbox.",
-             10.0,  9.0, 12.0, 11.0, GlobalToggle::AdvancedHitbox),
-        btn!("smoke particles",  "Allows smoke. Disable for better performance.",
-             7.0,   6.0,  9.0,  8.0, GlobalToggle::Smoke),
-        btn!("screenshake",      "Feel the impacts and explosions.",
-             4.0,   6.0,  6.0,  8.0, GlobalToggle::Screenshake),
-        btn!("Light Flashes",    "Activates light flashes for events",
-             10.0,  6.0, 12.0,  8.0, GlobalToggle::Flashes),
-        btn!("chunk particles",  "Allows chunks. Disable for better performance.",
-             7.0,   3.0,  9.0,  5.0, GlobalToggle::Chunks),
-        btn!("Color Effects",    "Color changes and correction",
-             10.0,  3.0, 12.0,  5.0, GlobalToggle::DynColor),
+        btn!(
+            "quit",
+            "Quit the game and go outside",
+            10.0,
+            20.0,
+            12.0,
+            22.0,
+            GlobalToggle::Quit
+        ),
+        btn!(
+            "resume",
+            "Resume current game",
+            7.0,
+            20.0,
+            9.0,
+            22.0,
+            GlobalToggle::Pause
+        ),
+        btn!(
+            "New Game",
+            "Start a new game with current parameters",
+            4.0,
+            20.0,
+            6.0,
+            22.0,
+            GlobalToggle::Restart
+        ),
+        btn!(
+            "Advanced hitbox",
+            "A more precise hitbox.",
+            10.0,
+            9.0,
+            12.0,
+            11.0,
+            GlobalToggle::AdvancedHitbox
+        ),
+        btn!(
+            "smoke particles",
+            "Allows smoke. Disable for better performance.",
+            7.0,
+            6.0,
+            9.0,
+            8.0,
+            GlobalToggle::Smoke
+        ),
+        btn!(
+            "screenshake",
+            "Feel the impacts and explosions.",
+            4.0,
+            6.0,
+            6.0,
+            8.0,
+            GlobalToggle::Screenshake
+        ),
+        btn!(
+            "Light Flashes",
+            "Activates light flashes for events",
+            10.0,
+            6.0,
+            12.0,
+            8.0,
+            GlobalToggle::Flashes
+        ),
+        btn!(
+            "chunk particles",
+            "Allows chunks. Disable for better performance.",
+            7.0,
+            3.0,
+            9.0,
+            5.0,
+            GlobalToggle::Chunks
+        ),
+        btn!(
+            "Color Effects",
+            "Color changes and correction",
+            10.0,
+            3.0,
+            12.0,
+            5.0,
+            GlobalToggle::DynColor
+        ),
     ]
 }
 
@@ -113,13 +176,17 @@ pub fn apply_button(
     // Pixel coords in Y-up space (matching the vertex shader and fill_poly)
     let px1 = (x1 * rr).round() as i32;
     let px2 = (x2 * rr).round() as i32;
-    let py1 = (y1 * rr).round() as i32;  // bottom in Y-up
-    let py2 = (y2 * rr).round() as i32;  // top in Y-up
+    let py1 = (y1 * rr).round() as i32; // bottom in Y-up
+    let py2 = (y2 * rr).round() as i32; // top in Y-up
 
     // fill_poly rect: bottom-left, bottom-right, top-right, top-left
     let rect_pts = vec![(px1, py1), (px2, py1), (px2, py2), (px1, py2)];
 
-    let fill_col: [f32; 4] = if on { [0.0, 128.0, 0.0, 255.0] } else { [128.0, 0.0, 0.0, 255.0] };
+    let fill_col: [f32; 4] = if on {
+        [0.0, 128.0, 0.0, 255.0]
+    } else {
+        [128.0, 0.0, 0.0, 255.0]
+    };
     renderer.hud_fill_poly(&rect_pts, fill_col);
 
     // Border: dark grey, 10 * render_scale px wide
@@ -130,7 +197,7 @@ pub fn apply_button(
     // Uniform character size based on safe zone (like HUD text), not button dimensions
     let sh = globals.render.safe_phys_height;
     let char_h = 0.02 * sh;
-    let char_w = char_h * 0.6;  // fixed aspect ratio
+    let char_w = char_h * 0.6; // fixed aspect ratio
     let char_sp = char_w * 0.15;
     let text_total_w = btn.text.len() as f64 * (char_w + char_sp) - char_sp;
     // Center text in button
@@ -139,14 +206,28 @@ pub fn apply_button(
     let text_col: [f32; 4] = [255.0, 255.0, 255.0, 255.0];
     // Shadow: offset by -1 phys unit
     render_string(
-        btn.text, (text_x - 1.0, text_y - 1.0),
-        char_w, char_h, char_sp, 0.0,
-        [0.0, 0.0, 0.0, 255.0], renderer, globals, rng,
+        btn.text,
+        (text_x - 1.0, text_y - 1.0),
+        char_w,
+        char_h,
+        char_sp,
+        0.0,
+        [0.0, 0.0, 0.0, 255.0],
+        renderer,
+        globals,
+        rng,
     );
     render_string(
-        btn.text, (text_x, text_y),
-        char_w, char_h, char_sp, 0.0,
-        text_col, renderer, globals, rng,
+        btn.text,
+        (text_x, text_y),
+        char_w,
+        char_h,
+        char_sp,
+        0.0,
+        text_col,
+        renderer,
+        globals,
+        rng,
     );
 
     // ---- Click detection (rising edge) ----
@@ -181,16 +262,30 @@ pub fn render_button_tooltip(
         let tip_y = my + 0.5;
         let tip_char_w = 0.009 * sw;
         let tip_char_h = 0.018 * sh;
-        let tip_sp     = 0.002 * sw;
+        let tip_sp = 0.002 * sw;
         render_string(
-            btn.text_over, (tip_x - 1.0, tip_y - 1.0),
-            tip_char_w, tip_char_h, tip_sp, 0.0,
-            [0.0, 0.0, 0.0, 255.0], renderer, globals, rng,
+            btn.text_over,
+            (tip_x - 1.0, tip_y - 1.0),
+            tip_char_w,
+            tip_char_h,
+            tip_sp,
+            0.0,
+            [0.0, 0.0, 0.0, 255.0],
+            renderer,
+            globals,
+            rng,
         );
         render_string(
-            btn.text_over, (tip_x, tip_y),
-            tip_char_w, tip_char_h, tip_sp, 0.0,
-            [255.0, 255.0, 255.0, 255.0], renderer, globals, rng,
+            btn.text_over,
+            (tip_x, tip_y),
+            tip_char_w,
+            tip_char_h,
+            tip_sp,
+            0.0,
+            [255.0, 255.0, 255.0, 255.0],
+            renderer,
+            globals,
+            rng,
         );
     }
 }
@@ -200,7 +295,7 @@ pub fn render_button_tooltip(
 /// `mouse_sx`, `mouse_sy`: raw SDL2 screen coordinates (Y-down).
 /// `mouse_down`: left mouse button state.
 pub fn render_pause_title(
-    buttons: &mut Vec<ButtonBoolean>,
+    buttons: &mut [ButtonBoolean],
     globals: &mut Globals,
     renderer: &mut Renderer2D,
     rng: &mut ThreadRng,
@@ -220,10 +315,10 @@ pub fn render_pause_title(
     // Render title shadow first
     render_string(
         "ASTEROIDS",
-        (sx + (2.1/16.0) * sw, sy + (14.7/24.0) * sh),
-        (1.0/16.0) * sw,
-        (4.0/24.0) * sh,
-        (1.0/40.0) * sw,
+        (sx + (2.1 / 16.0) * sw, sy + (14.7 / 24.0) * sh),
+        (1.0 / 16.0) * sw,
+        (4.0 / 24.0) * sh,
+        (1.0 / 40.0) * sw,
         0.0,
         shadow_col,
         renderer,
@@ -233,36 +328,21 @@ pub fn render_pause_title(
 
     // Phase 1: render all button backgrounds + text + click detection
     for btn in buttons.iter_mut() {
-        apply_button(
-            btn,
-            globals,
-            renderer,
-            rng,
-            mouse_sx,
-            mouse_sy,
-            mouse_down,
-        );
+        apply_button(btn, globals, renderer, rng, mouse_sx, mouse_sy, mouse_down);
     }
 
     // Phase 2: render tooltips on top of all buttons
     for btn in buttons.iter() {
-        render_button_tooltip(
-            btn,
-            globals,
-            renderer,
-            rng,
-            mouse_sx,
-            mouse_sy,
-        );
+        render_button_tooltip(btn, globals, renderer, rng, mouse_sx, mouse_sy);
     }
 
     // White title on top of everything
     render_string(
         "ASTEROIDS",
-        (sx + (2.0/16.0) * sw, sy + (15.0/24.0) * sh),
-        (1.0/16.0) * sw,
-        (4.0/24.0) * sh,
-        (1.0/40.0) * sw,
+        (sx + (2.0 / 16.0) * sw, sy + (15.0 / 24.0) * sh),
+        (1.0 / 16.0) * sw,
+        (4.0 / 24.0) * sh,
+        (1.0 / 40.0) * sw,
         0.0,
         [255.0, 255.0, 255.0, 255.0],
         renderer,

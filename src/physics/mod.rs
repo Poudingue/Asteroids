@@ -17,9 +17,7 @@ pub mod response;
 
 // Re-export key types and functions for convenience
 pub use collision::{collision_circles, collision_entities, collision_point, collisions_points};
-pub use response::{
-    consequences_collision, consequences_collision_frags, damage, phys_damage,
-};
+pub use response::{consequences_collision, consequences_collision_frags, damage, phys_damage};
 
 use crate::math_utils::Vec2;
 use crate::parameters::*;
@@ -54,7 +52,8 @@ pub fn insert_into_grid(
     let jy = globals.render.current_jitter_coll_table.y;
     for &(entry, pos) in entries {
         let x2 = jx + gw * (pos.x + globals.render.phys_width) / (3.0 * globals.render.phys_width);
-        let y2 = jy + gh * (pos.y + globals.render.phys_height) / (3.0 * globals.render.phys_height);
+        let y2 =
+            jy + gh * (pos.y + globals.render.phys_height) / (3.0 * globals.render.phys_height);
         if x2 < 0.0 || y2 < 0.0 || x2 >= gw || y2 >= gh {
             continue;
         }

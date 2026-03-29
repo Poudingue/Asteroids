@@ -1,8 +1,8 @@
 pub mod hud;
 pub mod world;
 
-use wgpu::util::DeviceExt;
 use crate::parameters::MSAA_SAMPLE_COUNT;
+use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -140,11 +140,23 @@ fn create_offscreen_texture(device: &wgpu::Device, width: u32, height: u32) -> w
     })
 }
 
-fn create_msaa_texture(device: &wgpu::Device, width: u32, height: u32, format: wgpu::TextureFormat, sample_count: u32) -> Option<wgpu::Texture> {
-    if sample_count <= 1 { return None; }
+fn create_msaa_texture(
+    device: &wgpu::Device,
+    width: u32,
+    height: u32,
+    format: wgpu::TextureFormat,
+    sample_count: u32,
+) -> Option<wgpu::Texture> {
+    if sample_count <= 1 {
+        return None;
+    }
     Some(device.create_texture(&wgpu::TextureDescriptor {
         label: Some("MSAA Texture"),
-        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count,
         dimension: wgpu::TextureDimension::D2,
@@ -268,12 +280,19 @@ impl Renderer2D {
 
         // --- Offscreen texture ---
         let offscreen_texture = create_offscreen_texture(device, width, height);
-        let offscreen_view =
-            offscreen_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let offscreen_view = offscreen_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // --- MSAA texture (None when MSAA_SAMPLE_COUNT == 1) ---
-        let msaa_offscreen_texture = create_msaa_texture(device, width, height, wgpu::TextureFormat::Rgba16Float, MSAA_SAMPLE_COUNT);
-        let msaa_offscreen_view = msaa_offscreen_texture.as_ref().map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()));
+        let msaa_offscreen_texture = create_msaa_texture(
+            device,
+            width,
+            height,
+            wgpu::TextureFormat::Rgba16Float,
+            MSAA_SAMPLE_COUNT,
+        );
+        let msaa_offscreen_view = msaa_offscreen_texture
+            .as_ref()
+            .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()));
 
         // --- Postprocess shader + pipeline (renders fullscreen triangle to swapchain) ---
         let postprocess_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -368,40 +387,39 @@ impl Renderer2D {
                 push_constant_ranges: &[],
             });
 
-        let postprocess_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Postprocess Pipeline"),
-                layout: Some(&postprocess_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &postprocess_shader,
-                    entry_point: Some("vs_main"),
-                    buffers: &[], // fullscreen triangle from vertex_index
-                    compilation_options: Default::default(),
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &postprocess_shader,
-                    entry_point: Some("fs_main"),
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: surface_format,
-                        blend: None,
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                    compilation_options: Default::default(),
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: None,
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    unclipped_depth: false,
-                    conservative: false,
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview: None,
-                cache: None,
-            });
+        let postprocess_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Postprocess Pipeline"),
+            layout: Some(&postprocess_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &postprocess_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[], // fullscreen triangle from vertex_index
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &postprocess_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
 
         // --- SDF circle shader + pipeline (renders into Rgba16Float offscreen texture) ---
         let sdf_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -433,12 +451,11 @@ impl Renderer2D {
             }],
         });
 
-        let sdf_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("SDF Pipeline Layout"),
-                bind_group_layouts: &[&sdf_bind_group_layout],
-                push_constant_ranges: &[],
-            });
+        let sdf_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("SDF Pipeline Layout"),
+            bind_group_layouts: &[&sdf_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
         let sdf_circle_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("SDF Circle Pipeline"),
@@ -538,12 +555,11 @@ impl Renderer2D {
             }],
         });
 
-        let hud_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("HUD Pipeline Layout"),
-                bind_group_layouts: &[&hud_bind_group_layout],
-                push_constant_ranges: &[],
-            });
+        let hud_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("HUD Pipeline Layout"),
+            bind_group_layouts: &[&hud_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
         let hud_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("HUD Pipeline"),
@@ -625,8 +641,17 @@ impl Renderer2D {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         // Recreate MSAA texture at new resolution
-        self.msaa_offscreen_texture = create_msaa_texture(device, width, height, wgpu::TextureFormat::Rgba16Float, self.msaa_sample_count);
-        self.msaa_offscreen_view = self.msaa_offscreen_texture.as_ref().map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()));
+        self.msaa_offscreen_texture = create_msaa_texture(
+            device,
+            width,
+            height,
+            wgpu::TextureFormat::Rgba16Float,
+            self.msaa_sample_count,
+        );
+        self.msaa_offscreen_view = self
+            .msaa_offscreen_texture
+            .as_ref()
+            .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()));
 
         // Recreate postprocess bind group (it references the old view)
         let postprocess_bind_group_layout =
@@ -698,21 +723,45 @@ impl Renderer2D {
     }
 
     pub fn push_circle_instance(&mut self, cx: f32, cy: f32, radius: f32, color: [f32; 4]) {
-        if radius <= 0.0 { return; }
-        self.sdf_circle_instances.push(CircleInstance { center: [cx, cy], radius, color, _padding: 0.0 });
+        if radius <= 0.0 {
+            return;
+        }
+        self.sdf_circle_instances.push(CircleInstance {
+            center: [cx, cy],
+            radius,
+            color,
+            _padding: 0.0,
+        });
     }
 
-    pub fn push_capsule_instance(&mut self, x0: f32, y0: f32, x1: f32, y1: f32, radius: f32, color: [f32; 4]) {
-        if radius <= 0.0 { return; }
+    pub fn push_capsule_instance(
+        &mut self,
+        x0: f32,
+        y0: f32,
+        x1: f32,
+        y1: f32,
+        radius: f32,
+        color: [f32; 4],
+    ) {
+        if radius <= 0.0 {
+            return;
+        }
         self.sdf_capsule_instances.push(CapsuleInstance {
-            p0: [x0, y0], p1: [x1, y1], radius, color, _padding: [0.0; 3],
+            p0: [x0, y0],
+            p1: [x1, y1],
+            radius,
+            color,
+            _padding: [0.0; 3],
         });
     }
 
     // ---- Internal geometry helpers (write to an arbitrary target Vec<Vertex>) ----
 
     fn push_vertex_to(target: &mut Vec<Vertex>, x: f32, y: f32, color: [f32; 4]) {
-        target.push(Vertex { position: [x, y], color });
+        target.push(Vertex {
+            position: [x, y],
+            color,
+        });
     }
 
     fn geo_fill_rect(target: &mut Vec<Vertex>, x: i32, y: i32, w: i32, h: i32, color: [f32; 4]) {
@@ -727,8 +776,10 @@ impl Renderer2D {
     }
 
     fn geo_fill_circle(target: &mut Vec<Vertex>, cx: f64, cy: f64, radius: f64, color: [f32; 4]) {
-        if radius <= 0.0 { return; }
-        let segments = (radius as i32).max(8).min(64) as usize;
+        if radius <= 0.0 {
+            return;
+        }
+        let segments = (radius as i32).clamp(8, 64) as usize;
         let cx = cx as f32;
         let cy = cy as f32;
         let r = radius as f32;
@@ -741,8 +792,15 @@ impl Renderer2D {
         }
     }
 
-    fn geo_fill_ellipse(target: &mut Vec<Vertex>, cx: i32, cy: i32, rx: i32, ry: i32, color: [f32; 4]) {
-        let segments = (rx.max(ry) as usize).max(8).min(64);
+    fn geo_fill_ellipse(
+        target: &mut Vec<Vertex>,
+        cx: i32,
+        cy: i32,
+        rx: i32,
+        ry: i32,
+        color: [f32; 4],
+    ) {
+        let segments = (rx.max(ry) as usize).clamp(8, 64);
         let cx = cx as f32;
         let cy = cy as f32;
         let rx = rx as f32;
@@ -751,13 +809,25 @@ impl Renderer2D {
             let angle1 = 2.0 * std::f32::consts::PI * (i as f32) / (segments as f32);
             let angle2 = 2.0 * std::f32::consts::PI * ((i + 1) as f32) / (segments as f32);
             Self::push_vertex_to(target, cx, cy, color);
-            Self::push_vertex_to(target, cx + rx * angle1.cos(), cy + ry * angle1.sin(), color);
-            Self::push_vertex_to(target, cx + rx * angle2.cos(), cy + ry * angle2.sin(), color);
+            Self::push_vertex_to(
+                target,
+                cx + rx * angle1.cos(),
+                cy + ry * angle1.sin(),
+                color,
+            );
+            Self::push_vertex_to(
+                target,
+                cx + rx * angle2.cos(),
+                cy + ry * angle2.sin(),
+                color,
+            );
         }
     }
 
     fn geo_fill_poly(target: &mut Vec<Vertex>, points: &[(i32, i32)], color: [f32; 4]) {
-        if points.len() < 3 { return; }
+        if points.len() < 3 {
+            return;
+        }
         let mut min_y = i32::MAX;
         let mut max_y = i32::MIN;
         for p in points {
@@ -785,23 +855,33 @@ impl Renderer2D {
                     if x_right > x_left {
                         let y_top = y as f32;
                         let y_bot = (y + 1) as f32;
-                        Self::push_vertex_to(target, x_left,  y_top, color);
+                        Self::push_vertex_to(target, x_left, y_top, color);
                         Self::push_vertex_to(target, x_right, y_top, color);
                         Self::push_vertex_to(target, x_right, y_bot, color);
-                        Self::push_vertex_to(target, x_left,  y_top, color);
+                        Self::push_vertex_to(target, x_left, y_top, color);
                         Self::push_vertex_to(target, x_right, y_bot, color);
-                        Self::push_vertex_to(target, x_left,  y_bot, color);
+                        Self::push_vertex_to(target, x_left, y_bot, color);
                     }
                 }
             }
         }
     }
 
-    fn geo_draw_line_f32(target: &mut Vec<Vertex>, x1: f32, y1: f32, x2: f32, y2: f32, color: [f32; 4], half_w: f32) {
+    fn geo_draw_line_f32(
+        target: &mut Vec<Vertex>,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        color: [f32; 4],
+        half_w: f32,
+    ) {
         let dx = x2 - x1;
         let dy = y2 - y1;
         let len = (dx * dx + dy * dy).sqrt();
-        if len < 0.001 { return; }
+        if len < 0.001 {
+            return;
+        }
         let nx = -dy / len * half_w;
         let ny = dx / len * half_w;
         Self::push_vertex_to(target, x1 + nx, y1 + ny, color);
@@ -812,8 +892,15 @@ impl Renderer2D {
         Self::push_vertex_to(target, x2 + nx, y2 + ny, color);
     }
 
-    fn geo_draw_poly(target: &mut Vec<Vertex>, points: &[(i32, i32)], color: [f32; 4], line_width: f32) {
-        if points.len() < 2 { return; }
+    fn geo_draw_poly(
+        target: &mut Vec<Vertex>,
+        points: &[(i32, i32)],
+        color: [f32; 4],
+        line_width: f32,
+    ) {
+        if points.len() < 2 {
+            return;
+        }
         let half_w = line_width / 2.0;
         for i in 0..points.len() {
             let j = (i + 1) % points.len();
@@ -850,7 +937,15 @@ impl Renderer2D {
 
     /// Draw a thick line between two points.
     pub fn draw_line(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, color: [f32; 4], width: f32) {
-        Self::geo_draw_line_f32(&mut self.vertices, x1 as f32, y1 as f32, x2 as f32, y2 as f32, color, width / 2.0);
+        Self::geo_draw_line_f32(
+            &mut self.vertices,
+            x1 as f32,
+            y1 as f32,
+            x2 as f32,
+            y2 as f32,
+            color,
+            width / 2.0,
+        );
     }
 
     /// Plot a single pixel as a 1x1 rect.
@@ -886,8 +981,24 @@ impl Renderer2D {
         Self::geo_fill_ellipse(&mut self.hud_vertices, cx, cy, rx, ry, color);
     }
 
-    pub fn hud_draw_line(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, color: [f32; 4], width: f32) {
-        Self::geo_draw_line_f32(&mut self.hud_vertices, x1 as f32, y1 as f32, x2 as f32, y2 as f32, color, width / 2.0);
+    pub fn hud_draw_line(
+        &mut self,
+        x1: i32,
+        y1: i32,
+        x2: i32,
+        y2: i32,
+        color: [f32; 4],
+        width: f32,
+    ) {
+        Self::geo_draw_line_f32(
+            &mut self.hud_vertices,
+            x1 as f32,
+            y1 as f32,
+            x2 as f32,
+            y2 as f32,
+            color,
+            width / 2.0,
+        );
     }
 
     pub fn hud_plot(&mut self, x: i32, y: i32, color: [f32; 4]) {
@@ -916,11 +1027,12 @@ impl Renderer2D {
                 a: clear_color[3],
             });
 
-            let (target_view, resolve_target) = if let Some(ref msaa_view) = self.msaa_offscreen_view {
-                (msaa_view, Some(&self.offscreen_view))
-            } else {
-                (&self.offscreen_view, None)
-            };
+            let (target_view, resolve_target) =
+                if let Some(ref msaa_view) = self.msaa_offscreen_view {
+                    (msaa_view, Some(&self.offscreen_view))
+                } else {
+                    (&self.offscreen_view, None)
+                };
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("World Pass"),
@@ -938,12 +1050,11 @@ impl Renderer2D {
             });
 
             if !self.vertices.is_empty() {
-                let vertex_buffer =
-                    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Vertex Buffer"),
-                        contents: bytemuck::cast_slice(&self.vertices),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
+                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&self.vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
                 render_pass.set_pipeline(&self.world_pipeline);
                 render_pass.set_bind_group(0, &self.world_bind_group, &[]);
@@ -953,7 +1064,8 @@ impl Renderer2D {
         }
 
         // === Pass 2: SDF entities -> offscreen Rgba16Float (no clear, load existing) ===
-        let has_sdf = !self.sdf_circle_instances.is_empty() || !self.sdf_capsule_instances.is_empty();
+        let has_sdf =
+            !self.sdf_circle_instances.is_empty() || !self.sdf_capsule_instances.is_empty();
         if has_sdf {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("SDF Pass"),
@@ -961,7 +1073,7 @@ impl Renderer2D {
                     view: &self.offscreen_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,  // Preserve world geometry
+                        load: wgpu::LoadOp::Load, // Preserve world geometry
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -971,11 +1083,12 @@ impl Renderer2D {
             });
 
             if !self.sdf_circle_instances.is_empty() {
-                let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("SDF Circle Instance Buffer"),
-                    contents: bytemuck::cast_slice(&self.sdf_circle_instances),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let instance_buffer =
+                    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("SDF Circle Instance Buffer"),
+                        contents: bytemuck::cast_slice(&self.sdf_circle_instances),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 render_pass.set_pipeline(&self.sdf_circle_pipeline);
                 render_pass.set_bind_group(0, &self.sdf_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, instance_buffer.slice(..));

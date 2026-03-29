@@ -13,7 +13,10 @@ use crate::parameters::*;
 /// `(asteroid_pos - screen_center) * mass / (10 + dist²_from_ship)`.
 /// The resulting vector is in world-space and can be scaled by `CAMERA_RATIO_OBJECTS`.
 fn center_of_attention(objects: &[Entity], ship_pos: Vec2, globals: &Globals) -> Vec2 {
-    let screen_center = Vec2::new(globals.render.phys_width / 2.0, globals.render.phys_height / 2.0);
+    let screen_center = Vec2::new(
+        globals.render.phys_width / 2.0,
+        globals.render.phys_height / 2.0,
+    );
     objects.iter().fold(Vec2::ZERO, |acc, obj| {
         let rel_pos = sub_vec(obj.position, ship_pos);
         let dist2 = distance_squared(rel_pos, Vec2::ZERO);
@@ -50,10 +53,7 @@ pub fn update_camera(state: &mut crate::game::GameState, globals: &Globals) {
         );
         add_vec(
             facing_offset,
-            add_vec(
-                add_vec(ship.position, velocity_lookahead),
-                asteroid_pull,
-            ),
+            add_vec(add_vec(ship.position, velocity_lookahead), asteroid_pull),
         )
     };
 
@@ -93,19 +93,47 @@ pub fn update_camera(state: &mut crate::game::GameState, globals: &Globals) {
 
     // 4. Apply displacement to all entities
     translate_entity(&mut state.ship, move_camera);
-    for e in state.objects.iter_mut()      { translate_entity(e, move_camera); }
-    for e in state.objects_oos.iter_mut()  { translate_entity(e, move_camera); }
-    for e in state.toosmall.iter_mut()     { translate_entity(e, move_camera); }
-    for e in state.toosmall_oos.iter_mut() { translate_entity(e, move_camera); }
-    for e in state.fragments.iter_mut()    { translate_entity(e, move_camera); }
-    for e in state.chunks.iter_mut()       { translate_entity(e, move_camera); }
-    for e in state.chunks_oos.iter_mut()   { translate_entity(e, move_camera); }
-    for e in state.chunks_explo.iter_mut() { translate_entity(e, move_camera); }
-    for e in state.projectiles.iter_mut()  { translate_entity(e, move_camera); }
-    for e in state.explosions.iter_mut()   { translate_entity(e, move_camera); }
-    for e in state.smoke.iter_mut()        { translate_entity(e, move_camera); }
-    for e in state.smoke_oos.iter_mut()    { translate_entity(e, move_camera); }
-    for e in state.sparks.iter_mut()       { translate_entity(e, move_camera); }
+    for e in state.objects.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.objects_oos.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.toosmall.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.toosmall_oos.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.fragments.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.chunks.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.chunks_oos.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.chunks_explo.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.projectiles.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.explosions.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.smoke.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.smoke_oos.iter_mut() {
+        translate_entity(e, move_camera);
+    }
+    for e in state.sparks.iter_mut() {
+        translate_entity(e, move_camera);
+    }
     // Stars get parallax treatment (proximity-scaled displacement)
-    for star in state.stars.iter_mut()     { move_star(star, move_camera, globals); }
+    for star in state.stars.iter_mut() {
+        move_star(star, move_camera, globals);
+    }
 }
