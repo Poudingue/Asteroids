@@ -1,14 +1,12 @@
+use asteroids::math_utils::Vec2;
 /// Safety-net tests for entity predicates and spawn functions in objects.rs
 /// These tests verify predicate complementarity and basic entity validity
 /// before V2 refactoring begins.
-
 use asteroids::objects::{
-    spawn_ship, spawn_projectile, spawn_asteroid, spawn_explosion, Entity, EntityKind,
-    Hitbox, Visuals, Polygon,
-    is_alive, is_dead, positive_radius, is_chunk, not_chunk,
-    too_small, big_enough, close_enough, too_far, check_spawn, check_not_spawn,
+    big_enough, check_not_spawn, check_spawn, close_enough, is_alive, is_chunk, is_dead, not_chunk,
+    positive_radius, spawn_asteroid, spawn_explosion, spawn_projectile, spawn_ship, too_far,
+    too_small, Entity, EntityKind, Hitbox, Polygon, Visuals,
 };
-use asteroids::math_utils::Vec2;
 use rand::thread_rng;
 
 // ============================================================================
@@ -176,7 +174,10 @@ fn check_spawn_not_spawn_complementary_inside() {
     let e = entity_at_position(Vec2::new(960.0, 540.0));
     assert!(check_spawn(&e, 1920.0, 1080.0));
     assert!(!check_not_spawn(&e, 1920.0, 1080.0));
-    assert_ne!(check_spawn(&e, 1920.0, 1080.0), check_not_spawn(&e, 1920.0, 1080.0));
+    assert_ne!(
+        check_spawn(&e, 1920.0, 1080.0),
+        check_not_spawn(&e, 1920.0, 1080.0)
+    );
 }
 
 #[test]
@@ -185,7 +186,10 @@ fn check_spawn_not_spawn_complementary_outside() {
     let e = entity_at_position(Vec2::new(-5000.0, -5000.0));
     assert!(!check_spawn(&e, 1920.0, 1080.0));
     assert!(check_not_spawn(&e, 1920.0, 1080.0));
-    assert_ne!(check_spawn(&e, 1920.0, 1080.0), check_not_spawn(&e, 1920.0, 1080.0));
+    assert_ne!(
+        check_spawn(&e, 1920.0, 1080.0),
+        check_not_spawn(&e, 1920.0, 1080.0)
+    );
 }
 
 #[test]
@@ -206,7 +210,10 @@ fn close_enough_too_far_complementary_nearby() {
     let e = entity_at_position(Vec2::new(960.0, 540.0));
     assert!(close_enough(&e, 1920.0, 1080.0));
     assert!(!too_far(&e, 1920.0, 1080.0));
-    assert_ne!(close_enough(&e, 1920.0, 1080.0), too_far(&e, 1920.0, 1080.0));
+    assert_ne!(
+        close_enough(&e, 1920.0, 1080.0),
+        too_far(&e, 1920.0, 1080.0)
+    );
 }
 
 #[test]
@@ -215,7 +222,10 @@ fn close_enough_too_far_complementary_very_far() {
     let e = entity_at_position(Vec2::new(50000.0, 50000.0));
     assert!(!close_enough(&e, 1920.0, 1080.0));
     assert!(too_far(&e, 1920.0, 1080.0));
-    assert_ne!(close_enough(&e, 1920.0, 1080.0), too_far(&e, 1920.0, 1080.0));
+    assert_ne!(
+        close_enough(&e, 1920.0, 1080.0),
+        too_far(&e, 1920.0, 1080.0)
+    );
 }
 
 // ============================================================================
@@ -275,12 +285,19 @@ fn spawn_projectile_is_valid() {
     assert_eq!(proj.velocity, vel);
     // Projectile has zero health (expires immediately via game logic)
     // ext_radius must be > 0 for collision detection
-    assert!(proj.hitbox.ext_radius > 0.0, "projectile ext_radius must be > 0");
+    assert!(
+        proj.hitbox.ext_radius > 0.0,
+        "projectile ext_radius must be > 0"
+    );
 }
 
 #[test]
 fn spawn_projectile_different_positions() {
-    let positions: &[Vec2] = &[Vec2::new(0.0, 0.0), Vec2::new(-500.0, 200.0), Vec2::new(1920.0, 1080.0)];
+    let positions: &[Vec2] = &[
+        Vec2::new(0.0, 0.0),
+        Vec2::new(-500.0, 200.0),
+        Vec2::new(1920.0, 1080.0),
+    ];
     for &pos in positions {
         let proj = spawn_projectile(pos, Vec2::ZERO, 1.0);
         assert_eq!(proj.position, pos);
@@ -316,8 +333,14 @@ fn spawn_asteroid_has_polygon_points() {
     let mut rng = thread_rng();
     let asteroid = spawn_asteroid(Vec2::new(0.0, 0.0), Vec2::new(0.0, 0.0), 200.0, &mut rng);
     // Asteroid polygon should have vertices
-    assert!(!asteroid.hitbox.points.0.is_empty(), "asteroid must have polygon points");
-    assert!(!asteroid.visuals.shapes.is_empty(), "asteroid must have visual shapes");
+    assert!(
+        !asteroid.hitbox.points.0.is_empty(),
+        "asteroid must have polygon points"
+    );
+    assert!(
+        !asteroid.visuals.shapes.is_empty(),
+        "asteroid must have visual shapes"
+    );
 }
 
 #[test]
@@ -340,7 +363,10 @@ fn spawn_explosion_is_valid() {
     let explosion = spawn_explosion(&proj, &mut rng);
 
     assert_eq!(explosion.kind, EntityKind::Explosion);
-    assert!(explosion.visuals.radius > 0.0, "explosion radius must be > 0");
+    assert!(
+        explosion.visuals.radius > 0.0,
+        "explosion radius must be > 0"
+    );
     // Explosion inherits position from projectile
     assert_eq!(explosion.position, proj.position);
 }
@@ -354,7 +380,13 @@ fn spawn_explosion_radius_in_range() {
     for _ in 0..20 {
         let explosion = spawn_explosion(&proj, &mut rng);
         // EXPLOSION_MIN_RADIUS = 200.0, EXPLOSION_MAX_RADIUS = 250.0
-        assert!(explosion.visuals.radius >= 200.0, "explosion radius below minimum");
-        assert!(explosion.visuals.radius <= 250.0, "explosion radius above maximum");
+        assert!(
+            explosion.visuals.radius >= 200.0,
+            "explosion radius below minimum"
+        );
+        assert!(
+            explosion.visuals.radius <= 250.0,
+            "explosion radius above maximum"
+        );
     }
 }

@@ -1,7 +1,6 @@
 /// Exhaustive property tests for math_utils.rs
 /// Covers every public function, testing correctness, mathematical properties, and float edge cases.
 /// These tests serve as a safety net before the V2 refactor that renames the French API to English.
-
 use asteroids::math_utils::*;
 use std::f64::consts::PI;
 
@@ -109,8 +108,16 @@ fn add_vec_inverse() {
 
 #[test]
 fn add_vec_known_values() {
-    assert!(vec2_approx_eq(add_vec(Vec2::new(1.0, 2.0), Vec2::new(3.0, 4.0)), Vec2::new(4.0, 6.0), EPS));
-    assert!(vec2_approx_eq(add_vec(Vec2::new(-1.0, -2.0), Vec2::new(1.0, 2.0)), Vec2::new(0.0, 0.0), EPS));
+    assert!(vec2_approx_eq(
+        add_vec(Vec2::new(1.0, 2.0), Vec2::new(3.0, 4.0)),
+        Vec2::new(4.0, 6.0),
+        EPS
+    ));
+    assert!(vec2_approx_eq(
+        add_vec(Vec2::new(-1.0, -2.0), Vec2::new(1.0, 2.0)),
+        Vec2::new(0.0, 0.0),
+        EPS
+    ));
 }
 
 #[test]
@@ -149,8 +156,16 @@ fn sub_vec_anti_commutativity() {
 
 #[test]
 fn sub_vec_known_values() {
-    assert!(vec2_approx_eq(sub_vec(Vec2::new(5.0, 3.0), Vec2::new(2.0, 1.0)), Vec2::new(3.0, 2.0), EPS));
-    assert!(vec2_approx_eq(sub_vec(Vec2::new(0.0, 0.0), Vec2::new(1.0, 1.0)), Vec2::new(-1.0, -1.0), EPS));
+    assert!(vec2_approx_eq(
+        sub_vec(Vec2::new(5.0, 3.0), Vec2::new(2.0, 1.0)),
+        Vec2::new(3.0, 2.0),
+        EPS
+    ));
+    assert!(vec2_approx_eq(
+        sub_vec(Vec2::new(0.0, 0.0), Vec2::new(1.0, 1.0)),
+        Vec2::new(-1.0, -1.0),
+        EPS
+    ));
 }
 
 #[test]
@@ -213,7 +228,11 @@ fn scale_vec_negative_scalar() {
 
 #[test]
 fn scale_vec_known_values() {
-    assert!(vec2_approx_eq(scale_vec(Vec2::new(2.0, 3.0), 4.0), Vec2::new(8.0, 12.0), EPS));
+    assert!(vec2_approx_eq(
+        scale_vec(Vec2::new(2.0, 3.0), 4.0),
+        Vec2::new(8.0, 12.0),
+        EPS
+    ));
 }
 
 // ─── magnitude ─────────────────────────────────────────────────────────────
@@ -237,7 +256,13 @@ fn magnitude_unit_vectors() {
 
 #[test]
 fn magnitude_non_negative() {
-    for v in &[Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0), Vec2::new(-1.0, 0.0), Vec2::new(3.0, -4.0), Vec2::new(-3.0, -4.0)] {
+    for v in &[
+        Vec2::new(0.0, 0.0),
+        Vec2::new(1.0, 0.0),
+        Vec2::new(-1.0, 0.0),
+        Vec2::new(3.0, -4.0),
+        Vec2::new(-3.0, -4.0),
+    ] {
         assert!(magnitude(*v) >= 0.0);
     }
 }
@@ -245,7 +270,11 @@ fn magnitude_non_negative() {
 #[test]
 fn magnitude_symmetry() {
     // hyp(x, y) == hyp(y, x) == hyp(-x, y) == hyp(x, -y)
-    let cases = [Vec2::new(3.0, 4.0), Vec2::new(1.5, 2.5), Vec2::new(1e7, 1e7)];
+    let cases = [
+        Vec2::new(3.0, 4.0),
+        Vec2::new(1.5, 2.5),
+        Vec2::new(1e7, 1e7),
+    ];
     for v in cases {
         let (x, y) = (v.x, v.y);
         let h = magnitude(v);
@@ -304,7 +333,11 @@ fn distance_squared_self_is_zero() {
 fn distance_squared_symmetry() {
     let p1 = Vec2::new(1.0, 2.0);
     let p2 = Vec2::new(4.0, 6.0);
-    assert!(approx_eq(distance_squared(p1, p2), distance_squared(p2, p1), EPS));
+    assert!(approx_eq(
+        distance_squared(p1, p2),
+        distance_squared(p2, p1),
+        EPS
+    ));
 }
 
 #[test]
@@ -322,7 +355,11 @@ fn distance_squared_non_negative() {
 #[test]
 fn distance_squared_known_3_4_5() {
     // Distance from (0,0) to (3,4) should be sqrt(25) = 5, so d² = 25
-    assert!(approx_eq(distance_squared(Vec2::new(0.0, 0.0), Vec2::new(3.0, 4.0)), 25.0, EPS));
+    assert!(approx_eq(
+        distance_squared(Vec2::new(0.0, 0.0), Vec2::new(3.0, 4.0)),
+        25.0,
+        EPS
+    ));
 }
 
 #[test]
@@ -423,7 +460,11 @@ fn lerp_float_known_values() {
 fn component_mul_vec_commutativity() {
     let a = Vec2::new(2.0, 3.0);
     let b = Vec2::new(4.0, 5.0);
-    assert!(vec2_approx_eq(component_mul_vec(a, b), component_mul_vec(b, a), EPS));
+    assert!(vec2_approx_eq(
+        component_mul_vec(a, b),
+        component_mul_vec(b, a),
+        EPS
+    ));
 }
 
 #[test]
@@ -520,9 +561,21 @@ fn to_i32_tuple_truncates() {
 
 #[test]
 fn from_i32_tuple_known_values() {
-    assert!(vec2_approx_eq(from_i32_tuple((3, 4)), Vec2::new(3.0, 4.0), EPS));
-    assert!(vec2_approx_eq(from_i32_tuple((-1, -2)), Vec2::new(-1.0, -2.0), EPS));
-    assert!(vec2_approx_eq(from_i32_tuple((0, 0)), Vec2::new(0.0, 0.0), EPS));
+    assert!(vec2_approx_eq(
+        from_i32_tuple((3, 4)),
+        Vec2::new(3.0, 4.0),
+        EPS
+    ));
+    assert!(vec2_approx_eq(
+        from_i32_tuple((-1, -2)),
+        Vec2::new(-1.0, -2.0),
+        EPS
+    ));
+    assert!(vec2_approx_eq(
+        from_i32_tuple((0, 0)),
+        Vec2::new(0.0, 0.0),
+        EPS
+    ));
 }
 
 #[test]
@@ -551,15 +604,27 @@ fn proj_unit_ratio() {
     let base = Vec2::new(1.0, 2.0);
     let dir = Vec2::new(3.0, 4.0);
     // proj(base, dir, 1.0) == base + dir
-    assert!(vec2_approx_eq(proj(base, dir, 1.0), add_vec(base, dir), EPS));
+    assert!(vec2_approx_eq(
+        proj(base, dir, 1.0),
+        add_vec(base, dir),
+        EPS
+    ));
 }
 
 #[test]
 fn proj_known_values() {
     // proj((0,0), (1,0), 5) = (5, 0)
-    assert!(vec2_approx_eq(proj(Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0), 5.0), Vec2::new(5.0, 0.0), EPS));
+    assert!(vec2_approx_eq(
+        proj(Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0), 5.0),
+        Vec2::new(5.0, 0.0),
+        EPS
+    ));
     // proj((1,1), (1,1), 2) = (3, 3)
-    assert!(vec2_approx_eq(proj(Vec2::new(1.0, 1.0), Vec2::new(1.0, 1.0), 2.0), Vec2::new(3.0, 3.0), EPS));
+    assert!(vec2_approx_eq(
+        proj(Vec2::new(1.0, 1.0), Vec2::new(1.0, 1.0), 2.0),
+        Vec2::new(3.0, 3.0),
+        EPS
+    ));
 }
 
 #[test]
@@ -567,7 +632,11 @@ fn proj_negative_ratio() {
     let base = Vec2::new(5.0, 5.0);
     let dir = Vec2::new(1.0, 1.0);
     // proj(base, dir, -1) == base - dir
-    assert!(vec2_approx_eq(proj(base, dir, -1.0), sub_vec(base, dir), EPS));
+    assert!(vec2_approx_eq(
+        proj(base, dir, -1.0),
+        sub_vec(base, dir),
+        EPS
+    ));
 }
 
 // ─── from_polar / to_polar ───────────────────────────────────────
@@ -617,7 +686,12 @@ fn from_polar_scaling() {
 
 #[test]
 fn from_polar_preserves_magnitude() {
-    let cases = [(0.0, 3.0), (PI / 6.0, 2.0), (PI, 4.0), (7.0 * PI / 4.0, 1.5)];
+    let cases = [
+        (0.0, 3.0),
+        (PI / 6.0, 2.0),
+        (PI, 4.0),
+        (7.0 * PI / 4.0, 1.5),
+    ];
     for (angle, r) in cases {
         let v = from_polar(angle, r);
         assert!(
@@ -759,7 +833,10 @@ fn wrap_float_range_check() {
     let modulo = 10.0;
     for &v in &[-1.0, 0.0, 5.0, 9.9, 10.0, 15.0, -5.0] {
         let r = wrap_float(v, modulo);
-        assert!(r >= 0.0 && r < modulo, "wrap_float({v}, {modulo}) = {r} out of range");
+        assert!(
+            r >= 0.0 && r < modulo,
+            "wrap_float({v}, {modulo}) = {r} out of range"
+        );
     }
 }
 
@@ -798,16 +875,8 @@ fn wrap_single_both_axes() {
 fn wrap_toroidal_in_range() {
     // A point inside [-w, w) x [-h, h) (the 1-screen-wide margin) should stay
     let r = wrap_toroidal(Vec2::new(5.0, 5.0), 10.0, 10.0);
-    assert!(
-        r.x >= -10.0 && r.x < 10.0,
-        "x={} out of [-10, 10)",
-        r.x
-    );
-    assert!(
-        r.y >= -10.0 && r.y < 10.0,
-        "y={} out of [-10, 10)",
-        r.y
-    );
+    assert!(r.x >= -10.0 && r.x < 10.0, "x={} out of [-10, 10)", r.x);
+    assert!(r.y >= -10.0 && r.y < 10.0, "y={} out of [-10, 10)", r.y);
 }
 
 #[test]
@@ -874,7 +943,10 @@ fn exp_decay_monotonic_decrease() {
     for i in 1..=5 {
         let t_curr = i as f64 * 0.1;
         let next = exp_decay(n, half_life, obs, speed, t_last, t_curr, proper);
-        assert!(next < prev, "not monotonically decreasing at step {i}: {next} >= {prev}");
+        assert!(
+            next < prev,
+            "not monotonically decreasing at step {i}: {next} >= {prev}"
+        );
         prev = next;
     }
 }
@@ -931,7 +1003,10 @@ fn abso_exp_decay_monotonic_decrease() {
     for i in 1..=5 {
         let t_curr = i as f64 * 0.1;
         let next = abso_exp_decay(n, half_life, t_last, t_curr);
-        assert!(next < prev, "not monotonically decreasing at step {i}: {next} >= {prev}");
+        assert!(
+            next < prev,
+            "not monotonically decreasing at step {i}: {next} >= {prev}"
+        );
         prev = next;
     }
 }

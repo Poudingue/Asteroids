@@ -2,7 +2,6 @@
 /// Covers move_entity, apply_inertia, accelerate_entity, boost_entity, rotate_entity,
 /// turn_entity, apply_torque (apply_angular_momentum), collision_circles, collision_point.
 /// These tests serve as a safety net before the V2 refactor.
-
 use asteroids::game::*;
 use asteroids::math_utils::*;
 use asteroids::objects::*;
@@ -108,7 +107,11 @@ fn move_entity_scales_with_game_speed() {
     move_entity(&mut e1, vel, &g1);
     move_entity(&mut e2, vel, &g2);
     assert!(
-        vec2_approx_eq(e2.position, Vec2::new(e1.position.x * 2.0, e1.position.y * 2.0), EPS),
+        vec2_approx_eq(
+            e2.position,
+            Vec2::new(e1.position.x * 2.0, e1.position.y * 2.0),
+            EPS
+        ),
         "game_speed=2 should double displacement"
     );
 }

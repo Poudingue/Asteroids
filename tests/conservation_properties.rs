@@ -1,3 +1,4 @@
+use asteroids::math_utils::{add_vec, magnitude, scale_vec, squared, Vec2};
 /// Physics conservation law tests for the Asteroids game engine.
 ///
 /// These tests verify physical invariants (mass, momentum, energy).
@@ -5,17 +6,14 @@
 /// implementation violates physics, marked with #[ignore].
 ///
 /// Goal: document violations, not hide them.
-
 use asteroids::objects::{
-    fragment_asteroid, spawn_fragments, spawn_asteroid, spawn_explosion,
-    spawn_explosion_chunk, spawn_n_chunks, spawn_projectile, Entity,
+    fragment_asteroid, spawn_asteroid, spawn_explosion, spawn_explosion_chunk, spawn_fragments,
+    spawn_n_chunks, spawn_projectile, Entity,
 };
 use asteroids::parameters::{
-    Globals, ASTEROID_DENSITY, ASTEROID_MIN_SIZE,
-    CHUNKS_EXPLO_MAX_SPEED, FRAGMENT_NUMBER,
+    Globals, ASTEROID_DENSITY, ASTEROID_MIN_SIZE, CHUNKS_EXPLO_MAX_SPEED, FRAGMENT_NUMBER,
 };
 use asteroids::physics::consequences_collision;
-use asteroids::math_utils::{Vec2, magnitude, add_vec, scale_vec, squared};
 use rand::thread_rng;
 use std::f64::consts::PI;
 
@@ -57,7 +55,9 @@ fn test_asteroid_fragmentation_mass_conservation() {
         assert!(
             fragment_total_mass <= parent_mass,
             "radius={}: fragment_total_mass={:.2} > parent_mass={:.2} (ratio={:.2}x)",
-            radius, fragment_total_mass, parent_mass,
+            radius,
+            fragment_total_mass,
+            parent_mass,
             fragment_total_mass / parent_mass
         );
     }
@@ -75,7 +75,8 @@ fn test_explosion_no_mass_creation() {
         assert!(
             explosion.mass <= proj_mass,
             "explosion mass ({}) > projectile mass ({})",
-            explosion.mass, proj_mass
+            explosion.mass,
+            proj_mass
         );
     }
 }
@@ -88,10 +89,17 @@ fn test_chunk_mass_bounded() {
     let parent_mass = parent.mass;
     let chunks = spawn_n_chunks(&parent, 20, parent.visuals.color, &mut rng);
     for chunk in &chunks {
-        assert!(chunk.mass <= parent_mass,
-            "chunk mass ({}) > parent mass ({})", chunk.mass, parent_mass);
-        assert!(chunk.mass > 0.0,
-            "chunk mass must be positive, got {}", chunk.mass);
+        assert!(
+            chunk.mass <= parent_mass,
+            "chunk mass ({}) > parent mass ({})",
+            chunk.mass,
+            parent_mass
+        );
+        assert!(
+            chunk.mass > 0.0,
+            "chunk mass must be positive, got {}",
+            chunk.mass
+        );
     }
 }
 
@@ -106,7 +114,9 @@ fn test_fragment_mass_formula_correct() {
         assert!(
             (frag.mass - expected_mass).abs() < 1e-6,
             "fragment mass={:.6} != PI*r^2*density={:.6} (r={})",
-            frag.mass, expected_mass, frag.hitbox.int_radius
+            frag.mass,
+            expected_mass,
+            frag.hitbox.int_radius
         );
     }
 }
@@ -126,8 +136,18 @@ fn test_collision_momentum_conservation() {
     let epsilon = 1.0;
     for seed in 0u64..20 {
         let mut rng = thread_rng();
-        let mut e1 = spawn_asteroid(Vec2::new(-200.0, 0.0), Vec2::new(100.0, 0.0), 200.0, &mut rng);
-        let mut e2 = spawn_asteroid(Vec2::new(200.0, 0.0), Vec2::new(-80.0, 0.0), 150.0, &mut rng);
+        let mut e1 = spawn_asteroid(
+            Vec2::new(-200.0, 0.0),
+            Vec2::new(100.0, 0.0),
+            200.0,
+            &mut rng,
+        );
+        let mut e2 = spawn_asteroid(
+            Vec2::new(200.0, 0.0),
+            Vec2::new(-80.0, 0.0),
+            150.0,
+            &mut rng,
+        );
         e1.proper_time = 1.0;
         e2.proper_time = 1.0;
         let p_before = add_vec(momentum(&e1), momentum(&e2));
@@ -149,8 +169,18 @@ fn test_collision_momentum_conservation() {
 #[ignore = "VIOLATION: Asymmetric e2 formula and scale_vec wrapping produce non-zero output. Even at proper_time=1.0 the total_mass/mass term differs between e1 and e2 paths. Latent momentum-injection bug."]
 fn test_elastic_bounce_momentum() {
     let mut rng = thread_rng();
-    let mut e1 = spawn_asteroid(Vec2::new(-100.0, 0.0), Vec2::new(500.0, 0.0), 200.0, &mut rng);
-    let mut e2 = spawn_asteroid(Vec2::new(100.0, 0.0), Vec2::new(-500.0, 0.0), 200.0, &mut rng);
+    let mut e1 = spawn_asteroid(
+        Vec2::new(-100.0, 0.0),
+        Vec2::new(500.0, 0.0),
+        200.0,
+        &mut rng,
+    );
+    let mut e2 = spawn_asteroid(
+        Vec2::new(100.0, 0.0),
+        Vec2::new(-500.0, 0.0),
+        200.0,
+        &mut rng,
+    );
     e1.proper_time = 1.0;
     e2.proper_time = 1.0;
     e2.mass = e1.mass; // force equal mass for clean symmetry
@@ -180,8 +210,18 @@ fn test_elastic_bounce_momentum() {
 fn test_collision_energy_no_increase() {
     for seed in 0u64..20 {
         let mut rng = thread_rng();
-        let mut e1 = spawn_asteroid(Vec2::new(-300.0, 0.0), Vec2::new(200.0, 50.0), 200.0, &mut rng);
-        let mut e2 = spawn_asteroid(Vec2::new(300.0, 0.0), Vec2::new(-150.0, -30.0), 180.0, &mut rng);
+        let mut e1 = spawn_asteroid(
+            Vec2::new(-300.0, 0.0),
+            Vec2::new(200.0, 50.0),
+            200.0,
+            &mut rng,
+        );
+        let mut e2 = spawn_asteroid(
+            Vec2::new(300.0, 0.0),
+            Vec2::new(-150.0, -30.0),
+            180.0,
+            &mut rng,
+        );
         e1.proper_time = 1.0;
         e2.proper_time = 1.0;
         let ke_before = kinetic_energy(&e1) + kinetic_energy(&e2);
@@ -192,7 +232,10 @@ fn test_collision_energy_no_increase() {
         assert!(
             ke_after <= ke_before + 1e-6,
             "seed={}: KE increased! ke_before={:.2}, ke_after={:.2}, ratio={:.2}x",
-            seed, ke_before, ke_after, ke_after / ke_before.max(1.0)
+            seed,
+            ke_before,
+            ke_after,
+            ke_after / ke_before.max(1.0)
         );
     }
 }
@@ -203,8 +246,18 @@ fn test_collision_energy_no_increase() {
 #[ignore = "VIOLATION: Heavy (r=800) vs light (r=100): light gets speed kick = total_mass/light_mass >> 1. Creates enormous KE in light entity. ke_before << ke_after."]
 fn test_collision_energy_with_restitution() {
     let mut rng = thread_rng();
-    let mut heavy = spawn_asteroid(Vec2::new(-100.0, 0.0), Vec2::new(10.0, 0.0), 800.0, &mut rng);
-    let mut light = spawn_asteroid(Vec2::new(100.0, 0.0), Vec2::new(-10.0, 0.0), 100.0, &mut rng);
+    let mut heavy = spawn_asteroid(
+        Vec2::new(-100.0, 0.0),
+        Vec2::new(10.0, 0.0),
+        800.0,
+        &mut rng,
+    );
+    let mut light = spawn_asteroid(
+        Vec2::new(100.0, 0.0),
+        Vec2::new(-10.0, 0.0),
+        100.0,
+        &mut rng,
+    );
     heavy.proper_time = 1.0;
     light.proper_time = 1.0;
     let ke_before = kinetic_energy(&heavy) + kinetic_energy(&light);
@@ -215,7 +268,9 @@ fn test_collision_energy_with_restitution() {
     assert!(
         ke_after < ke_before,
         "energy should strictly decrease: ke_before={:.2}, ke_after={:.2}, ratio={:.2}x",
-        ke_before, ke_after, ke_after / ke_before.max(1.0)
+        ke_before,
+        ke_after,
+        ke_after / ke_before.max(1.0)
     );
 }
 
@@ -245,12 +300,16 @@ fn test_fragments_inherit_parent_velocity() {
     assert!(
         (avg_vx - parent_vel.x).abs() < tolerance,
         "avg fragment vx={:.2} too far from parent vx={:.2} (diff={:.2})",
-        avg_vx, parent_vel.x, (avg_vx - parent_vel.x).abs()
+        avg_vx,
+        parent_vel.x,
+        (avg_vx - parent_vel.x).abs()
     );
     assert!(
         (avg_vy - parent_vel.y).abs() < tolerance,
         "avg fragment vy={:.2} too far from parent vy={:.2} (diff={:.2})",
-        avg_vy, parent_vel.y, (avg_vy - parent_vel.y).abs()
+        avg_vy,
+        parent_vel.y,
+        (avg_vy - parent_vel.y).abs()
     );
 }
 
@@ -268,7 +327,9 @@ fn test_chunks_velocity_bounded() {
         assert!(
             speed <= max_expected_speed + 1.0,
             "chunk[{}] speed={:.2} exceeds max expected {:.2}",
-            i, speed, max_expected_speed
+            i,
+            speed,
+            max_expected_speed
         );
     }
 }
@@ -286,7 +347,8 @@ fn test_projectile_mass_reasonable() {
     assert!(
         proj.mass < min_asteroid.mass,
         "projectile mass ({}) should be < minimum asteroid mass ({})",
-        proj.mass, min_asteroid.mass
+        proj.mass,
+        min_asteroid.mass
     );
     assert!(proj.mass > 0.0, "projectile mass must be positive");
 }
@@ -296,14 +358,20 @@ fn test_projectile_mass_reasonable() {
 fn test_asteroid_mass_scales_with_size() {
     let mut rng = thread_rng();
     let radii = [100.0_f64, 150.0, 200.0, 300.0, 500.0, 800.0];
-    let asteroids: Vec<Entity> = radii.iter()
+    let asteroids: Vec<Entity> = radii
+        .iter()
         .map(|&r| spawn_asteroid(Vec2::ZERO, Vec2::ZERO, r, &mut rng))
         .collect();
     for i in 1..asteroids.len() {
         assert!(
             asteroids[i].mass > asteroids[i - 1].mass,
             "asteroid[{}] (r={}) mass={:.2} should be > asteroid[{}] (r={}) mass={:.2}",
-            i, radii[i], asteroids[i].mass, i-1, radii[i-1], asteroids[i-1].mass
+            i,
+            radii[i],
+            asteroids[i].mass,
+            i - 1,
+            radii[i - 1],
+            asteroids[i - 1].mass
         );
     }
 }
@@ -334,7 +402,8 @@ fn test_chunk_mass_less_than_min_asteroid() {
     assert!(
         chunk.mass < min_asteroid.mass,
         "chunk mass ({}) should be < min asteroid mass ({})",
-        chunk.mass, min_asteroid.mass
+        chunk.mass,
+        min_asteroid.mass
     );
 }
 
@@ -350,14 +419,19 @@ fn test_fragment_mass_stable_across_seeds() {
             assert!(
                 (frag.mass - expected).abs() < 1e-6,
                 "seed={}: fragment mass mismatch: mass={:.6}, expected={:.6}",
-                seed, frag.mass, expected
+                seed,
+                frag.mass,
+                expected
             );
             let parent_radius = parent.hitbox.int_radius;
             let frag_radius = frag.hitbox.int_radius;
             assert!(
                 frag_radius >= 0.39 * parent_radius && frag_radius <= 0.71 * parent_radius,
                 "seed={}: fragment radius {:.2} out of range [{:.2}, {:.2}]",
-                seed, frag_radius, 0.4 * parent_radius, 0.7 * parent_radius
+                seed,
+                frag_radius,
+                0.4 * parent_radius,
+                0.7 * parent_radius
             );
         }
     }

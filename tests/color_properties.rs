@@ -89,7 +89,10 @@ fn hdr_add_associativity() {
     let a = c(1.0, 2.0, 3.0);
     let b = c(4.0, 5.0, 6.0);
     let cc = c(7.0, 8.0, 9.0);
-    assert!(color_approx(hdr_add(hdr_add(a, b), cc), hdr_add(a, hdr_add(b, cc))));
+    assert!(color_approx(
+        hdr_add(hdr_add(a, b), cc),
+        hdr_add(a, hdr_add(b, cc))
+    ));
 }
 
 #[test]
@@ -385,31 +388,41 @@ fn redirect_spectre_wide_b_extreme_overflow_bleeds_to_r() {
 
 #[test]
 fn rgb_of_hdr_black_is_zeros() {
-    let result = rgb_of_hdr(
-        HdrColor::zero(),
-        &HdrColor::zero(),
-        &HdrColor::one(),
-        1.0,
-    );
+    let result = rgb_of_hdr(HdrColor::zero(), &HdrColor::zero(), &HdrColor::one(), 1.0);
     assert_eq!(result, [0, 0, 0, 255]);
 }
 
 #[test]
 fn rgb_of_hdr_alpha_always_255() {
-    let result = rgb_of_hdr(c(100.0, 150.0, 200.0), &HdrColor::zero(), &HdrColor::one(), 1.0);
+    let result = rgb_of_hdr(
+        c(100.0, 150.0, 200.0),
+        &HdrColor::zero(),
+        &HdrColor::one(),
+        1.0,
+    );
     assert_eq!(result[3], 255);
 }
 
 #[test]
 fn rgb_of_hdr_clamping_above_255() {
     // Channel > 255 should be clamped to 255
-    let result = rgb_of_hdr(c(1000.0, 0.0, 0.0), &HdrColor::zero(), &HdrColor::one(), 1.0);
+    let result = rgb_of_hdr(
+        c(1000.0, 0.0, 0.0),
+        &HdrColor::zero(),
+        &HdrColor::one(),
+        1.0,
+    );
     assert_eq!(result[0], 255);
 }
 
 #[test]
 fn rgb_of_hdr_negative_clamped_to_zero() {
-    let result = rgb_of_hdr(c(-100.0, -200.0, -300.0), &HdrColor::zero(), &HdrColor::one(), 1.0);
+    let result = rgb_of_hdr(
+        c(-100.0, -200.0, -300.0),
+        &HdrColor::zero(),
+        &HdrColor::one(),
+        1.0,
+    );
     assert_eq!(result[0], 0);
     assert_eq!(result[1], 0);
     assert_eq!(result[2], 0);
@@ -418,7 +431,12 @@ fn rgb_of_hdr_negative_clamped_to_zero() {
 #[test]
 fn rgb_of_hdr_mid_range_passthrough() {
     // No add color, identity mul, exposure=1 → values pass through as-is
-    let result = rgb_of_hdr(c(100.0, 150.0, 200.0), &HdrColor::zero(), &HdrColor::one(), 1.0);
+    let result = rgb_of_hdr(
+        c(100.0, 150.0, 200.0),
+        &HdrColor::zero(),
+        &HdrColor::one(),
+        1.0,
+    );
     assert_eq!(result[0], 100);
     assert_eq!(result[1], 150);
     assert_eq!(result[2], 200);
@@ -525,5 +543,8 @@ fn saturate_negative_i_inverts_deviation() {
 
 #[test]
 fn saturate_zero_color_stays_zero() {
-    assert!(color_approx(saturate(HdrColor::zero(), 0.5), HdrColor::zero()));
+    assert!(color_approx(
+        saturate(HdrColor::zero(), 0.5),
+        HdrColor::zero()
+    ));
 }

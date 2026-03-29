@@ -1,6 +1,5 @@
 /// Property tests for the Vec2 struct in math.rs
 /// Covers all operators, methods, conversions, and edge cases.
-
 use asteroids::math::Vec2;
 use std::f64::consts::PI;
 
