@@ -1104,14 +1104,12 @@ pub fn render_frame(
 
     // HUD overlay — skip when paused (matches OCaml behavior)
     if !globals.time.pause {
-        // Extract rng to avoid simultaneous borrow of state fields
-        let rng = &mut state.rng as *mut _;
-        render_hud(state, globals, renderer, unsafe { &mut *rng });
+        render_hud(state, globals, renderer);
     }
 
     // Pause title overlay + interactive buttons
     if globals.time.pause {
-        crate::pause_menu::render_pause_title(state, globals, renderer, mouse_sx, mouse_sy, mouse_down);
+        crate::pause_menu::render_pause_title(&mut state.buttons, globals, renderer, &mut state.rng, mouse_sx, mouse_sy, mouse_down);
     }
 
     // Scanlines effect (rendered last, on top of everything)

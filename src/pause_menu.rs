@@ -1,6 +1,6 @@
 use rand::prelude::*;
 
-use crate::game::GameState;
+use rand::rngs::ThreadRng;
 use crate::rendering::hud::render_string;
 use crate::parameters::{GlobalToggle, Globals};
 use crate::rendering::Renderer2D;
@@ -219,9 +219,10 @@ pub fn render_button_tooltip(
 /// `mouse_sx`, `mouse_sy`: raw SDL2 screen coordinates (Y-down).
 /// `mouse_down`: left mouse button state.
 pub fn render_pause_title(
-    state: &mut GameState,
+    buttons: &mut Vec<ButtonBoolean>,
     globals: &mut Globals,
     renderer: &mut Renderer2D,
+    rng: &mut ThreadRng,
     mouse_sx: f64,
     mouse_sy: f64,
     mouse_down: bool,
@@ -234,34 +235,28 @@ pub fn render_pause_title(
 
     // Shadow (black, slightly offset)
     let shadow_col = [0u8, 0, 0, 255];
-    // We need to split borrow: rng from state, but buttons also in state.
-    // Render title shadow first (no buttons yet).
-    {
-        let rng = &mut state.rng as *mut _;
-        render_string(
-            "ASTEROIDS",
-            (sx + (2.1/16.0) * sw, sy + (14.7/24.0) * sh),
-            (1.0/16.0) * sw,
-            (4.0/24.0) * sh,
-            (1.0/40.0) * sw,
-            0.0,
-            shadow_col,
-            renderer,
-            globals,
-            unsafe { &mut *rng },
-        );
-    }
+
+    // Render title shadow first
+    render_string(
+        "ASTEROIDS",
+        (sx + (2.1/16.0) * sw, sy + (14.7/24.0) * sh),
+        (1.0/16.0) * sw,
+        (4.0/24.0) * sh,
+        (1.0/40.0) * sw,
+        0.0,
+        shadow_col,
+        renderer,
+        globals,
+        rng,
+    );
 
     // Phase 1: render all button backgrounds + text + click detection
-    let btn_count = state.buttons.len();
-    for i in 0..btn_count {
-        let rng = &mut state.rng as *mut _;
-        let btn = &mut state.buttons[i] as *mut ButtonBoolean;
+    for btn in buttons.iter_mut() {
         apply_button(
-            unsafe { &mut *btn },
+            btn,
             globals,
             renderer,
-            unsafe { &mut *rng },
+            rng,
             mouse_sx,
             mouse_sy,
             mouse_down,
@@ -269,33 +264,33 @@ pub fn render_pause_title(
     }
 
     // Phase 2: render tooltips on top of all buttons
+    // We can't borrow `buttons` as immutable here while `rng` is already borrowed,
+    // but since `rng` is passed separately there's no conflict — use index loop.
+    let btn_count = buttons.len();
     for i in 0..btn_count {
-        let rng = &mut state.rng as *mut _;
-        let btn = &state.buttons[i] as *const ButtonBoolean;
+        // SAFETY: indices are in-bounds, no overlapping mutable borrows.
+        // We borrow buttons[i] immutably and rng separately.
         render_button_tooltip(
-            unsafe { &*btn },
+            &buttons[i],
             globals,
             renderer,
-            unsafe { &mut *rng },
+            rng,
             mouse_sx,
             mouse_sy,
         );
     }
 
     // White title on top of everything
-    {
-        let rng = &mut state.rng as *mut _;
-        render_string(
-            "ASTEROIDS",
-            (sx + (2.0/16.0) * sw, sy + (15.0/24.0) * sh),
-            (1.0/16.0) * sw,
-            (4.0/24.0) * sh,
-            (1.0/40.0) * sw,
-            0.0,
-            [255, 255, 255, 255],
-            renderer,
-            globals,
-            unsafe { &mut *rng },
-        );
-    }
+    render_string(
+        "ASTEROIDS",
+        (sx + (2.0/16.0) * sw, sy + (15.0/24.0) * sh),
+        (1.0/16.0) * sw,
+        (4.0/24.0) * sh,
+        (1.0/40.0) * sw,
+        0.0,
+        [255, 255, 255, 255],
+        renderer,
+        globals,
+        rng,
+    );
 }

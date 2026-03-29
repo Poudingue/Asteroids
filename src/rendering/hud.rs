@@ -306,10 +306,9 @@ pub fn render_scanlines(offset: i32, height: i32, renderer: &mut Renderer2D) {
 /// Render the full HUD. Matches OCaml `affiche_hud`.
 /// Called at the END of render_frame (on top of everything).
 pub fn render_hud(
-    state: &GameState,
+    state: &mut GameState,
     globals: &Globals,
     renderer: &mut Renderer2D,
-    rng: &mut impl Rng,
 ) {
     // Skip HUD in retro mode
     if globals.visual.retro {
@@ -419,7 +418,7 @@ pub fn render_hud(
         score_col,
         renderer,
         globals,
-        rng,
+        &mut state.rng,
     );
 
     // ----- Stage -----
@@ -434,7 +433,7 @@ pub fn render_hud(
         white,
         renderer,
         globals,
-        rng,
+        &mut state.rng,
     );
 
     // ----- Death countdown -----
@@ -456,7 +455,7 @@ pub fn render_hud(
                     white,
                     renderer,
                     globals,
-                    rng,
+                    &mut state.rng,
                 );
             }
         }
@@ -515,7 +514,7 @@ pub fn render_hud(
             debug_color,
             renderer,
             globals,
-            rng,
+            &mut state.rng,
         );
     }
 }
