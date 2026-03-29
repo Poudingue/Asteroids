@@ -10,14 +10,6 @@ use crate::math::Vec2;
 // Constants (Display Parameters)
 // ============================================================================
 
-// Effect of scanlines to imitate CRT monitors that projected the image line by line.
-// Activating the animated_scanlines effect allows animation imitating interlaced videos,
-// by activating one line out of two one image out of two, but it doesn't pass well
-// because the image refresh cannot really be at exactly 60 with the OCaml engine.
-// Test at your own risk.
-pub const SCANLINES_PERIOD: i32 = 5;
-pub const ANIMATED_SCANLINES: bool = true;
-
 // Antialiasing jitter makes the render space "shake".
 // This is a form of spatial dithering to compensate for the loss of precision
 // due to rasterization when placing objects and drawing contours.
@@ -102,6 +94,13 @@ pub const RAND_MIN_LUM: f64 = 0.5;
 pub const RAND_MAX_LUM: f64 = 1.5;
 pub const SPACE_SATURATION: f64 = 2.0;
 pub const STAR_SATURATION: f64 = 8.0;
+
+/// MSAA sample count for polygon rendering. Valid values: 1 (off), 2, 4.
+/// SDF entities use their own smoothstep AA (controlled by SDF_AA_ENABLED in sdf.wgsl).
+// SDF anti-aliasing is controlled by compile-time const `SDF_AA_ENABLED` in src/shaders/sdf.wgsl.
+// true = smoothstep AA (default), false = hard edges.
+// This is independent of MSAA, which only affects polygon geometry.
+pub const MSAA_SAMPLE_COUNT: u32 = 4;
 
 // Button colors (stored as u32: (r << 16) | (g << 8) | b)
 pub const TRUECOLOR: u32 = (0 << 16) | (128 << 8) | 0; // rgb 0 128 0
@@ -425,10 +424,6 @@ pub struct ExposureConfig {
 
 /// Visual/rendering toggles and color goals.
 pub struct VisualConfig {
-    pub retro: bool,
-    pub oldschool: bool,
-    pub scanlines: bool,
-    pub scanlines_offset: i32,
     pub motion_blur: bool,
     pub screenshake_enabled: bool,
     pub smoke_enabled: bool,
@@ -556,10 +551,6 @@ impl Globals {
                 mul_base: (1.0, 1.0, 1.0),
             },
             visual: VisualConfig {
-                retro: false,
-                oldschool: false,
-                scanlines: false,
-                scanlines_offset: 0,
                 motion_blur: false,
                 screenshake_enabled: true,
                 smoke_enabled: true,
@@ -666,8 +657,6 @@ impl Globals {
             GlobalToggle::Quit           => self.time.quit,
             GlobalToggle::Pause          => self.time.pause,
             GlobalToggle::Restart        => self.time.restart,
-            GlobalToggle::Scanlines      => self.visual.scanlines,
-            GlobalToggle::Retro          => self.visual.retro,
             GlobalToggle::AdvancedHitbox => self.advanced_hitbox,
             GlobalToggle::Smoke          => self.visual.smoke_enabled,
             GlobalToggle::Screenshake    => self.visual.screenshake_enabled,
@@ -683,8 +672,6 @@ impl Globals {
             GlobalToggle::Quit           => self.time.quit            = val,
             GlobalToggle::Pause          => self.time.pause           = val,
             GlobalToggle::Restart        => self.time.restart         = val,
-            GlobalToggle::Scanlines      => self.visual.scanlines     = val,
-            GlobalToggle::Retro          => self.visual.retro         = val,
             GlobalToggle::AdvancedHitbox => self.advanced_hitbox      = val,
             GlobalToggle::Smoke          => self.visual.smoke_enabled = val,
             GlobalToggle::Screenshake    => self.visual.screenshake_enabled = val,
@@ -702,8 +689,6 @@ pub enum GlobalToggle {
     Quit,
     Pause,
     Restart,
-    Scanlines,
-    Retro,
     AdvancedHitbox,
     Smoke,
     Screenshake,

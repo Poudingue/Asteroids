@@ -2,6 +2,7 @@ pub mod hud;
 pub mod world;
 
 use wgpu::util::DeviceExt;
+use crate::parameters::MSAA_SAMPLE_COUNT;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -115,6 +116,9 @@ pub struct Renderer2D {
     sdf_capsule_pipeline: wgpu::RenderPipeline,
     sdf_capsule_instances: Vec<CapsuleInstance>,
     sdf_bind_group: wgpu::BindGroup,
+    msaa_sample_count: u32,
+    msaa_offscreen_texture: Option<wgpu::Texture>,
+    msaa_offscreen_view: Option<wgpu::TextureView>,
     pub width: u32,
     pub height: u32,
 }
@@ -134,6 +138,20 @@ fn create_offscreen_texture(device: &wgpu::Device, width: u32, height: u32) -> w
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         view_formats: &[],
     })
+}
+
+fn create_msaa_texture(device: &wgpu::Device, width: u32, height: u32, format: wgpu::TextureFormat, sample_count: u32) -> Option<wgpu::Texture> {
+    if sample_count <= 1 { return None; }
+    Some(device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("MSAA Texture"),
+        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats: &[],
+    }))
 }
 
 impl Renderer2D {
@@ -239,7 +257,11 @@ impl Renderer2D {
                 conservative: false,
             },
             depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
+            multisample: wgpu::MultisampleState {
+                count: MSAA_SAMPLE_COUNT,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             multiview: None,
             cache: None,
         });
@@ -248,6 +270,10 @@ impl Renderer2D {
         let offscreen_texture = create_offscreen_texture(device, width, height);
         let offscreen_view =
             offscreen_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // --- MSAA texture (None when MSAA_SAMPLE_COUNT == 1) ---
+        let msaa_offscreen_texture = create_msaa_texture(device, width, height, wgpu::TextureFormat::Rgba16Float, MSAA_SAMPLE_COUNT);
+        let msaa_offscreen_view = msaa_offscreen_texture.as_ref().map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()));
 
         // --- Postprocess shader + pipeline (renders fullscreen triangle to swapchain) ---
         let postprocess_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -574,6 +600,9 @@ impl Renderer2D {
             sdf_capsule_pipeline,
             sdf_capsule_instances: Vec::with_capacity(2048),
             sdf_bind_group,
+            msaa_sample_count: MSAA_SAMPLE_COUNT,
+            msaa_offscreen_texture,
+            msaa_offscreen_view,
             width,
             height,
         }
@@ -594,6 +623,10 @@ impl Renderer2D {
         self.offscreen_view = self
             .offscreen_texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Recreate MSAA texture at new resolution
+        self.msaa_offscreen_texture = create_msaa_texture(device, width, height, wgpu::TextureFormat::Rgba16Float, self.msaa_sample_count);
+        self.msaa_offscreen_view = self.msaa_offscreen_texture.as_ref().map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()));
 
         // Recreate postprocess bind group (it references the old view)
         let postprocess_bind_group_layout =
@@ -873,6 +906,8 @@ impl Renderer2D {
         });
 
         // --- Pass 1: Render world geometry into offscreen Rgba16Float texture ---
+        // When MSAA is enabled, render into the multisampled texture and resolve to offscreen.
+        // When MSAA is off (sample_count==1), render directly to offscreen.
         {
             let load_op = wgpu::LoadOp::Clear(wgpu::Color {
                 r: clear_color[0],
@@ -881,11 +916,17 @@ impl Renderer2D {
                 a: clear_color[3],
             });
 
+            let (target_view, resolve_target) = if let Some(ref msaa_view) = self.msaa_offscreen_view {
+                (msaa_view, Some(&self.offscreen_view))
+            } else {
+                (&self.offscreen_view, None)
+            };
+
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("World Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.offscreen_view,
-                    resolve_target: None,
+                    view: target_view,
+                    resolve_target,
                     ops: wgpu::Operations {
                         load: load_op,
                         store: wgpu::StoreOp::Store,
