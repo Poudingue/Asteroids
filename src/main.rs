@@ -10,6 +10,7 @@ fn main() {
     // SDL2 init
     let sdl_context = sdl2::init().expect("Failed to init SDL2");
     let video_subsystem = sdl_context.video().expect("Failed to init video");
+    let game_controller_subsystem = sdl_context.game_controller().expect("Failed to init game controller");
 
     // Start borderless fullscreen at desktop resolution
     let mut window = video_subsystem
@@ -87,6 +88,24 @@ fn main() {
     let mut event_pump = sdl_context.event_pump().expect("Failed to get event pump");
     let mut running = true;
     let mut is_fullscreen = true;
+    let mut active_controller: Option<sdl2::controller::GameController> = None;
+
+    // Open any controller already connected at startup
+    if let Ok(count) = game_controller_subsystem.num_joysticks() {
+        for i in 0..count {
+            if game_controller_subsystem.is_game_controller(i) {
+                match game_controller_subsystem.open(i) {
+                    Ok(controller) => {
+                        println!("Controller connected: {}", controller.name());
+                        state.gamepad.connected = true;
+                        active_controller = Some(controller);
+                        break;
+                    }
+                    Err(e) => eprintln!("Failed to open controller {}: {}", i, e),
+                }
+            }
+        }
+    }
 
     while running {
         let frame_start = Instant::now();
@@ -190,6 +209,64 @@ fn main() {
                     renderer.resize(&device, &queue, new_w, new_h);
                     globals.recompute_for_resolution(new_w, new_h);
                 }
+                Event::ControllerDeviceAdded { which, .. } => {
+                    if active_controller.is_none() {
+                        match game_controller_subsystem.open(which) {
+                            Ok(controller) => {
+                                println!("Controller connected: {}", controller.name());
+                                state.gamepad.connected = true;
+                                state.gamepad.left_center_offset = math::Vec2::ZERO;
+                                state.gamepad.right_center_offset = math::Vec2::ZERO;
+                                active_controller = Some(controller);
+                            }
+                            Err(e) => eprintln!("Failed to open controller: {}", e),
+                        }
+                    }
+                }
+                Event::ControllerDeviceRemoved { which, .. } => {
+                    if let Some(ref c) = active_controller {
+                        if c.instance_id() == which {
+                            println!("Controller disconnected");
+                            state.gamepad.connected = false;
+                            state.gamepad.left_stick_raw = math::Vec2::ZERO;
+                            state.gamepad.right_stick_raw = math::Vec2::ZERO;
+                            active_controller = None;
+                        }
+                    }
+                }
+                Event::ControllerAxisMotion { axis, value, .. } => {
+                    let normalized = value as f64 / 32767.0;
+                    use sdl2::controller::Axis;
+                    match axis {
+                        Axis::LeftX  => state.gamepad.left_stick_raw.x = normalized,
+                        Axis::LeftY  => state.gamepad.left_stick_raw.y = -normalized,
+                        Axis::RightX => state.gamepad.right_stick_raw.x = normalized,
+                        Axis::RightY => state.gamepad.right_stick_raw.y = -normalized,
+                        Axis::TriggerLeft => {
+                            let was_pressed = state.gamepad.left_trigger_pressed;
+                            let is_pressed = normalized > 0.5;
+                            if is_pressed && !was_pressed {
+                                // Teleport on left trigger — wired in Task 7
+                            }
+                            state.gamepad.left_trigger_pressed = is_pressed;
+                        }
+                        _ => {}
+                    }
+                }
+                Event::ControllerButtonDown { button, .. } => {
+                    use sdl2::controller::Button;
+                    match button {
+                        Button::B => {
+                            state.gamepad.any_button_pressed = true;
+                            // Teleport on B press — wired in Task 7
+                        }
+                        Button::Start => globals.time.pause = !globals.time.pause,
+                        _ => state.gamepad.any_button_pressed = true,
+                    }
+                }
+                Event::ControllerButtonUp { .. } => {
+                    state.gamepad.any_button_pressed = false;
+                }
                 _ => {}
             }
         }
@@ -226,6 +303,61 @@ fn main() {
             // Mouse left-click = fire
             if mouse_state.left() {
                 input::fire(&mut state, &mut globals);
+            }
+
+            // Gamepad input processing
+            if state.gamepad.connected {
+                // Process left stick (movement) — copy raw values before &mut state borrow
+                let left_raw = state.gamepad.left_stick_raw;
+                let left_offset = state.gamepad.left_center_offset;
+                let right_raw = state.gamepad.right_stick_raw;
+                let right_offset = state.gamepad.right_center_offset;
+
+                let left_x = input::process_stick_axis(left_raw.x, left_offset.x);
+                let left_y = input::process_stick_axis(left_raw.y, left_offset.y);
+                let left_processed = math::Vec2::new(left_x, left_y);
+                input::world_space_thrust_stick(&mut state, &globals, left_processed);
+
+                // Process right stick (aim)
+                let right_x = input::process_stick_axis(right_raw.x, right_offset.x);
+                let right_y = input::process_stick_axis(right_raw.y, right_offset.y);
+                let right_processed = math::Vec2::new(right_x, right_y);
+                input::aim_from_stick(&mut state.ship, right_processed);
+
+                // Fire on A button held or right trigger
+                if let Some(ref controller) = active_controller {
+                    use sdl2::controller::Button;
+                    if controller.button(Button::A) {
+                        input::fire(&mut state, &mut globals);
+                    }
+                    use sdl2::controller::Axis;
+                    let rt = controller.axis(Axis::TriggerRight) as f64 / 32767.0;
+                    if rt > 0.5 {
+                        input::fire(&mut state, &mut globals);
+                    }
+                }
+
+                // Drift compensation update
+                let dt = globals.time.time_current_frame - globals.time.time_last_frame;
+                let current_time = globals.time.time_current_frame;
+                let any_pressed = state.gamepad.any_button_pressed;
+
+                input::update_drift_compensation(
+                    &mut state.gamepad.left_center_offset,
+                    left_raw,
+                    any_pressed,
+                    &mut state.gamepad.last_idle_time,
+                    current_time,
+                    dt,
+                );
+                input::update_drift_compensation(
+                    &mut state.gamepad.right_center_offset,
+                    right_raw,
+                    any_pressed,
+                    &mut state.gamepad.last_idle_time,
+                    current_time,
+                    dt,
+                );
             }
 
             // Update game state (physics, wrapping, asteroids, etc.)
