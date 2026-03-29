@@ -26,14 +26,41 @@ impl Vertex {
 }
 
 pub struct Renderer2D {
-    pipeline: wgpu::RenderPipeline,
+    world_pipeline: wgpu::RenderPipeline,
     screen_size_buffer: wgpu::Buffer,
-    screen_size_bind_group: wgpu::BindGroup,
+    // Kept for future zoom control (Phase 1.2+)
+    #[allow(dead_code)]
+    zoom_factor_buffer: wgpu::Buffer,
+    world_bind_group: wgpu::BindGroup,
+    offscreen_texture: wgpu::Texture,
+    offscreen_view: wgpu::TextureView,
+    postprocess_pipeline: wgpu::RenderPipeline,
+    postprocess_bind_group: wgpu::BindGroup,
+    postprocess_sampler: wgpu::Sampler,
+    // Kept for use in resize() when rebuilding pipelines
+    #[allow(dead_code)]
+    surface_format: wgpu::TextureFormat,
     vertices: Vec<Vertex>,
     pub width: u32,
     pub height: u32,
 }
 
+fn create_offscreen_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Offscreen HDR Texture"),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba16Float,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[],
+    })
+}
 
 impl Renderer2D {
     pub fn new(
@@ -42,9 +69,10 @@ impl Renderer2D {
         width: u32,
         height: u32,
     ) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shape Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shape.wgsl").into()),
+        // --- World shader + pipeline (renders into Rgba16Float offscreen texture) ---
+        let world_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("World Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/world.wgsl").into()),
         });
 
         let screen_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -53,49 +81,75 @@ impl Renderer2D {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Screen Size Bind Group Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+        let zoom_factor_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Zoom Factor Buffer"),
+            contents: bytemuck::cast_slice(&[1.0f32]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let world_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("World Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        let world_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("World Bind Group"),
+            layout: &world_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: screen_size_buffer.as_entire_binding(),
                 },
-                count: None,
-            }],
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: zoom_factor_buffer.as_entire_binding(),
+                },
+            ],
         });
 
-        let screen_size_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Screen Size Bind Group"),
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: screen_size_buffer.as_entire_binding(),
-            }],
-        });
+        let world_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("World Pipeline Layout"),
+                bind_group_layouts: &[&world_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&pipeline_layout),
+        let world_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("World Pipeline"),
+            layout: Some(&world_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: &world_shader,
                 entry_point: Some("vs_main"),
                 buffers: &[Vertex::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: &world_shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
+                    format: wgpu::TextureFormat::Rgba16Float,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -105,7 +159,7 @@ impl Renderer2D {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None, // No culling for 2D
+                cull_mode: None,
                 polygon_mode: wgpu::PolygonMode::Fill,
                 unclipped_depth: false,
                 conservative: false,
@@ -116,18 +170,127 @@ impl Renderer2D {
             cache: None,
         });
 
+        // --- Offscreen texture ---
+        let offscreen_texture = create_offscreen_texture(device, width, height);
+        let offscreen_view =
+            offscreen_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // --- Postprocess shader + pipeline (renders fullscreen triangle to swapchain) ---
+        let postprocess_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Postprocess Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/postprocess.wgsl").into()),
+        });
+
+        let postprocess_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Postprocess Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let postprocess_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Postprocess Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+
+        let postprocess_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Postprocess Bind Group"),
+            layout: &postprocess_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&offscreen_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&postprocess_sampler),
+                },
+            ],
+        });
+
+        let postprocess_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Postprocess Pipeline Layout"),
+                bind_group_layouts: &[&postprocess_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let postprocess_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Postprocess Pipeline"),
+                layout: Some(&postprocess_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &postprocess_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[], // fullscreen triangle from vertex_index
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &postprocess_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: surface_format,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
         Self {
-            pipeline,
+            world_pipeline,
             screen_size_buffer,
-            screen_size_bind_group,
+            zoom_factor_buffer,
+            world_bind_group,
+            offscreen_texture,
+            offscreen_view,
+            postprocess_pipeline,
+            postprocess_bind_group,
+            postprocess_sampler,
+            surface_format,
             vertices: Vec::with_capacity(65536),
             width,
             height,
         }
     }
 
-    /// Update the screen size uniform buffer after a window resize.
-    pub fn resize(&mut self, queue: &wgpu::Queue, width: u32, height: u32) {
+    /// Update the screen size uniform buffer and recreate offscreen texture after a window resize.
+    pub fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, width: u32, height: u32) {
         self.width = width;
         self.height = height;
         queue.write_buffer(
@@ -135,6 +298,51 @@ impl Renderer2D {
             0,
             bytemuck::cast_slice(&[width as f32, height as f32]),
         );
+
+        // Recreate offscreen texture at new resolution
+        self.offscreen_texture = create_offscreen_texture(device, width, height);
+        self.offscreen_view = self
+            .offscreen_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Recreate postprocess bind group (it references the old view)
+        let postprocess_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Postprocess Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+
+        self.postprocess_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Postprocess Bind Group"),
+            layout: &postprocess_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.offscreen_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.postprocess_sampler),
+                },
+            ],
+        });
     }
 
     pub fn begin_frame(&mut self) {
@@ -319,59 +527,26 @@ impl Renderer2D {
         view: &wgpu::TextureView,
         clear_color: [f64; 4],
     ) {
-        if self.vertices.is_empty() {
-            // Still need to do the clear
-            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Clear Encoder"),
-            });
-            {
-                let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Clear Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: clear_color[0],
-                                g: clear_color[1],
-                                b: clear_color[2],
-                                a: clear_color[3],
-                            }),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                });
-            }
-            queue.submit(std::iter::once(encoder.finish()));
-            return;
-        }
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&self.vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
 
+        // --- Pass 1: Render world geometry into offscreen Rgba16Float texture ---
         {
+            let load_op = wgpu::LoadOp::Clear(wgpu::Color {
+                r: clear_color[0],
+                g: clear_color[1],
+                b: clear_color[2],
+                a: clear_color[3],
+            });
+
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Main Render Pass"),
+                label: Some("World Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
+                    view: &self.offscreen_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: clear_color[0],
-                            g: clear_color[1],
-                            b: clear_color[2],
-                            a: clear_color[3],
-                        }),
+                        load: load_op,
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -380,10 +555,41 @@ impl Renderer2D {
                 occlusion_query_set: None,
             });
 
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.screen_size_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            render_pass.draw(0..self.vertices.len() as u32, 0..1);
+            if !self.vertices.is_empty() {
+                let vertex_buffer =
+                    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Vertex Buffer"),
+                        contents: bytemuck::cast_slice(&self.vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+
+                render_pass.set_pipeline(&self.world_pipeline);
+                render_pass.set_bind_group(0, &self.world_bind_group, &[]);
+                render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                render_pass.draw(0..self.vertices.len() as u32, 0..1);
+            }
+        }
+
+        // --- Pass 2: Blit offscreen texture to swapchain via fullscreen triangle ---
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Postprocess Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_pipeline(&self.postprocess_pipeline);
+            render_pass.set_bind_group(0, &self.postprocess_bind_group, &[]);
+            render_pass.draw(0..3, 0..1);
         }
 
         queue.submit(std::iter::once(encoder.finish()));

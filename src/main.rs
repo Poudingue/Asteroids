@@ -188,7 +188,7 @@ fn main() {
                     config.width = new_w;
                     config.height = new_h;
                     surface.configure(&device, &config);
-                    renderer.resize(&queue, new_w, new_h);
+                    renderer.resize(&device, &queue, new_w, new_h);
                     globals.recompute_for_resolution(new_w, new_h);
                 }
                 _ => {}
