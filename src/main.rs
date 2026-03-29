@@ -213,9 +213,19 @@ fn main() {
             let mouse_state = event_pump.mouse_state();
             input::aim_at_mouse(&mut state.ship, mouse_state.x(), mouse_state.y(), &globals);
 
-            // Mouse click = accelerate forward
+            // WASD world-space movement
+            let keyboard = event_pump.keyboard_state();
+            let keys_pressed = [
+                keyboard.is_scancode_pressed(Scancode::W),
+                keyboard.is_scancode_pressed(Scancode::A),
+                keyboard.is_scancode_pressed(Scancode::S),
+                keyboard.is_scancode_pressed(Scancode::D),
+            ];
+            input::world_space_thrust_keyboard(&mut state, &globals, keys_pressed);
+
+            // Mouse left-click = fire
             if mouse_state.left() {
-                input::acceleration(&mut state, &globals);
+                input::fire(&mut state, &mut globals);
             }
 
             // Update game state (physics, wrapping, asteroids, etc.)

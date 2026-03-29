@@ -22,17 +22,28 @@ pub fn aim_at_mouse(ship: &mut Entity, mouse_x: i32, mouse_y: i32, globals: &Glo
     ship.orientation = theta;
 }
 
-pub fn acceleration(state: &mut GameState, globals: &Globals) {
-    let orientation = state.ship.orientation;
-    accelerate_entity(
-        &mut state.ship,
-        from_polar(orientation, SHIP_MAX_ACCEL),
-        globals,
-    );
-    // Engine fire: spawn 1 particle when accelerating (OCaml: spawn_fire)
-    if state.ship.health > 0.0 && globals.visual.smoke_enabled {
-        let fire = spawn_fire(&state.ship, &mut state.rng);
-        state.smoke.push(fire);
+/// World-space keyboard thrust: WASD = cardinal directions, diagonal normalized.
+/// Movement is decoupled from aim (ship.orientation).
+pub fn world_space_thrust_keyboard(state: &mut GameState, globals: &Globals, keys_pressed: [bool; 4]) {
+    let [w, a, s, d] = keys_pressed;
+    let mut dir = Vec2::new(0.0, 0.0);
+    if w { dir.y += 1.0; } // Y-up in physics space
+    if s { dir.y -= 1.0; }
+    if a { dir.x -= 1.0; }
+    if d { dir.x += 1.0; }
+    let mag = (dir.x * dir.x + dir.y * dir.y).sqrt();
+    if mag > 0.0 {
+        let normalized = Vec2::new(dir.x / mag, dir.y / mag);
+        accelerate_entity(
+            &mut state.ship,
+            scale_vec(normalized, SHIP_MAX_ACCEL),
+            globals,
+        );
+        // Engine fire while thrusting
+        if state.ship.health > 0.0 && globals.visual.smoke_enabled {
+            let fire = spawn_fire(&state.ship, &mut state.rng);
+            state.smoke.push(fire);
+        }
     }
 }
 
