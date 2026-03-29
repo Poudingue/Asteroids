@@ -179,7 +179,7 @@ pub fn render_star_trail(
         renderer.plot(x1 - 1, y1 + 1, diag_color);
         renderer.plot(x1 - 1, y1 - 1, diag_color);
     } else {
-        // Moving star: render as a line trail
+        // Moving star: render as a thin SDF capsule trail
         let dist = magnitude(sub_vec(pos1, pos2));
         let trail_lum = (1.0 / (1.0 + dist)).sqrt();
         let trail_color = hdr_add(
@@ -190,7 +190,7 @@ pub fn render_star_trail(
             ),
         );
         let color = to_hdr_rgba(trail_color);
-        renderer.draw_line(x1, y1, x2, y2, color, 2.0);
+        renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, 1.0, color);
     }
 }
 
@@ -198,37 +198,7 @@ pub fn render_star_trail(
 // Projectile rendering
 // ============================================================================
 
-/// Render a light trail (motion blur line) for a fast-moving entity.
-/// Used for projectiles. Ported from OCaml render_light_trail.
-pub fn render_light_trail(
-    radius: f64,
-    pos: Vec2,
-    velocity: Vec2,
-    hdr_color: HdrColor,
-    proper_time: f64,
-    renderer: &mut Renderer2D,
-    globals: &Globals,
-) {
-    let pos1 = scale_vec(add_vec(pos, globals.screenshake.game_screenshake_pos), globals.render.render_scale);
-    let dt_game = globals.time.game_speed
-        * (globals.time.time_current_frame - globals.time.time_last_frame)
-            .max(1.0 / FRAMERATE_RENDER);
-    let veloc = scale_vec(velocity, -(globals.observer_proper_time / proper_time) * dt_game);
-    let last_pos = scale_vec(
-        add_vec(sub_vec(pos, veloc), globals.screenshake.game_screenshake_previous_pos),
-        globals.render.render_scale,
-    );
-    let pos2 = lerp_vec(last_pos, pos1, SHUTTER_SPEED);
-    let dist = magnitude(sub_vec(pos1, pos2));
-    let trail_lum = 0.5 * (radius / (radius + dist)).sqrt();
-    let color = to_hdr_rgba(intensify(hdr_color, trail_lum));
-    let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.render.current_jitter_double);
-    let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.render.current_jitter_double);
-    let line_width = dither_radius(2.0 * radius, DITHER_AA, DITHER_POWER_RADIUS, &mut rand::thread_rng());
-    renderer.draw_line(x1, y1, x2, y2, color, line_width.max(1) as f32);
-}
-
-/// Render a projectile as four concentric light trails. Ported from OCaml render_projectile.
+/// Render a projectile as an SDF capsule (motion-blur trail). Ported from OCaml render_projectile.
 pub fn render_projectile(entity: &Entity, renderer: &mut Renderer2D, globals: &Globals, rng: &mut impl Rng) {
     let rad = globals.render.render_scale
         * rand_range(0.5, 1.0, rng)
@@ -237,15 +207,33 @@ pub fn render_projectile(entity: &Entity, renderer: &mut Renderer2D, globals: &G
         // Retro mode: simple white filled circle at projectile position
         let pos = scale_vec(entity.position, globals.render.render_scale);
         let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
-        renderer.fill_circle(x as f64, y as f64, rad.max(1.0), [255.0, 255.0, 255.0, 255.0]);
+        renderer.push_circle_instance(x as f32, y as f32, rad.max(1.0) as f32, [255.0, 255.0, 255.0, 255.0]);
     } else {
         let pos = entity.position;
         let vel = entity.velocity;
         let col = intensify(hdr(entity.visuals.color), entity.hdr_exposure * globals.exposure.game_exposure);
-        let pt = entity.proper_time;
-        render_light_trail(rad,        pos, vel, intensify(col, 0.25), pt, renderer, globals);
-        render_light_trail(rad * 0.75, pos, vel, intensify(col, 0.5),  pt, renderer, globals);
-        render_light_trail(rad * 0.5,  pos, vel, col,                  pt, renderer, globals);
-        render_light_trail(rad * 0.25, pos, vel, intensify(col, 2.0),  pt, renderer, globals);
+
+        // Compute trail endpoint using the same motion-blur logic as render_light_trail
+        let pos1 = scale_vec(add_vec(pos, globals.screenshake.game_screenshake_pos), globals.render.render_scale);
+        let dt_game = globals.time.game_speed
+            * (globals.time.time_current_frame - globals.time.time_last_frame)
+                .max(1.0 / FRAMERATE_RENDER);
+        let proper_time = entity.proper_time;
+        let veloc = scale_vec(vel, -(globals.observer_proper_time / proper_time) * dt_game);
+        let last_pos = scale_vec(
+            add_vec(sub_vec(pos, veloc), globals.screenshake.game_screenshake_previous_pos),
+            globals.render.render_scale,
+        );
+        let pos2 = lerp_vec(last_pos, pos1, SHUTTER_SPEED);
+
+        let dist = magnitude(sub_vec(pos1, pos2));
+        let trail_lum = 0.5 * (rad / (rad + dist)).sqrt();
+        let color = to_hdr_rgba(intensify(col, trail_lum));
+
+        let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.render.current_jitter_double);
+        let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.render.current_jitter_double);
+        let radius = dither_radius(rad, DITHER_AA, DITHER_POWER_RADIUS, rng).max(1) as f32;
+
+        renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, radius, color);
     }
 }
