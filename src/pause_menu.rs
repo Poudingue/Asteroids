@@ -126,17 +126,17 @@ pub fn apply_button(
     if globals.visual.retro {
         // Retro mode: white fill if ON, black fill if OFF
         let fill_col: [f32; 4] = if on { [255.0, 255.0, 255.0, 255.0] } else { [0.0, 0.0, 0.0, 255.0] };
-        renderer.fill_poly(&rect_pts, fill_col);
+        renderer.hud_fill_poly(&rect_pts, fill_col);
         // White frame
-        renderer.draw_poly(&rect_pts, [255.0, 255.0, 255.0, 255.0], 2.0 * rr as f32);
+        renderer.hud_draw_poly(&rect_pts, [255.0, 255.0, 255.0, 255.0], 2.0 * rr as f32);
     } else {
         // Normal mode
         let fill_col: [f32; 4] = if on { [0.0, 128.0, 0.0, 255.0] } else { [128.0, 0.0, 0.0, 255.0] };
-        renderer.fill_poly(&rect_pts, fill_col);
+        renderer.hud_fill_poly(&rect_pts, fill_col);
 
         // Border: dark grey, 10 * render_scale px wide
         let border_w = 10.0 * rr as f32;
-        renderer.draw_poly(&rect_pts, [64.0, 64.0, 64.0, 255.0], border_w);
+        renderer.hud_draw_poly(&rect_pts, [64.0, 64.0, 64.0, 255.0], border_w);
     }
 
     // ---- Centered text (both modes) ----

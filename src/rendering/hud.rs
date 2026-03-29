@@ -115,7 +115,7 @@ fn render_char(
 ) {
     let shape = shape_char(c);
     let pts = displace_shape(encadrement, &shape, render_scale);
-    renderer.fill_poly(&pts, color);
+    renderer.hud_fill_poly(&pts, color);
 }
 
 /// Render a string of characters, each in a bounding quad advancing left to right.
@@ -207,7 +207,7 @@ fn render_bar(
         (p2.0.round() as i32, p2.1.round() as i32),
         (p3.0.round() as i32, p3.1.round() as i32),
     ];
-    renderer.fill_poly(&pts, color);
+    renderer.hud_fill_poly(&pts, color);
 }
 
 /// Draw a heart shape: two ellipses + a diamond polygon.
@@ -234,11 +234,11 @@ fn draw_heart(
     let lcy = (y1 - tiery) as i32;
     let rx  = (quartx + 0.5) as i32;
     let ry  = (tiery  + 0.5) as i32;
-    renderer.fill_ellipse(lcx, lcy, rx, ry, color);
+    renderer.hud_fill_ellipse(lcx, lcy, rx, ry, color);
 
     // Right ellipse center: (x1 - quartx, y1 - tiery)
     let rcx = (x1 - quartx + 0.5) as i32;
-    renderer.fill_ellipse(rcx, lcy, rx, ry, color);
+    renderer.hud_fill_ellipse(rcx, lcy, rx, ry, color);
 
     // Diamond bottom polygon (matches OCaml fill_poly)
     let decal = 1.0 - (1.0 / 2.0_f64.sqrt());
@@ -248,7 +248,7 @@ fn draw_heart(
         ((x0 + 2.0*quartx) as i32,               (y1 - tiery) as i32),
         ((x1 - decal*quartx - 0.5) as i32,       (y0 + (1.0+decal)*tiery) as i32),
     ];
-    renderer.fill_poly(&pts, color);
+    renderer.hud_fill_poly(&pts, color);
 }
 
 /// Render `n` hearts for the lives display. Matches OCaml `draw_n_hearts`.
@@ -284,7 +284,7 @@ fn draw_bar_frame(
             (ry * globals.render.phys_height * globals.render.render_scale).round() as i32,
         )
     }).collect();
-    renderer.draw_poly(&pts, color, line_width);
+    renderer.hud_draw_poly(&pts, color, line_width);
 }
 
 // ============================================================================
@@ -298,7 +298,7 @@ pub fn render_scanlines(offset: i32, height: i32, renderer: &mut Renderer2D) {
     let width = renderer.width as i32;
     let mut y = offset;
     while y < height {
-        renderer.fill_rect(0, y, width, 1, [0.0, 0.0, 0.0, 255.0]);
+        renderer.hud_fill_rect(0, y, width, 1, [0.0, 0.0, 0.0, 255.0]);
         y += SCANLINES_PERIOD;
     }
 }

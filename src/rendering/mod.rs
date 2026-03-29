@@ -55,6 +55,9 @@ pub struct Renderer2D {
     #[allow(dead_code)]
     surface_format: wgpu::TextureFormat,
     vertices: Vec<Vertex>,
+    hud_pipeline: wgpu::RenderPipeline,
+    hud_vertices: Vec<Vertex>,
+    hud_bind_group: wgpu::BindGroup,
     pub width: u32,
     pub height: u32,
 }
@@ -317,6 +320,77 @@ impl Renderer2D {
                 cache: None,
             });
 
+        // --- HUD shader + pipeline (renders directly to swapchain, alpha blending, no tonemapping) ---
+        let hud_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("HUD Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/hud.wgsl").into()),
+        });
+
+        let hud_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("HUD Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let hud_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("HUD Bind Group"),
+            layout: &hud_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: screen_size_buffer.as_entire_binding(),
+            }],
+        });
+
+        let hud_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("HUD Pipeline Layout"),
+                bind_group_layouts: &[&hud_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let hud_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("HUD Pipeline"),
+            layout: Some(&hud_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &hud_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Vertex::desc()],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &hud_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
         Self {
             world_pipeline,
             screen_size_buffer,
@@ -330,6 +404,9 @@ impl Renderer2D {
             postprocess_uniform_buffer,
             surface_format,
             vertices: Vec::with_capacity(65536),
+            hud_pipeline,
+            hud_vertices: Vec::with_capacity(16384),
+            hud_bind_group,
             width,
             height,
         }
@@ -415,161 +492,151 @@ impl Renderer2D {
 
     pub fn begin_frame(&mut self) {
         self.vertices.clear();
+        self.hud_vertices.clear();
     }
 
-    fn push_vertex(&mut self, x: f32, y: f32, color: [f32; 4]) {
-        self.vertices.push(Vertex {
-            position: [x, y],
-            color,
-        });
+    // ---- Internal geometry helpers (write to an arbitrary target Vec<Vertex>) ----
+
+    fn push_vertex_to(target: &mut Vec<Vertex>, x: f32, y: f32, color: [f32; 4]) {
+        target.push(Vertex { position: [x, y], color });
     }
 
-    pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [f32; 4]) {
+    fn geo_fill_rect(target: &mut Vec<Vertex>, x: i32, y: i32, w: i32, h: i32, color: [f32; 4]) {
         let (x0, y0) = (x as f32, y as f32);
         let (x1, y1) = ((x + w) as f32, (y + h) as f32);
-        // Two triangles
-        self.push_vertex(x0, y0, color);
-        self.push_vertex(x1, y0, color);
-        self.push_vertex(x1, y1, color);
-        self.push_vertex(x0, y0, color);
-        self.push_vertex(x1, y1, color);
-        self.push_vertex(x0, y1, color);
+        Self::push_vertex_to(target, x0, y0, color);
+        Self::push_vertex_to(target, x1, y0, color);
+        Self::push_vertex_to(target, x1, y1, color);
+        Self::push_vertex_to(target, x0, y0, color);
+        Self::push_vertex_to(target, x1, y1, color);
+        Self::push_vertex_to(target, x0, y1, color);
     }
 
-    pub fn fill_circle(&mut self, cx: f64, cy: f64, radius: f64, color: [f32; 4]) {
-        if radius <= 0.0 {
-            return;
-        }
+    fn geo_fill_circle(target: &mut Vec<Vertex>, cx: f64, cy: f64, radius: f64, color: [f32; 4]) {
+        if radius <= 0.0 { return; }
         let segments = (radius as i32).max(8).min(64) as usize;
         let cx = cx as f32;
         let cy = cy as f32;
         let r = radius as f32;
-
         for i in 0..segments {
             let angle1 = 2.0 * std::f32::consts::PI * (i as f32) / (segments as f32);
             let angle2 = 2.0 * std::f32::consts::PI * ((i + 1) as f32) / (segments as f32);
-            self.push_vertex(cx, cy, color);
-            self.push_vertex(cx + r * angle1.cos(), cy + r * angle1.sin(), color);
-            self.push_vertex(cx + r * angle2.cos(), cy + r * angle2.sin(), color);
+            Self::push_vertex_to(target, cx, cy, color);
+            Self::push_vertex_to(target, cx + r * angle1.cos(), cy + r * angle1.sin(), color);
+            Self::push_vertex_to(target, cx + r * angle2.cos(), cy + r * angle2.sin(), color);
         }
     }
 
-    pub fn fill_ellipse(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, color: [f32; 4]) {
+    fn geo_fill_ellipse(target: &mut Vec<Vertex>, cx: i32, cy: i32, rx: i32, ry: i32, color: [f32; 4]) {
         let segments = (rx.max(ry) as usize).max(8).min(64);
         let cx = cx as f32;
         let cy = cy as f32;
         let rx = rx as f32;
         let ry = ry as f32;
-
         for i in 0..segments {
             let angle1 = 2.0 * std::f32::consts::PI * (i as f32) / (segments as f32);
             let angle2 = 2.0 * std::f32::consts::PI * ((i + 1) as f32) / (segments as f32);
-            self.push_vertex(cx, cy, color);
-            self.push_vertex(cx + rx * angle1.cos(), cy + ry * angle1.sin(), color);
-            self.push_vertex(cx + rx * angle2.cos(), cy + ry * angle2.sin(), color);
+            Self::push_vertex_to(target, cx, cy, color);
+            Self::push_vertex_to(target, cx + rx * angle1.cos(), cy + ry * angle1.sin(), color);
+            Self::push_vertex_to(target, cx + rx * angle2.cos(), cy + ry * angle2.sin(), color);
         }
     }
 
-    /// Fill a polygon from a list of (i32, i32) points.
-    /// Uses ear-clipping triangulation — works for concave and convex polygons.
-    pub fn fill_poly(&mut self, points: &[(i32, i32)], color: [f32; 4]) {
+    fn geo_fill_poly(target: &mut Vec<Vertex>, points: &[(i32, i32)], color: [f32; 4]) {
         if points.len() < 3 { return; }
-
-        // Find bounding box
         let mut min_y = i32::MAX;
         let mut max_y = i32::MIN;
         for p in points {
             min_y = min_y.min(p.1);
             max_y = max_y.max(p.1);
         }
-
         let n = points.len();
-
-        // Scanline fill with even-odd rule — correct for self-intersecting polygons
         for y in min_y..=max_y {
-            let scan_y = y as f32 + 0.5; // center of pixel row
+            let scan_y = y as f32 + 0.5;
             let mut intersections: Vec<f32> = Vec::new();
-
             for i in 0..n {
                 let j = (i + 1) % n;
                 let (x0, y0) = (points[i].0 as f32, points[i].1 as f32);
                 let (x1, y1) = (points[j].0 as f32, points[j].1 as f32);
-
-                // Check if edge crosses this scanline
                 if (y0 <= scan_y && y1 > scan_y) || (y1 <= scan_y && y0 > scan_y) {
-                    // Compute X intersection
                     let t = (scan_y - y0) / (y1 - y0);
                     intersections.push(x0 + t * (x1 - x0));
                 }
             }
-
             intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-            // Fill between pairs (even-odd rule)
             for pair in intersections.chunks(2) {
                 if pair.len() == 2 {
                     let x_left = pair[0];
                     let x_right = pair[1];
                     if x_right > x_left {
-                        // Draw a horizontal span as two triangles
                         let y_top = y as f32;
                         let y_bot = (y + 1) as f32;
-                        self.push_vertex(x_left,  y_top, color);
-                        self.push_vertex(x_right, y_top, color);
-                        self.push_vertex(x_right, y_bot, color);
-                        self.push_vertex(x_left,  y_top, color);
-                        self.push_vertex(x_right, y_bot, color);
-                        self.push_vertex(x_left,  y_bot, color);
+                        Self::push_vertex_to(target, x_left,  y_top, color);
+                        Self::push_vertex_to(target, x_right, y_top, color);
+                        Self::push_vertex_to(target, x_right, y_bot, color);
+                        Self::push_vertex_to(target, x_left,  y_top, color);
+                        Self::push_vertex_to(target, x_right, y_bot, color);
+                        Self::push_vertex_to(target, x_left,  y_bot, color);
                     }
                 }
             }
         }
     }
 
-    /// Draw a polygon outline. Each edge is a thick quad.
-    pub fn draw_poly(&mut self, points: &[(i32, i32)], color: [f32; 4], line_width: f32) {
-        if points.len() < 2 {
-            return;
-        }
+    fn geo_draw_line_f32(target: &mut Vec<Vertex>, x1: f32, y1: f32, x2: f32, y2: f32, color: [f32; 4], half_w: f32) {
+        let dx = x2 - x1;
+        let dy = y2 - y1;
+        let len = (dx * dx + dy * dy).sqrt();
+        if len < 0.001 { return; }
+        let nx = -dy / len * half_w;
+        let ny = dx / len * half_w;
+        Self::push_vertex_to(target, x1 + nx, y1 + ny, color);
+        Self::push_vertex_to(target, x1 - nx, y1 - ny, color);
+        Self::push_vertex_to(target, x2 - nx, y2 - ny, color);
+        Self::push_vertex_to(target, x1 + nx, y1 + ny, color);
+        Self::push_vertex_to(target, x2 - nx, y2 - ny, color);
+        Self::push_vertex_to(target, x2 + nx, y2 + ny, color);
+    }
+
+    fn geo_draw_poly(target: &mut Vec<Vertex>, points: &[(i32, i32)], color: [f32; 4], line_width: f32) {
+        if points.len() < 2 { return; }
         let half_w = line_width / 2.0;
         for i in 0..points.len() {
             let j = (i + 1) % points.len();
             let (x1, y1) = (points[i].0 as f32, points[i].1 as f32);
             let (x2, y2) = (points[j].0 as f32, points[j].1 as f32);
-            self.draw_line_f32(x1, y1, x2, y2, color, half_w);
+            Self::geo_draw_line_f32(target, x1, y1, x2, y2, color, half_w);
         }
+    }
+
+    // ---- World rendering methods (write to self.vertices → HDR offscreen) ----
+
+    pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [f32; 4]) {
+        Self::geo_fill_rect(&mut self.vertices, x, y, w, h, color);
+    }
+
+    pub fn fill_circle(&mut self, cx: f64, cy: f64, radius: f64, color: [f32; 4]) {
+        Self::geo_fill_circle(&mut self.vertices, cx, cy, radius, color);
+    }
+
+    pub fn fill_ellipse(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, color: [f32; 4]) {
+        Self::geo_fill_ellipse(&mut self.vertices, cx, cy, rx, ry, color);
+    }
+
+    /// Fill a polygon from a list of (i32, i32) points.
+    /// Uses scanline fill with even-odd rule — correct for self-intersecting polygons.
+    pub fn fill_poly(&mut self, points: &[(i32, i32)], color: [f32; 4]) {
+        Self::geo_fill_poly(&mut self.vertices, points, color);
+    }
+
+    /// Draw a polygon outline. Each edge is a thick quad.
+    pub fn draw_poly(&mut self, points: &[(i32, i32)], color: [f32; 4], line_width: f32) {
+        Self::geo_draw_poly(&mut self.vertices, points, color, line_width);
     }
 
     /// Draw a thick line between two points.
     pub fn draw_line(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, color: [f32; 4], width: f32) {
-        self.draw_line_f32(
-            x1 as f32,
-            y1 as f32,
-            x2 as f32,
-            y2 as f32,
-            color,
-            width / 2.0,
-        );
-    }
-
-    fn draw_line_f32(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: [f32; 4], half_w: f32) {
-        let dx = x2 - x1;
-        let dy = y2 - y1;
-        let len = (dx * dx + dy * dy).sqrt();
-        if len < 0.001 {
-            return;
-        }
-        // Perpendicular direction
-        let nx = -dy / len * half_w;
-        let ny = dx / len * half_w;
-
-        // Quad as two triangles
-        self.push_vertex(x1 + nx, y1 + ny, color);
-        self.push_vertex(x1 - nx, y1 - ny, color);
-        self.push_vertex(x2 - nx, y2 - ny, color);
-        self.push_vertex(x1 + nx, y1 + ny, color);
-        self.push_vertex(x2 - nx, y2 - ny, color);
-        self.push_vertex(x2 + nx, y2 + ny, color);
+        Self::geo_draw_line_f32(&mut self.vertices, x1 as f32, y1 as f32, x2 as f32, y2 as f32, color, width / 2.0);
     }
 
     /// Plot a single pixel as a 1x1 rect.
@@ -581,6 +648,36 @@ impl Renderer2D {
     /// For now, this is a no-op placeholder; the vector font in game.rs handles important text.
     pub fn draw_string(&mut self, _text: &str, _x: i32, _y: i32, _color: [f32; 4]) {
         // Debug text will use the custom vector font or be skipped initially
+    }
+
+    // ---- HUD rendering methods (write to self.hud_vertices → swapchain, no tonemapping) ----
+
+    pub fn hud_fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [f32; 4]) {
+        Self::geo_fill_rect(&mut self.hud_vertices, x, y, w, h, color);
+    }
+
+    pub fn hud_fill_poly(&mut self, points: &[(i32, i32)], color: [f32; 4]) {
+        Self::geo_fill_poly(&mut self.hud_vertices, points, color);
+    }
+
+    pub fn hud_draw_poly(&mut self, points: &[(i32, i32)], color: [f32; 4], line_width: f32) {
+        Self::geo_draw_poly(&mut self.hud_vertices, points, color, line_width);
+    }
+
+    pub fn hud_fill_circle(&mut self, cx: f64, cy: f64, radius: f64, color: [f32; 4]) {
+        Self::geo_fill_circle(&mut self.hud_vertices, cx, cy, radius, color);
+    }
+
+    pub fn hud_fill_ellipse(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, color: [f32; 4]) {
+        Self::geo_fill_ellipse(&mut self.hud_vertices, cx, cy, rx, ry, color);
+    }
+
+    pub fn hud_draw_line(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, color: [f32; 4], width: f32) {
+        Self::geo_draw_line_f32(&mut self.hud_vertices, x1 as f32, y1 as f32, x2 as f32, y2 as f32, color, width / 2.0);
+    }
+
+    pub fn hud_plot(&mut self, x: i32, y: i32, color: [f32; 4]) {
+        self.hud_fill_rect(x, y, 1, 1, color);
     }
 
     pub fn end_frame(
@@ -653,6 +750,33 @@ impl Renderer2D {
             render_pass.set_pipeline(&self.postprocess_pipeline);
             render_pass.set_bind_group(0, &self.postprocess_bind_group, &[]);
             render_pass.draw(0..3, 0..1);
+        }
+
+        // === Pass 4: HUD -> swapchain (no tonemapping, alpha blending) ===
+        if !self.hud_vertices.is_empty() {
+            let hud_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("HUD Vertex Buffer"),
+                contents: bytemuck::cast_slice(&self.hud_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("HUD Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Preserve post-process output
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.hud_pipeline);
+            render_pass.set_bind_group(0, &self.hud_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, hud_vertex_buffer.slice(..));
+            render_pass.draw(0..self.hud_vertices.len() as u32, 0..1);
         }
 
         queue.submit(std::iter::once(encoder.finish()));
