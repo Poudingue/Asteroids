@@ -86,7 +86,6 @@ fn main() {
     // Event loop
     let mut event_pump = sdl_context.event_pump().expect("Failed to get event pump");
     let mut running = true;
-    let mut prev_w_pressed = false;
     let mut is_fullscreen = true;
 
     while running {
@@ -117,7 +116,7 @@ fn main() {
                     ..
                 } => running = false,
                 Event::KeyDown {
-                    keycode: Some(Keycode::P) | Some(Keycode::Escape),
+                    keycode: Some(Keycode::Escape),
                     repeat: false,
                     ..
                 } => globals.time.pause = !globals.time.pause,
@@ -217,46 +216,6 @@ fn main() {
             // Mouse click = accelerate forward
             if mouse_state.left() {
                 input::acceleration(&mut state, &globals);
-            }
-
-            // Keyboard input (scancodes = physical key positions)
-            // AZERTY: Z=forward, Q=left, D=right, A=strafe-left, E=strafe-right
-            // Physical: W=Z, A=Q, D=D, Q=A, E=E
-            let keyboard = event_pump.keyboard_state();
-            use sdl2::keyboard::Scancode;
-
-            // Forward: W (physical) = Z on AZERTY
-            // Impulse mode: fire boost only on key-down transition (edge-triggered, matches OCaml)
-            // Continuous mode: call acceleration every frame while held
-            let w_pressed = keyboard.is_scancode_pressed(Scancode::W);
-            if globals.ship_control.ship_impulse_pos {
-                if w_pressed && !prev_w_pressed {
-                    input::boost_forward(&mut state, &globals);
-                }
-            } else if w_pressed {
-                input::acceleration(&mut state, &globals);
-            }
-            prev_w_pressed = w_pressed;
-            // Rotate left: A (physical) = Q on AZERTY
-            if keyboard.is_scancode_pressed(Scancode::A) {
-                input::handle_left(&mut state.ship, &globals);
-            }
-            // Rotate right: D (physical) = D on both
-            if keyboard.is_scancode_pressed(Scancode::D) {
-                input::handle_right(&mut state.ship, &globals);
-            }
-            // Strafe left: Q (physical) = A on AZERTY
-            if keyboard.is_scancode_pressed(Scancode::Q) {
-                input::strafe_left(&mut state.ship);
-            }
-            // Strafe right: E (physical) = E on both
-            if keyboard.is_scancode_pressed(Scancode::E) {
-                input::strafe_right(&mut state.ship);
-            }
-
-            // Space = fire
-            if keyboard.is_scancode_pressed(Scancode::Space) {
-                input::fire(&mut state, &mut globals);
             }
 
             // Update game state (physics, wrapping, asteroids, etc.)

@@ -1,10 +1,7 @@
 use std::f64::consts::PI;
 
 use crate::color::*;
-use crate::game::{
-    accelerate_entity, apply_torque, boost_entity, boost_torque, rotate_entity, turn_entity,
-    GameState,
-};
+use crate::game::{accelerate_entity, GameState};
 use crate::math_utils::*;
 use crate::objects::*;
 use crate::parameters::*;
@@ -41,18 +38,6 @@ pub fn acceleration(state: &mut GameState, globals: &Globals) {
 
 /// Forward boost (impulse, instant velocity change).
 /// Also spawns 9 engine fire particles for a more intense thrust effect (matches OCaml `boost`).
-pub fn boost_forward(state: &mut GameState, globals: &Globals) {
-    let orientation = state.ship.orientation;
-    boost_entity(&mut state.ship, from_polar(orientation, SHIP_MAX_BOOST));
-    // Engine fire: spawn 9 particles on boost (OCaml: 3 lists of 3)
-    if state.ship.health > 0.0 && globals.visual.smoke_enabled {
-        for _ in 0..9 {
-            let fire = spawn_fire(&state.ship, &mut state.rng);
-            state.smoke.push(fire);
-        }
-    }
-}
-
 /// Teleport ship to mouse position (F key). Edge-triggered; respects cooldown.
 /// Matches OCaml `teleport`: sets position/velocity, spawns explosion chunks, adjusts exposure/game_speed.
 pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mouse_y: f64) {
@@ -82,48 +67,6 @@ pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mous
         // Reset cooldown
         state.cooldown_tp += COOLDOWN_TP;
     }
-}
-
-/// Rotate left — impulse or continuous depending on globals
-pub fn handle_left(ship: &mut Entity, globals: &Globals) {
-    if globals.ship_control.ship_impulse_pos {
-        if globals.ship_control.ship_direct_rotat {
-            turn_entity(ship, SHIP_MAX_ROTAT);
-        } else {
-            boost_torque(ship, SHIP_MAX_TOURN_BOOST);
-        }
-    } else if globals.ship_control.ship_direct_rotat {
-        rotate_entity(ship, SHIP_MAX_TOURN, globals);
-    } else {
-        apply_torque(ship, SHIP_MAX_TOURN, globals);
-    }
-}
-
-/// Rotate right — impulse or continuous depending on globals
-pub fn handle_right(ship: &mut Entity, globals: &Globals) {
-    if globals.ship_control.ship_impulse_pos {
-        if globals.ship_control.ship_direct_rotat {
-            turn_entity(ship, -SHIP_MAX_ROTAT);
-        } else {
-            boost_torque(ship, -SHIP_MAX_TOURN_BOOST);
-        }
-    } else if globals.ship_control.ship_direct_rotat {
-        rotate_entity(ship, -SHIP_MAX_TOURN, globals);
-    } else {
-        apply_torque(ship, -SHIP_MAX_TOURN, globals);
-    }
-}
-
-/// Strafe left (always impulse boost perpendicular to heading)
-pub fn strafe_left(ship: &mut Entity) {
-    let orientation = ship.orientation + PI / 2.0;
-    boost_entity(ship, from_polar(orientation, SHIP_MAX_BOOST));
-}
-
-/// Strafe right (always impulse boost perpendicular to heading)
-pub fn strafe_right(ship: &mut Entity) {
-    let orientation = ship.orientation - PI / 2.0;
-    boost_entity(ship, from_polar(orientation, SHIP_MAX_BOOST));
 }
 
 /// Fire projectiles. Called when Space is held and cooldown allows.

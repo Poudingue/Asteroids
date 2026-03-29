@@ -3,7 +3,6 @@
 //! This is a port of ml/parameters.ml to Rust.
 //! Contains all game configuration constants and mutable global state.
 
-use std::f64::consts::PI;
 use crate::math::Vec2;
 
 // ============================================================================
@@ -212,14 +211,8 @@ pub const SHIP_DEATH_MAX_MOMENTUM: f64 = 2.0;
 // Movement controls
 pub const SHIP_MAX_DEPL: f64 = 50.0; // In px/s. Useful if direct movement control.
 pub const SHIP_MAX_ACCEL: f64 = 10000.0; // In px/s². Useful if acceleration control.
-pub const SHIP_MAX_BOOST: f64 = 2000.0; // In px/s. Useful if boost control.
 pub const SHIP_HALF_STOP: f64 = 10.0; // Time needed to lose half inertia.
-
-// Rotation controls
-pub const SHIP_MAX_TOURN: f64 = 4.0; // In radian/s
 pub const SHIP_MAX_MOMENT: f64 = 0.5; // In radian/s²
-pub const SHIP_MAX_TOURN_BOOST: f64 = 3.0; // In radian/s
-pub const SHIP_MAX_ROTAT: f64 = PI / 6.0; // In radians
 pub const SHIP_HALF_STOP_ROTAT: f64 = 0.2; // Time needed to lose half angular momentum
 
 // Minimum time between random teleportations
@@ -437,14 +430,6 @@ pub struct VisualConfig {
     pub star_color_goal: (f64, f64, f64),
 }
 
-/// Ship movement control mode flags.
-pub struct ShipControlConfig {
-    pub ship_direct_pos: bool,
-    pub ship_direct_rotat: bool,
-    pub ship_impulse_pos: bool,
-    pub ship_impulse_rotat: bool,
-}
-
 /// Rendering scale and physics / safe-zone dimensions.
 pub struct RenderState {
     pub render_scale: f64,
@@ -512,7 +497,6 @@ pub struct Globals {
     pub time: TimeConfig,
     pub exposure: ExposureConfig,
     pub visual: VisualConfig,
-    pub ship_control: ShipControlConfig,
     pub render: RenderState,
     pub screenshake: ScreenshakeState,
     pub framerate: FramerateState,
@@ -562,12 +546,6 @@ impl Globals {
                 space_color_goal: (0.0, 0.0, 0.0),
                 star_color: (100.0, 100.0, 100.0),
                 star_color_goal: (100.0, 100.0, 100.0),
-            },
-            ship_control: ShipControlConfig {
-                ship_direct_pos: false,
-                ship_direct_rotat: false,
-                ship_impulse_pos: true,
-                ship_impulse_rotat: true,
             },
             render: RenderState {
                 render_scale,
