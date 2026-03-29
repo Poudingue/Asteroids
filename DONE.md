@@ -1,5 +1,18 @@
 # Asteroids Rust Port - Completed Items
 
+## V2 Phase 1 - Rendering Pipeline Overhaul (2026-03-28)
+
+- [x] Phase 1 Task 10: Particle budgets with graceful degradation (completed: 2026-03-28)
+- [x] Phase 1 Task 9: Remove retro/scanline code paths (completed: 2026-03-28)
+- [x] Phase 1 Tasks 7+8: MSAA 4x for polygons + SDF AA toggle (completed: 2026-03-28)
+- [x] Phase 1 Task 6: SDF capsule instances for projectile/star trails (completed: 2026-03-28)
+- [x] Phase 1 Task 5: SDF instanced circles for particles (completed: 2026-03-28)
+- [x] Phase 1 Task 4: Separate HUD pass (not affected by tonemapping) (completed: 2026-03-28)
+- [x] Phase 1 Task 3: Tonemapping variants (faithful, spectral bleed, ACES, Reinhard) (completed: 2026-03-28)
+- [x] Phase 1 Task 2: GPU tonemapping — faithful port of redirect_spectre_wide (completed: 2026-03-28)
+- [x] Phase 1 Task 1: Offscreen Rgba16Float texture + post-process blit (completed: 2026-03-28)
+- [x] Phase 1 design spec + implementation plan (completed: 2026-03-28)
+
 ## V2 Phase 0 - Foundation (2026-03-28)
 
 - [x] Task 14: Bug fixes and cleanups — raw pointer removal, extract_if, dead code, EntityKind::Chunk, constant dedup (completed: 2026-03-28)
