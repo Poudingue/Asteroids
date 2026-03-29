@@ -17,6 +17,48 @@ use crate::rendering::world::{render_visuals, render_chunk, render_star_trail, r
 use crate::rendering::hud::render_hud;
 
 // ============================================================================
+// GamepadState
+// ============================================================================
+
+/// Runtime state for gamepad input processing.
+pub struct GamepadState {
+    /// Whether a gamepad is currently connected
+    pub connected: bool,
+    /// Drift compensation offset for left stick
+    pub left_center_offset: Vec2,
+    /// Drift compensation offset for right stick
+    pub right_center_offset: Vec2,
+    /// Timestamp when sticks last went idle (for drift recalibration)
+    pub last_idle_time: f64,
+    /// Smoothed visual aim angle for ship rendering (lags behind true orientation)
+    pub visual_aim_angle: f64,
+    /// Raw left stick axes after normalization [-1.0, 1.0], before dead zone
+    pub left_stick_raw: Vec2,
+    /// Raw right stick axes after normalization [-1.0, 1.0], before dead zone
+    pub right_stick_raw: Vec2,
+    /// Whether any gamepad button is currently pressed (for drift detection)
+    pub any_button_pressed: bool,
+    /// Whether left trigger is currently past the activation threshold (for edge detection)
+    pub left_trigger_pressed: bool,
+}
+
+impl GamepadState {
+    pub fn new() -> Self {
+        Self {
+            connected: false,
+            left_center_offset: Vec2::ZERO,
+            right_center_offset: Vec2::ZERO,
+            last_idle_time: 0.0,
+            visual_aim_angle: std::f64::consts::PI / 2.0, // Match ship's initial orientation
+            left_stick_raw: Vec2::ZERO,
+            right_stick_raw: Vec2::ZERO,
+            any_button_pressed: false,
+            left_trigger_pressed: false,
+        }
+    }
+}
+
+// ============================================================================
 // GameState
 // ============================================================================
 
@@ -50,6 +92,8 @@ pub struct GameState {
     pub buttons: Vec<ButtonBoolean>,
     /// Left mouse button state — used for rising-edge click detection.
     pub mouse_button_down: bool,
+    /// Gamepad input and processing state.
+    pub gamepad: GamepadState,
 }
 
 use crate::pause_menu::ButtonBoolean;
@@ -92,6 +136,7 @@ impl GameState {
             rng,
             buttons: crate::pause_menu::make_buttons(globals),
             mouse_button_down: false,
+            gamepad: GamepadState::new(),
         }
     }
 }

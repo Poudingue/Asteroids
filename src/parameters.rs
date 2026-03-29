@@ -220,6 +220,28 @@ pub const COOLDOWN_TP: f64 = 5.0;
 pub const TP_TIME_INVIC: f64 = 1.0; // Invincibility time after tp. TODO: Implement
 
 // ============================================================================
+// Gamepad constants
+// ============================================================================
+
+/// Inner dead zone threshold — stick deflection below this is treated as zero
+pub const STICK_DEAD_ZONE_INNER: f64 = 0.15;
+/// Outer dead zone threshold — stick deflection above this is treated as 1.0
+pub const STICK_DEAD_ZONE_OUTER: f64 = 0.90;
+/// Seconds of idle before drift recalibration starts
+pub const DRIFT_RECENTER_DELAY: f64 = 2.0;
+/// Lerp speed for drift compensation (per second)
+pub const DRIFT_RECENTER_SPEED: f64 = 0.5;
+/// Visual smoothing for ship rotation (0.0 = instant, higher = more lag)
+pub const AIM_VISUAL_SMOOTHING: f64 = 8.0;
+
+// ============================================================================
+// Teleport constants
+// ============================================================================
+
+/// Half-angle of the teleport targeting cone (degrees)
+pub const TELEPORT_CONE_HALF_ANGLE_DEG: f64 = 7.5;
+
+// ============================================================================
 // Constants (Projectile Parameters)
 // ============================================================================
 
