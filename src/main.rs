@@ -153,7 +153,7 @@ fn main() {
                     repeat: false,
                     ..
                 } => {
-                    input::teleport(&mut state, &mut globals, mouse_x_snap, mouse_y_snap);
+                    input::teleport(&mut state, &mut globals);
                 }
                 // F11: toggle fullscreen
                 Event::KeyDown {
@@ -246,7 +246,7 @@ fn main() {
                             let was_pressed = state.gamepad.left_trigger_pressed;
                             let is_pressed = normalized > 0.5;
                             if is_pressed && !was_pressed {
-                                // Teleport on left trigger — wired in Task 7
+                                input::teleport(&mut state, &mut globals);
                             }
                             state.gamepad.left_trigger_pressed = is_pressed;
                         }
@@ -258,7 +258,7 @@ fn main() {
                     match button {
                         Button::B => {
                             state.gamepad.any_button_pressed = true;
-                            // Teleport on B press — wired in Task 7
+                            input::teleport(&mut state, &mut globals);
                         }
                         Button::Start => globals.time.pause = !globals.time.pause,
                         _ => state.gamepad.any_button_pressed = true,

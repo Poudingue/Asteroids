@@ -47,18 +47,83 @@ pub fn world_space_thrust_keyboard(state: &mut GameState, globals: &Globals, key
     }
 }
 
-/// Forward boost (impulse, instant velocity change).
-/// Also spawns 9 engine fire particles for a more intense thrust effect (matches OCaml `boost`).
-/// Teleport ship to mouse position (F key). Edge-triggered; respects cooldown.
-/// Matches OCaml `teleport`: sets position/velocity, spawns explosion chunks, adjusts exposure/game_speed.
-pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mouse_y: f64) {
-    if state.cooldown_tp <= 0.0 {
-        // Teleport to mouse position in physics space
-        let new_pos = Vec2::new(mouse_x / globals.render.render_scale, mouse_y / globals.render.render_scale);
-        state.ship.position = new_pos;
+/// Cone-based teleport: cast a 15° cone along aim direction, find the biggest
+/// asteroid (object) in the cone (within screen bounds), teleport to its center.
+/// The targeted asteroid's health is set to 0 — normal fragmentation in
+/// update_game (spawn_fragments) handles debris spawning.
+pub fn teleport(state: &mut GameState, globals: &mut Globals) {
+    if state.cooldown_tp > 0.0 {
+        return;
+    }
+
+    let cone_half_angle = TELEPORT_CONE_HALF_ANGLE_DEG.to_radians();
+    let aim_angle = state.ship.orientation;
+    let ship_pos = state.ship.position;
+
+    // Screen bounds for visibility check
+    let phys_w = globals.render.phys_width;
+    let phys_h = globals.render.phys_height;
+
+    // Find the biggest asteroid (object) within the cone
+    let mut best_idx: Option<usize> = None;
+    let mut best_radius: f64 = 0.0;
+
+    for (i, asteroid) in state.objects.iter().enumerate() {
+        let delta = sub_vec(asteroid.position, ship_pos);
+        let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
+        if distance < 1.0 {
+            continue; // Too close / overlapping
+        }
+
+        // Angle from ship to asteroid center
+        let angle_to = delta.y.atan2(delta.x);
+
+        // Angular difference (wrapped to [-PI, PI])
+        let mut angle_diff = angle_to - aim_angle;
+        while angle_diff > PI { angle_diff -= 2.0 * PI; }
+        while angle_diff < -PI { angle_diff += 2.0 * PI; }
+
+        // Effective cone: widen by the asteroid's angular radius
+        let angular_radius = (asteroid.hitbox.int_radius / distance).asin().abs();
+        let effective_diff = angle_diff.abs() - angular_radius;
+
+        if effective_diff > cone_half_angle {
+            continue; // Outside cone
+        }
+
+        // Asteroid must be ahead (not behind ship)
+        let aim_dir = from_polar(aim_angle, 1.0);
+        let dot = delta.x * aim_dir.x + delta.y * aim_dir.y;
+        if dot <= 0.0 {
+            continue; // Behind ship
+        }
+
+        // Screen bounds check: asteroid center must be visible
+        let pos = asteroid.position;
+        if pos.x < 0.0 || pos.x > phys_w || pos.y < 0.0 || pos.y > phys_h {
+            continue;
+        }
+
+        // Pick biggest
+        let radius = asteroid.hitbox.int_radius;
+        if radius > best_radius {
+            best_radius = radius;
+            best_idx = Some(i);
+        }
+    }
+
+    if let Some(idx) = best_idx {
+        let target_pos = state.objects[idx].position;
+
+        // Kill the targeted asteroid — set health to 0 so normal fragmentation
+        // in update_game (spawn_fragments) handles debris spawning.
+        state.objects[idx].health = 0.0;
+
+        // Teleport ship to asteroid center
+        state.ship.position = target_pos;
         state.ship.velocity = Vec2::ZERO;
 
-        // Visual flash + slow-mo (matches OCaml: add_color intensify, game_exposure *= tp, game_speed *= ratio_time_tp)
+        // Visual flash (blue for teleport)
         if globals.visual.flashes_enabled {
             let flash = intensify(HdrColor { r: 0.0, g: 4.0, b: 40.0 }, 1.0);
             globals.exposure.add_color = (
@@ -70,7 +135,7 @@ pub fn teleport(state: &mut GameState, globals: &mut Globals, mouse_x: f64, mous
         globals.exposure.game_exposure *= GAME_EXPOSURE_TP;
         globals.time.game_speed *= RATIO_TIME_TP;
 
-        // Spawn teleport explosion chunks
+        // Spawn teleport explosion chunks (blue)
         let tp_color = (0.0, 1000.0, 10000.0);
         let new_chunks = spawn_n_chunks(&state.ship, NB_CHUNKS_EXPLO, tp_color, &mut state.rng);
         state.chunks_explo.extend(new_chunks);
