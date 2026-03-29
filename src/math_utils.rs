@@ -116,19 +116,6 @@ pub fn from_i32_tuple(v: (i32, i32)) -> Vec2 {
     Vec2::new(v.0 as f64, v.1 as f64)
 }
 
-/// Apply dithering to a float value before converting to int
-///
-/// # Arguments
-/// * `fl` - Float value to convert
-/// * `dither_aa` - Whether anti-aliasing dithering is enabled
-/// * `dither_power` - Dithering strength
-pub fn dither(fl: f64, dither_aa: bool, dither_power: f64, rng: &mut impl Rng) -> i32 {
-    if dither_aa {
-        (fl + rng.gen::<f64>() * dither_power) as i32
-    } else {
-        fl as i32
-    }
-}
 
 /// Apply dithering to a radius value before converting to int
 ///
@@ -238,10 +225,6 @@ pub fn wrap_toroidal(v: Vec2, phys_width: f64, phys_height: f64) -> Vec2 {
     )
 }
 
-/// Set difference: elements in l1 that are not in l2
-pub fn diff<T: PartialEq + Clone>(l1: &[T], l2: &[T]) -> Vec<T> {
-    l1.iter().filter(|x| !l2.contains(x)).cloned().collect()
-}
 
 /// Convert a polar polygon to affine (cartesian) coordinates with rotation and scale.
 pub fn polygon_to_cartesian(poly: &[(f64, f64)], rotat: f64, scale: f64) -> Vec<Vec2> {
@@ -253,4 +236,9 @@ pub fn polygon_to_cartesian(poly: &[(f64, f64)], rotat: f64, scale: f64) -> Vec<
 /// Displace all points in an affine polygon by a position offset.
 pub fn translate_polygon(poly: &[Vec2], pos: Vec2) -> Vec<Vec2> {
     poly.iter().map(|&p| add_vec(p, pos)).collect()
+}
+
+/// Set difference: elements in l1 that are not in l2
+pub fn diff<T: PartialEq + Clone>(l1: &[T], l2: &[T]) -> Vec<T> {
+    l1.iter().filter(|x| !l2.contains(x)).cloned().collect()
 }

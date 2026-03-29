@@ -216,9 +216,6 @@ fn ischunk(entity: &Entity) -> bool {
     entity.hitbox.int_radius < CHUNK_MAX_SIZE
 }
 
-fn notchunk(entity: &Entity) -> bool {
-    !ischunk(entity)
-}
 
 fn big_enough(entity: &Entity) -> bool {
     entity.hitbox.int_radius >= ASTEROID_MIN_SIZE
@@ -302,7 +299,7 @@ fn despawn(state: &mut GameState, globals: &Globals) {
         state.chunks_oos.clear();
     }
 
-    // Now filter dead entities from asteroid lists (notchunk already removed above)
+    // Now filter dead entities from asteroid lists
     state.objects.retain(is_alive);
     state.objects_oos.retain(is_alive);
     state.toosmall.retain(is_alive);

@@ -20,7 +20,6 @@ pub enum EntityKind {
     Ship,
     Explosion,
     Smoke,
-    Spark,
     Shotgun,
     Sniper,
     Machinegun,
