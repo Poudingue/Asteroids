@@ -1067,11 +1067,33 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         }
     }
 
+    // --- Visual aim smoothing ---
+    let dt_game = globals.time.time_current_frame - globals.time.time_last_frame;
+    update_visual_aim(&mut state.gamepad, state.ship.orientation, dt_game);
+
     // --- Particle budget enforcement ---
     enforce_particle_budgets(state);
 
     // --- Camera update: translate all entities to keep ship centred ---
     crate::camera::update_camera(state, globals);
+}
+
+/// Update the smoothed visual aim angle to track ship.orientation.
+/// Uses exponential approach: visual angle lerps toward true aim at a rate
+/// controlled by AIM_VISUAL_SMOOTHING. Handles angle wrapping correctly.
+pub fn update_visual_aim(gamepad: &mut GamepadState, target: f64, dt: f64) {
+    use std::f64::consts::PI;
+    let mut diff = target - gamepad.visual_aim_angle;
+    // Wrap to [-PI, PI]
+    while diff > PI { diff -= 2.0 * PI; }
+    while diff < -PI { diff += 2.0 * PI; }
+
+    if AIM_VISUAL_SMOOTHING <= 0.0 {
+        gamepad.visual_aim_angle = target;
+    } else {
+        let factor = (AIM_VISUAL_SMOOTHING * dt).min(1.0);
+        gamepad.visual_aim_angle += diff * factor;
+    }
 }
 
 /// Enforce per-collection particle caps, removing oldest/smallest particles first.
@@ -1178,8 +1200,11 @@ pub fn render_frame(
         render_projectile(p, renderer, globals, &mut state.rng);
     }
 
-    // Ship
+    // Ship — render with smoothed visual aim angle
+    let true_aim = state.ship.orientation;
+    state.ship.orientation = state.gamepad.visual_aim_angle;
     render_visuals(&state.ship, Vec2::ZERO, renderer, globals, &mut state.rng);
+    state.ship.orientation = true_aim;
 
     // Fragments — after ship (OCaml order)
     for entity in &state.fragments {
