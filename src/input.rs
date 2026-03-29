@@ -125,3 +125,73 @@ pub fn fire(state: &mut GameState, globals: &mut Globals) {
         state.ship.velocity = add_vec(state.ship.velocity, recoil);
     }
 }
+
+// ============================================================================
+// Gamepad input helpers
+// ============================================================================
+
+/// Process a single stick axis: subtract drift offset, apply inner/outer dead zone, remap to [0, 1].
+pub fn process_stick_axis(raw: f64, center_offset: f64) -> f64 {
+    let adjusted = raw - center_offset;
+    let abs_val = adjusted.abs();
+    if abs_val < STICK_DEAD_ZONE_INNER {
+        return 0.0;
+    }
+    if abs_val > STICK_DEAD_ZONE_OUTER {
+        return adjusted.signum();
+    }
+    let remapped = (abs_val - STICK_DEAD_ZONE_INNER) / (STICK_DEAD_ZONE_OUTER - STICK_DEAD_ZONE_INNER);
+    remapped * adjusted.signum()
+}
+
+/// World-space gamepad stick thrust: analog magnitude proportional to stick deflection.
+pub fn world_space_thrust_stick(state: &mut GameState, globals: &Globals, stick: Vec2) {
+    let mag = (stick.x * stick.x + stick.y * stick.y).sqrt();
+    if mag > 0.0 {
+        let clamped_mag = mag.min(1.0);
+        let direction = Vec2::new(stick.x / mag, stick.y / mag);
+        accelerate_entity(
+            &mut state.ship,
+            scale_vec(direction, SHIP_MAX_ACCEL * clamped_mag),
+            globals,
+        );
+        // Engine fire while thrusting via stick
+        if state.ship.health > 0.0 && globals.visual.smoke_enabled {
+            let fire = spawn_fire(&state.ship, &mut state.rng);
+            state.smoke.push(fire);
+        }
+    }
+}
+
+/// Set ship aim direction from right stick. Only updates when stick magnitude exceeds dead zone
+/// (keeps last aim direction when stick is released / in dead zone).
+pub fn aim_from_stick(ship: &mut Entity, stick: Vec2) {
+    let mag = (stick.x * stick.x + stick.y * stick.y).sqrt();
+    if mag > 0.0 {
+        ship.orientation = stick.y.atan2(stick.x);
+    }
+}
+
+/// Update adaptive drift compensation for a stick.
+/// When no buttons are pressed and stick is stable for DRIFT_RECENTER_DELAY seconds,
+/// slowly lerp the center offset toward the current raw reading.
+pub fn update_drift_compensation(
+    center_offset: &mut Vec2,
+    raw: Vec2,
+    any_button_pressed: bool,
+    last_idle_time: &mut f64,
+    current_time: f64,
+    dt: f64,
+) {
+    if any_button_pressed || raw.x.abs() > 0.5 || raw.y.abs() > 0.5 {
+        // Stick is actively in use — reset idle timer
+        *last_idle_time = current_time;
+        return;
+    }
+    let idle_duration = current_time - *last_idle_time;
+    if idle_duration >= DRIFT_RECENTER_DELAY {
+        let lerp_factor = (DRIFT_RECENTER_SPEED * dt).min(1.0);
+        center_offset.x += (raw.x - center_offset.x) * lerp_factor;
+        center_offset.y += (raw.y - center_offset.y) * lerp_factor;
+    }
+}
