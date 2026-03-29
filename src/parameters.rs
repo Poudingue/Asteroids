@@ -234,6 +234,8 @@ pub const TP_TIME_INVIC: f64 = 1.0; // Invincibility time after tp. TODO: Implem
 // Regular projectile values
 pub const PROJECTILE_HERIT_SPEED: bool = true;
 pub const PROJECTILE_HEALTH: f64 = 0.0; // We consider death when health drops below zero. We have certainty here that the projectile will destroy itself.
+pub const PROJECTILE_RADIUS: f64 = 15.0;
+pub const PROJECTILE_RADIUS_HITBOX: f64 = 20.0;
 pub const PROJECTILE_NUMBER_DEFAULT_VAL: i32 = 5;
 pub const EXPLOSION_DAMAGES_PROJECTILE: f64 = 5000.0;
 

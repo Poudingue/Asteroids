@@ -1,9 +1,5 @@
-use crate::parameters::{
-    ASTEROID_MAX_SPAWN_RADIUS, ASTEROID_MAX_VELOCITY, ASTEROID_MIN_SPAWN_RADIUS,
-    ASTEROID_MIN_VELOCITY, ASTEROID_STAGE_VELOCITY,
-    FRAGMENT_MIN_SIZE, FRAGMENT_MAX_SIZE, FRAGMENT_MIN_VELOCITY, FRAGMENT_MAX_VELOCITY,
-    FRAGMENT_MIN_EXPOSURE, FRAGMENT_MAX_EXPOSURE,
-};
+use std::f64::consts::PI;
+use crate::parameters::*;
 use crate::math_utils::{
     add_vec, squared, magnitude, scale_vec, from_polar, rand_range, sub_vec, Vec2,
 };
@@ -71,79 +67,6 @@ pub struct Star {
     pub proximity: f64,
     pub lum: f64,
 }
-
-// ============================================================================
-// Constants (hardcoded from parameters.ml for now)
-// ============================================================================
-
-const PI: f64 = std::f64::consts::PI;
-const SHIP_RADIUS: f64 = 25.0;
-const SHIP_DENSITY: f64 = 100.0;
-const SHIP_MAX_HEALTH: f64 = 100.0;
-const SHIP_DAM_RATIO: f64 = 0.8;
-const SHIP_DAM_RES: f64 = 10.0;
-const SHIP_PHYS_RATIO: f64 = 0.005;
-const SHIP_PHYS_RES: f64 = 0.0;
-
-const PROJECTILE_RADIUS: f64 = 15.0;
-const PROJECTILE_RADIUS_HITBOX: f64 = 20.0;
-const PROJECTILE_HEALTH: f64 = 0.0;
-
-const ASTEROID_POLYGON_MIN_SIDES: i32 = 7;
-const ASTEROID_POLYGON_SIZE_RATIO: f64 = 0.02;
-const ASTEROID_POLYGON_MIN: f64 = 1.0;
-const ASTEROID_POLYGON_MAX: f64 = 1.3;
-const ASTEROID_DENSITY: f64 = 1.0;
-const ASTEROID_MIN_HEALTH: f64 = 50.0;
-const ASTEROID_MASS_HEALTH: f64 = 0.01;
-const ASTEROID_DAM_RATIO: f64 = 1.0;
-const ASTEROID_DAM_RES: f64 = 0.0;
-const ASTEROID_PHYS_RATIO: f64 = 1.0;
-const ASTEROID_PHYS_RES: f64 = 100.0;
-const ASTEROID_MIN_LUM: f64 = 40.0;
-const ASTEROID_MAX_LUM: f64 = 120.0;
-const ASTEROID_MIN_SATUR: f64 = 0.4;
-const ASTEROID_MAX_SATUR: f64 = 0.5;
-const ASTEROID_MAX_MOMENT: f64 = 1.0;
-
-const CHUNKS_EXPLO_MIN_RADIUS: f64 = 150.0;
-const CHUNKS_EXPLO_MAX_RADIUS: f64 = 300.0;
-const CHUNKS_EXPLO_MIN_SPEED: f64 = 10000.0;
-const CHUNKS_EXPLO_MAX_SPEED: f64 = 20000.0;
-
-const EXPLOSION_MAX_RADIUS: f64 = 250.0;
-const EXPLOSION_MIN_RADIUS: f64 = 200.0;
-const EXPLOSION_MIN_EXPOSURE: f64 = 0.4;
-const EXPLOSION_MAX_EXPOSURE: f64 = 1.3;
-const EXPLOSION_RATIO_RADIUS: f64 = 2.0;
-const EXPLOSION_DEATH_MAX_RADIUS: f64 = 150.0;
-const EXPLOSION_DEATH_MIN_RADIUS: f64 = 100.0;
-const EXPLOSION_MIN_EXPOSURE_HERITATE: f64 = 2.0;
-const EXPLOSION_MAX_EXPOSURE_HERITATE: f64 = 6.0;
-const EXPLOSION_DAMAGES_PROJECTILE: f64 = 5000.0;
-const EXPLOSION_DAMAGES_OBJET: f64 = 50.0;
-const EXPLOSION_DAMAGES_CHUNK: f64 = 150.0;
-const EXPLOSION_DAMAGES_DEATH: f64 = 50.0;
-const EXPLOSION_SATURATE: f64 = 10.0;
-
-const MUZZLE_RATIO_RADIUS: f64 = 3.0;
-const MUZZLE_RATIO_SPEED: f64 = 0.05;
-
-const FIRE_MAX_RANDOM: f64 = 100.0;
-const FIRE_MIN_SPEED: f64 = 500.0;
-const FIRE_MAX_SPEED: f64 = 1000.0;
-const FIRE_RATIO_RADIUS: f64 = 1.4;
-
-const SMOKE_MAX_SPEED: f64 = 400.0;
-
-const STAR_MIN_PROX: f64 = 0.3;
-const STAR_MAX_PROX: f64 = 0.9;
-const STAR_MIN_LUM: f64 = 0.0;
-const STAR_MAX_LUM: f64 = 4.0;
-
-const CHUNK_MAX_SIZE: f64 = 50.0;
-const ASTEROID_MIN_SIZE: f64 = 100.0;
-const MAX_DIST: f64 = 20000.0;
 
 // ============================================================================
 // Spawn functions
