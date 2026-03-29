@@ -73,7 +73,21 @@ pub struct Star {
 // ============================================================================
 
 pub fn spawn_ship() -> Entity {
+    // 16-sided polygon approximating the ship base circle (replaces CPU fill_circle)
+    let base_radius = SHIP_RADIUS * 0.9;
+    let n_sides = 16usize;
+    let circle_poly: Vec<(f64, f64)> = (0..n_sides)
+        .map(|i| {
+            let angle = 2.0 * PI * i as f64 / n_sides as f64;
+            (angle, base_radius)
+        })
+        .collect();
+
     let shapes = vec![
+        (
+            (1000.0, 100.0, 25.0),
+            Polygon(circle_poly),
+        ),
         (
             (200.0, 20.0, 20.0),
             Polygon(vec![

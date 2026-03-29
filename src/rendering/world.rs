@@ -70,8 +70,9 @@ pub fn render_visuals(
     );
     let exposure = globals.exposure.game_exposure * entity.hdr_exposure;
 
-    // Base circle (not in retro mode)
-    if visuals.radius > 0.0 && !globals.visual.retro {
+    // SDF circle for entities with radius but no polygon shapes (smoke, explosions)
+    // Entities with shapes (ship, asteroids): only render polygon shapes, no base circle
+    if visuals.radius > 0.0 && !globals.visual.retro && visuals.shapes.is_empty() {
         let color = to_hdr_rgba(intensify(hdr(visuals.color), exposure));
         let (x, y) = dither_vec(position, DITHER_AA, globals.render.current_jitter_double);
         let r = dither_radius(
@@ -80,7 +81,7 @@ pub fn render_visuals(
             DITHER_POWER_RADIUS,
             rng,
         );
-        renderer.fill_circle(x as f64, y as f64, r.max(1) as f64, color);
+        renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color);
     }
 
     // Polygon shapes on top
@@ -122,7 +123,7 @@ pub fn render_chunk(
             globals.render.render_scale * entity.visuals.radius,
             DITHER_AA, DITHER_POWER_RADIUS, rng,
         );
-        renderer.fill_circle(x as f64, y as f64, r.max(1) as f64, color);
+        renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color);
     }
 }
 

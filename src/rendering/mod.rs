@@ -38,6 +38,31 @@ impl Vertex {
     }
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CircleInstance {
+    pub center: [f32; 2],
+    pub radius: f32,
+    pub color: [f32; 4],
+    pub _padding: f32,
+}
+
+impl CircleInstance {
+    const ATTRIBS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+        2 => Float32x2,   // center
+        3 => Float32,     // radius
+        4 => Float32x4,   // color
+    ];
+
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<CircleInstance>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &Self::ATTRIBS,
+        }
+    }
+}
+
 pub struct Renderer2D {
     world_pipeline: wgpu::RenderPipeline,
     screen_size_buffer: wgpu::Buffer,
@@ -58,6 +83,9 @@ pub struct Renderer2D {
     hud_pipeline: wgpu::RenderPipeline,
     hud_vertices: Vec<Vertex>,
     hud_bind_group: wgpu::BindGroup,
+    sdf_circle_pipeline: wgpu::RenderPipeline,
+    sdf_circle_instances: Vec<CircleInstance>,
+    sdf_bind_group: wgpu::BindGroup,
     pub width: u32,
     pub height: u32,
 }
@@ -320,6 +348,77 @@ impl Renderer2D {
                 cache: None,
             });
 
+        // --- SDF circle shader + pipeline (renders into Rgba16Float offscreen texture) ---
+        let sdf_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("SDF Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/sdf.wgsl").into()),
+        });
+
+        let sdf_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("SDF Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let sdf_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("SDF Bind Group"),
+            layout: &sdf_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: screen_size_buffer.as_entire_binding(),
+            }],
+        });
+
+        let sdf_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("SDF Pipeline Layout"),
+                bind_group_layouts: &[&sdf_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let sdf_circle_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("SDF Circle Pipeline"),
+            layout: Some(&sdf_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &sdf_shader,
+                entry_point: Some("vs_circle"),
+                buffers: &[CircleInstance::desc()],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &sdf_shader,
+                entry_point: Some("fs_circle"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba16Float,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
         // --- HUD shader + pipeline (renders directly to swapchain, alpha blending, no tonemapping) ---
         let hud_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("HUD Shader"),
@@ -407,6 +506,9 @@ impl Renderer2D {
             hud_pipeline,
             hud_vertices: Vec::with_capacity(16384),
             hud_bind_group,
+            sdf_circle_pipeline,
+            sdf_circle_instances: Vec::with_capacity(4096),
+            sdf_bind_group,
             width,
             height,
         }
@@ -493,6 +595,12 @@ impl Renderer2D {
     pub fn begin_frame(&mut self) {
         self.vertices.clear();
         self.hud_vertices.clear();
+        self.sdf_circle_instances.clear();
+    }
+
+    pub fn push_circle_instance(&mut self, cx: f32, cy: f32, radius: f32, color: [f32; 4]) {
+        if radius <= 0.0 { return; }
+        self.sdf_circle_instances.push(CircleInstance { center: [cx, cy], radius, color, _padding: 0.0 });
     }
 
     // ---- Internal geometry helpers (write to an arbitrary target Vec<Vertex>) ----
@@ -730,7 +838,34 @@ impl Renderer2D {
             }
         }
 
-        // --- Pass 2: Blit offscreen texture to swapchain via fullscreen triangle ---
+        // === Pass 2: SDF entities -> offscreen Rgba16Float (no clear, load existing) ===
+        if !self.sdf_circle_instances.is_empty() {
+            let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("SDF Circle Instance Buffer"),
+                contents: bytemuck::cast_slice(&self.sdf_circle_instances),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("SDF Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.offscreen_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,  // Preserve world geometry
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.sdf_circle_pipeline);
+            render_pass.set_bind_group(0, &self.sdf_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, instance_buffer.slice(..));
+            render_pass.draw(0..6, 0..self.sdf_circle_instances.len() as u32);
+        }
+
+        // --- Pass 3: Blit offscreen texture to swapchain via fullscreen triangle ---
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Postprocess Pass"),
