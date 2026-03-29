@@ -1,0 +1,21 @@
+# Asteroids Rust Port - Completed Items
+
+## V2 Phase 0 - Foundation (2026-03-28)
+
+- [x] Task 14: Bug fixes and cleanups — raw pointer removal, extract_if, dead code, EntityKind::Chunk, constant dedup (completed: 2026-03-28)
+- [x] Task 13: Config restructure — split Globals into 9 focused sub-structs (completed: 2026-03-28)
+- [x] Game manual created at docs/GAME_MANUAL.md (completed: 2026-03-28)
+- [x] README updated for V2 Phase 0 progress (completed: 2026-03-28)
+- [x] Engine integration tests (camera, spawn, game state) (completed: 2026-03-28)
+- [x] Dt cap bugfix: MAX_DT=0.05s in game loop (completed: 2026-03-27)
+- [x] Conservation tests: 9 pass, 6 ignored (documented physics violations) (completed: 2026-03-27)
+- [x] Task 12: Extract physics/ modules from game.rs (completed: 2026-03-27)
+- [x] Task 11: Extract rendering/ modules from game.rs (completed: 2026-03-27)
+- [x] Task 10: Extract pause_menu.rs from game.rs (completed: 2026-03-27)
+- [x] Task 9: Extract camera.rs from game.rs (completed: 2026-03-27)
+- [x] Task 8: Extract input.rs from game.rs (completed: 2026-03-27)
+- [x] Task 7: French→English rename (71 identifiers) (completed: 2026-03-27)
+- [x] Task 6: HdrColor .v→.g + operator impls (completed: 2026-03-27)
+- [x] Task 5: Vec2 struct replacing (f64, f64) tuples (completed: 2026-03-27)
+- [x] Task 1-4: Exhaustive safety-net tests (290 tests) (completed: 2026-03-27)
+- [x] Task 0: src/lib.rs (dual lib+bin crate) (completed: 2026-03-27)
