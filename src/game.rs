@@ -273,31 +273,17 @@ fn transfer_oos(
     oos.extend(going_out);
 }
 
-/// Drain elements matching predicate, keeping order stable.
-/// Returns removed elements; modifies vec in-place to keep non-matching.
-fn drain_filter_stable<T>(vec: &mut Vec<T>, pred: impl Fn(&T) -> bool) -> Vec<T> {
-    let mut removed = Vec::new();
-    let mut i = 0;
-    while i < vec.len() {
-        if pred(&vec[i]) {
-            removed.push(vec.remove(i));
-        } else {
-            i += 1;
-        }
-    }
-    removed
-}
 
 /// Remove dead entities, transfer chunk-sized asteroids to chunks list, and remove zero-radius debris.
 /// Matches OCaml despawn: collects ischunk from all asteroid lists before filtering notchunk.
 fn despawn(state: &mut GameState, globals: &Globals) {
     if globals.visual.chunks_enabled {
         // Collect chunk-sized asteroids from all asteroid lists (OCaml: ischunk filter then append to ref_chunks)
-        let new_from_objects      = drain_filter_stable(&mut state.objects,      ischunk);
-        let new_from_objects_oos  = drain_filter_stable(&mut state.objects_oos,  ischunk);
-        let new_from_toosmall     = drain_filter_stable(&mut state.toosmall,     ischunk);
-        let new_from_toosmall_oos = drain_filter_stable(&mut state.toosmall_oos, ischunk);
-        let new_from_fragments    = drain_filter_stable(&mut state.fragments,    ischunk);
+        let new_from_objects      = state.objects.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
+        let new_from_objects_oos  = state.objects_oos.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
+        let new_from_toosmall     = state.toosmall.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
+        let new_from_toosmall_oos = state.toosmall_oos.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
+        let new_from_fragments    = state.fragments.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
 
         state.chunks.extend(new_from_objects);
         state.chunks.extend(new_from_objects_oos);
@@ -741,9 +727,9 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     apply_angular_momentum_all(&mut state.fragments, globals);
 
     // --- Size classification: move too-small asteroids ---
-    let small_objs = drain_filter_stable(&mut state.objects, too_small);
+    let small_objs = state.objects.extract_if(.., |e| too_small(e)).collect::<Vec<_>>();
     state.toosmall.extend(small_objs);
-    let small_frags = drain_filter_stable(&mut state.fragments, too_small);
+    let small_frags = state.fragments.extract_if(.., |e| too_small(e)).collect::<Vec<_>>();
     state.toosmall.extend(small_frags);
 
     // --- OOS transfers ---
@@ -846,7 +832,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     spawn_fragments(&state.fragments.clone(), &mut state.fragments, FRAGMENT_NUMBER, &mut state.rng);
 
     // --- Move chunks out of fragments ---
-    let new_chunks = drain_filter_stable(&mut state.fragments, ischunk);
+    let new_chunks = state.fragments.extract_if(.., |e| ischunk(e)).collect::<Vec<_>>();
     state.chunks.extend(new_chunks);
 
     // --- Recenter (wrap positions) ---
