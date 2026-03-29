@@ -5,6 +5,19 @@ use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct PostProcessUniforms {
+    pub game_exposure: f32,
+    pub add_color_r: f32,
+    pub add_color_g: f32,
+    pub add_color_b: f32,
+    pub mul_color_r: f32,
+    pub mul_color_g: f32,
+    pub mul_color_b: f32,
+    pub _padding: f32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     pub position: [f32; 2],
     pub color: [f32; 4],
@@ -37,6 +50,7 @@ pub struct Renderer2D {
     postprocess_pipeline: wgpu::RenderPipeline,
     postprocess_bind_group: wgpu::BindGroup,
     postprocess_sampler: wgpu::Sampler,
+    postprocess_uniform_buffer: wgpu::Buffer,
     // Kept for use in resize() when rebuilding pipelines
     #[allow(dead_code)]
     surface_format: wgpu::TextureFormat,
@@ -192,6 +206,23 @@ impl Renderer2D {
             ..Default::default()
         });
 
+        // Neutral postprocess uniforms: exposure=1.0, add=0, mul=1
+        let postprocess_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Postprocess Uniform Buffer"),
+                contents: bytemuck::cast_slice(&[PostProcessUniforms {
+                    game_exposure: 1.0,
+                    add_color_r: 0.0,
+                    add_color_g: 0.0,
+                    add_color_b: 0.0,
+                    mul_color_r: 1.0,
+                    mul_color_g: 1.0,
+                    mul_color_b: 1.0,
+                    _padding: 0.0,
+                }]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
         let postprocess_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Postprocess Bind Group Layout"),
@@ -212,6 +243,16 @@ impl Renderer2D {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ],
             });
 
@@ -226,6 +267,10 @@ impl Renderer2D {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&postprocess_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: postprocess_uniform_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -282,6 +327,7 @@ impl Renderer2D {
             postprocess_pipeline,
             postprocess_bind_group,
             postprocess_sampler,
+            postprocess_uniform_buffer,
             surface_format,
             vertices: Vec::with_capacity(65536),
             width,
@@ -326,6 +372,16 @@ impl Renderer2D {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ],
             });
 
@@ -341,27 +397,34 @@ impl Renderer2D {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&self.postprocess_sampler),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.postprocess_uniform_buffer.as_entire_binding(),
+                },
             ],
         });
+    }
+
+    pub fn update_postprocess_uniforms(&self, queue: &wgpu::Queue, uniforms: &PostProcessUniforms) {
+        queue.write_buffer(
+            &self.postprocess_uniform_buffer,
+            0,
+            bytemuck::cast_slice(std::slice::from_ref(uniforms)),
+        );
     }
 
     pub fn begin_frame(&mut self) {
         self.vertices.clear();
     }
 
-    fn push_vertex(&mut self, x: f32, y: f32, color: [u8; 4]) {
+    fn push_vertex(&mut self, x: f32, y: f32, color: [f32; 4]) {
         self.vertices.push(Vertex {
             position: [x, y],
-            color: [
-                color[0] as f32 / 255.0,
-                color[1] as f32 / 255.0,
-                color[2] as f32 / 255.0,
-                color[3] as f32 / 255.0,
-            ],
+            color,
         });
     }
 
-    pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [u8; 4]) {
+    pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [f32; 4]) {
         let (x0, y0) = (x as f32, y as f32);
         let (x1, y1) = ((x + w) as f32, (y + h) as f32);
         // Two triangles
@@ -373,7 +436,7 @@ impl Renderer2D {
         self.push_vertex(x0, y1, color);
     }
 
-    pub fn fill_circle(&mut self, cx: f64, cy: f64, radius: f64, color: [u8; 4]) {
+    pub fn fill_circle(&mut self, cx: f64, cy: f64, radius: f64, color: [f32; 4]) {
         if radius <= 0.0 {
             return;
         }
@@ -391,7 +454,7 @@ impl Renderer2D {
         }
     }
 
-    pub fn fill_ellipse(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, color: [u8; 4]) {
+    pub fn fill_ellipse(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, color: [f32; 4]) {
         let segments = (rx.max(ry) as usize).max(8).min(64);
         let cx = cx as f32;
         let cy = cy as f32;
@@ -409,7 +472,7 @@ impl Renderer2D {
 
     /// Fill a polygon from a list of (i32, i32) points.
     /// Uses ear-clipping triangulation — works for concave and convex polygons.
-    pub fn fill_poly(&mut self, points: &[(i32, i32)], color: [u8; 4]) {
+    pub fn fill_poly(&mut self, points: &[(i32, i32)], color: [f32; 4]) {
         if points.len() < 3 { return; }
 
         // Find bounding box
@@ -464,7 +527,7 @@ impl Renderer2D {
     }
 
     /// Draw a polygon outline. Each edge is a thick quad.
-    pub fn draw_poly(&mut self, points: &[(i32, i32)], color: [u8; 4], line_width: f32) {
+    pub fn draw_poly(&mut self, points: &[(i32, i32)], color: [f32; 4], line_width: f32) {
         if points.len() < 2 {
             return;
         }
@@ -478,7 +541,7 @@ impl Renderer2D {
     }
 
     /// Draw a thick line between two points.
-    pub fn draw_line(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, color: [u8; 4], width: f32) {
+    pub fn draw_line(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, color: [f32; 4], width: f32) {
         self.draw_line_f32(
             x1 as f32,
             y1 as f32,
@@ -489,7 +552,7 @@ impl Renderer2D {
         );
     }
 
-    fn draw_line_f32(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: [u8; 4], half_w: f32) {
+    fn draw_line_f32(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: [f32; 4], half_w: f32) {
         let dx = x2 - x1;
         let dy = y2 - y1;
         let len = (dx * dx + dy * dy).sqrt();
@@ -510,13 +573,13 @@ impl Renderer2D {
     }
 
     /// Plot a single pixel as a 1x1 rect.
-    pub fn plot(&mut self, x: i32, y: i32, color: [u8; 4]) {
+    pub fn plot(&mut self, x: i32, y: i32, color: [f32; 4]) {
         self.fill_rect(x, y, 1, 1, color);
     }
 
     /// Draw a string using SDL2-style bitmap font would go here.
     /// For now, this is a no-op placeholder; the vector font in game.rs handles important text.
-    pub fn draw_string(&mut self, _text: &str, _x: i32, _y: i32, _color: [u8; 4]) {
+    pub fn draw_string(&mut self, _text: &str, _x: i32, _y: i32, _color: [f32; 4]) {
         // Debug text will use the custom vector font or be skipped initially
     }
 

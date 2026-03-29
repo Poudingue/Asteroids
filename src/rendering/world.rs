@@ -5,7 +5,7 @@ use crate::math_utils::*;
 use crate::objects::*;
 use crate::parameters::*;
 use crate::rendering::Renderer2D;
-use crate::game::{hdr, to_rgba};
+use crate::game::{hdr, to_hdr_rgba};
 
 // ============================================================================
 // Polygon rendering helpers
@@ -16,7 +16,7 @@ pub fn render_poly(
     poly: &[(f64, f64)],
     pos: Vec2,
     rotat: f64,
-    color: [u8; 4],
+    color: [f32; 4],
     renderer: &mut Renderer2D,
     globals: &Globals,
 ) {
@@ -27,7 +27,7 @@ pub fn render_poly(
         .map(|&p| dither_vec(p, DITHER_AA, globals.render.current_jitter_double))
         .collect();
     if globals.visual.retro {
-        renderer.draw_poly(&screen_points, [255, 255, 255, 255], 1.0);
+        renderer.draw_poly(&screen_points, [255.0, 255.0, 255.0, 255.0], 1.0);
     } else {
         renderer.fill_poly(&screen_points, color);
     }
@@ -43,7 +43,7 @@ pub fn render_shapes(
     globals: &Globals,
 ) {
     for (col, Polygon(poly)) in shapes {
-        let color = to_rgba(intensify(hdr(*col), exposure), globals);
+        let color = to_hdr_rgba(intensify(hdr(*col), exposure));
         render_poly(poly, pos, rotat, color, renderer, globals);
     }
 }
@@ -72,7 +72,7 @@ pub fn render_visuals(
 
     // Base circle (not in retro mode)
     if visuals.radius > 0.0 && !globals.visual.retro {
-        let color = to_rgba(intensify(hdr(visuals.color), exposure), globals);
+        let color = to_hdr_rgba(intensify(hdr(visuals.color), exposure));
         let (x, y) = dither_vec(position, DITHER_AA, globals.render.current_jitter_double);
         let r = dither_radius(
             visuals.radius * globals.render.render_scale,
@@ -110,13 +110,12 @@ pub fn render_chunk(
         renderer.fill_circle(
             x as f64, y as f64,
             (0.25 * globals.render.render_scale * entity.visuals.radius).max(1.0),
-            [128, 128, 128, 255],
+            [128.0, 128.0, 128.0, 255.0],
         );
     } else {
         let intensity_chunk = 1.0;
-        let color = to_rgba(
+        let color = to_hdr_rgba(
             intensify(hdr(entity.visuals.color), intensity_chunk * globals.exposure.game_exposure * entity.hdr_exposure),
-            globals,
         );
         let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
         let r = dither_radius(
@@ -156,7 +155,7 @@ pub fn render_star_trail(
 
     if x1 == x2 && y1 == y2 {
         // Static star: render as a cross of pixels
-        let center_color = to_rgba(
+        let center_color = to_hdr_rgba(
             intensify(
                 hdr_add(
                     star_color_tmp,
@@ -164,17 +163,16 @@ pub fn render_star_trail(
                 ),
                 globals.exposure.game_exposure,
             ),
-            globals,
         );
         renderer.plot(x1, y1, center_color);
 
-        let arm_color = to_rgba(intensify(star_color_tmp, 0.25), globals);
+        let arm_color = to_hdr_rgba(intensify(star_color_tmp, 0.25));
         renderer.plot(x1 + 1, y1, arm_color);
         renderer.plot(x1 - 1, y1, arm_color);
         renderer.plot(x1, y1 + 1, arm_color);
         renderer.plot(x1, y1 - 1, arm_color);
 
-        let diag_color = to_rgba(intensify(star_color_tmp, 0.125), globals);
+        let diag_color = to_hdr_rgba(intensify(star_color_tmp, 0.125));
         renderer.plot(x1 + 1, y1 + 1, diag_color);
         renderer.plot(x1 + 1, y1 - 1, diag_color);
         renderer.plot(x1 - 1, y1 + 1, diag_color);
@@ -190,7 +188,7 @@ pub fn render_star_trail(
                 intensify(hdr(globals.exposure.add_color), globals.exposure.game_exposure),
             ),
         );
-        let color = to_rgba(trail_color, globals);
+        let color = to_hdr_rgba(trail_color);
         renderer.draw_line(x1, y1, x2, y2, color, 2.0);
     }
 }
@@ -222,7 +220,7 @@ pub fn render_light_trail(
     let pos2 = lerp_vec(last_pos, pos1, SHUTTER_SPEED);
     let dist = magnitude(sub_vec(pos1, pos2));
     let trail_lum = 0.5 * (radius / (radius + dist)).sqrt();
-    let color = to_rgba(intensify(hdr_color, trail_lum), globals);
+    let color = to_hdr_rgba(intensify(hdr_color, trail_lum));
     let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.render.current_jitter_double);
     let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.render.current_jitter_double);
     let line_width = dither_radius(2.0 * radius, DITHER_AA, DITHER_POWER_RADIUS, &mut rand::thread_rng());
@@ -238,7 +236,7 @@ pub fn render_projectile(entity: &Entity, renderer: &mut Renderer2D, globals: &G
         // Retro mode: simple white filled circle at projectile position
         let pos = scale_vec(entity.position, globals.render.render_scale);
         let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
-        renderer.fill_circle(x as f64, y as f64, rad.max(1.0), [255, 255, 255, 255]);
+        renderer.fill_circle(x as f64, y as f64, rad.max(1.0), [255.0, 255.0, 255.0, 255.0]);
     } else {
         let pos = entity.position;
         let vel = entity.velocity;

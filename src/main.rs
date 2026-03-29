@@ -288,6 +288,16 @@ fn main() {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
+        renderer.update_postprocess_uniforms(&queue, &rendering::PostProcessUniforms {
+            game_exposure: globals.exposure.game_exposure as f32,
+            add_color_r: globals.exposure.add_color.0 as f32,
+            add_color_g: globals.exposure.add_color.1 as f32,
+            add_color_b: globals.exposure.add_color.2 as f32,
+            mul_color_r: globals.exposure.mul_color.0 as f32,
+            mul_color_g: globals.exposure.mul_color.1 as f32,
+            mul_color_b: globals.exposure.mul_color.2 as f32,
+            _padding: 0.0,
+        });
         renderer.begin_frame();
         game::render_frame(&mut state, &mut globals, &mut renderer, mouse_x_snap, mouse_y_snap, mouse_left_snap);
         renderer.end_frame(&device, &queue, &view, [0.0, 0.0, 0.0, 1.0]);

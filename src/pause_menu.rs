@@ -125,18 +125,18 @@ pub fn apply_button(
 
     if globals.visual.retro {
         // Retro mode: white fill if ON, black fill if OFF
-        let fill_col = if on { [255u8, 255, 255, 255] } else { [0u8, 0, 0, 255] };
+        let fill_col: [f32; 4] = if on { [255.0, 255.0, 255.0, 255.0] } else { [0.0, 0.0, 0.0, 255.0] };
         renderer.fill_poly(&rect_pts, fill_col);
         // White frame
-        renderer.draw_poly(&rect_pts, [255, 255, 255, 255], 2.0 * rr as f32);
+        renderer.draw_poly(&rect_pts, [255.0, 255.0, 255.0, 255.0], 2.0 * rr as f32);
     } else {
         // Normal mode
-        let fill_col: [u8; 4] = if on { [0, 128, 0, 255] } else { [128, 0, 0, 255] };
+        let fill_col: [f32; 4] = if on { [0.0, 128.0, 0.0, 255.0] } else { [128.0, 0.0, 0.0, 255.0] };
         renderer.fill_poly(&rect_pts, fill_col);
 
         // Border: dark grey, 10 * render_scale px wide
         let border_w = 10.0 * rr as f32;
-        renderer.draw_poly(&rect_pts, [64, 64, 64, 255], border_w);
+        renderer.draw_poly(&rect_pts, [64.0, 64.0, 64.0, 255.0], border_w);
     }
 
     // ---- Centered text (both modes) ----
@@ -149,17 +149,17 @@ pub fn apply_button(
     // Center text in button
     let text_x = x1 + ((x2 - x1) - text_total_w) * 0.5;
     let text_y = y1 + ((y2 - y1) - char_h) * 0.5;
-    let text_col = if globals.visual.retro {
-        if on { [0u8, 0, 0, 255] } else { [255u8, 255, 255, 255] }
+    let text_col: [f32; 4] = if globals.visual.retro {
+        if on { [0.0, 0.0, 0.0, 255.0] } else { [255.0, 255.0, 255.0, 255.0] }
     } else {
-        [255, 255, 255, 255]
+        [255.0, 255.0, 255.0, 255.0]
     };
     if !globals.visual.retro {
         // Shadow: offset by -1 phys unit
         render_string(
             btn.text, (text_x - 1.0, text_y - 1.0),
             char_w, char_h, char_sp, 0.0,
-            [0, 0, 0, 255], renderer, globals, rng,
+            [0.0, 0.0, 0.0, 255.0], renderer, globals, rng,
         );
     }
     render_string(
@@ -204,12 +204,12 @@ pub fn render_button_tooltip(
         render_string(
             btn.text_over, (tip_x - 1.0, tip_y - 1.0),
             tip_char_w, tip_char_h, tip_sp, 0.0,
-            [0, 0, 0, 255], renderer, globals, rng,
+            [0.0, 0.0, 0.0, 255.0], renderer, globals, rng,
         );
         render_string(
             btn.text_over, (tip_x, tip_y),
             tip_char_w, tip_char_h, tip_sp, 0.0,
-            [255, 255, 255, 255], renderer, globals, rng,
+            [255.0, 255.0, 255.0, 255.0], renderer, globals, rng,
         );
     }
 }
@@ -234,7 +234,7 @@ pub fn render_pause_title(
     let sh = globals.render.safe_phys_height;
 
     // Shadow (black, slightly offset)
-    let shadow_col = [0u8, 0, 0, 255];
+    let shadow_col: [f32; 4] = [0.0, 0.0, 0.0, 255.0];
 
     // Render title shadow first
     render_string(
@@ -283,7 +283,7 @@ pub fn render_pause_title(
         (4.0/24.0) * sh,
         (1.0/40.0) * sw,
         0.0,
-        [255, 255, 255, 255],
+        [255.0, 255.0, 255.0, 255.0],
         renderer,
         globals,
         rng,

@@ -109,7 +109,7 @@ fn displace_shape(
 fn render_char(
     encadrement: &[(f64, f64); 4],
     c: char,
-    color: [u8; 4],
+    color: [f32; 4],
     renderer: &mut Renderer2D,
     render_scale: f64,
 ) {
@@ -132,7 +132,7 @@ pub fn render_string(
     h_char: f64,
     l_space: f64,
     shake: f64,
-    color: [u8; 4],
+    color: [f32; 4],
     renderer: &mut Renderer2D,
     globals: &Globals,
     rng: &mut impl Rng,
@@ -173,7 +173,7 @@ pub fn render_string(
 fn render_bar(
     ratio: f64,
     quad: &[(f64, f64); 4],
-    color: [u8; 4],
+    color: [f32; 4],
     renderer: &mut Renderer2D,
     globals: &Globals,
 ) {
@@ -216,7 +216,7 @@ fn render_bar(
 fn draw_heart(
     pos0: (f64, f64),
     pos1: (f64, f64),
-    color: [u8; 4],
+    color: [f32; 4],
     renderer: &mut Renderer2D,
     render_scale: f64,
 ) {
@@ -252,7 +252,7 @@ fn draw_heart(
 }
 
 /// Render `n` hearts for the lives display. Matches OCaml `draw_n_hearts`.
-fn draw_n_hearts(n: i32, color: [u8; 4], renderer: &mut Renderer2D, globals: &Globals) {
+fn draw_n_hearts(n: i32, color: [f32; 4], renderer: &mut Renderer2D, globals: &Globals) {
     let sx = globals.render.safe_offset_x;
     let sy = globals.render.safe_offset_y;
     let sw = globals.render.safe_phys_width;
@@ -273,7 +273,7 @@ fn draw_n_hearts(n: i32, color: [u8; 4], renderer: &mut Renderer2D, globals: &Gl
 /// Draw a bar outline (quadrilateral frame) using draw_poly.
 fn draw_bar_frame(
     quad: &[(f64, f64); 4],
-    color: [u8; 4],
+    color: [f32; 4],
     line_width: f32,
     renderer: &mut Renderer2D,
     globals: &Globals,
@@ -298,7 +298,7 @@ pub fn render_scanlines(offset: i32, height: i32, renderer: &mut Renderer2D) {
     let width = renderer.width as i32;
     let mut y = offset;
     while y < height {
-        renderer.fill_rect(0, y, width, 1, [0, 0, 0, 255]);
+        renderer.fill_rect(0, y, width, 1, [0.0, 0.0, 0.0, 255.0]);
         y += SCANLINES_PERIOD;
     }
 }
@@ -316,15 +316,15 @@ pub fn render_hud(
     }
 
     // ----- Colors -----
-    let red   : [u8; 4] = [255,  32,  32, 255];
-    let orange: [u8; 4] = [255, 128,   0, 255];
-    let dark_red: [u8; 4] = [32, 0, 0, 255];
-    let cyan  : [u8; 4] = [  0, 192, 255, 255];
-    let dark_blue: [u8; 4] = [0, 0, 32, 255];
-    let yellow: [u8; 4] = [255, 220,  50, 255];
-    let dark_yellow: [u8; 4] = [32, 16, 0, 255];
-    let white : [u8; 4] = [255, 255, 255, 255];
-    let frame_color: [u8; 4] = [64, 64, 64, 255];
+    let red   : [f32; 4] = [255.0,  32.0,  32.0, 255.0];
+    let orange: [f32; 4] = [255.0, 128.0,   0.0, 255.0];
+    let dark_red: [f32; 4] = [32.0, 0.0, 0.0, 255.0];
+    let cyan  : [f32; 4] = [  0.0, 192.0, 255.0, 255.0];
+    let dark_blue: [f32; 4] = [0.0, 0.0, 32.0, 255.0];
+    let yellow: [f32; 4] = [255.0, 220.0,  50.0, 255.0];
+    let dark_yellow: [f32; 4] = [32.0, 16.0, 0.0, 255.0];
+    let white : [f32; 4] = [255.0, 255.0, 255.0, 255.0];
+    let frame_color: [f32; 4] = [64.0, 64.0, 64.0, 255.0];
     let frame_width: f32 = 10.0 * globals.render.render_scale as f32;
 
     // ----- Safe zone for HUD placement -----
@@ -396,12 +396,8 @@ pub fn render_hud(
     // ----- Score -----
     // Color: warm amber/orange, dimmed by shake_score
     let score_intensity = 1.0 / (1.0 + 10.0 * globals.screenshake.shake_score);
-    let score_col = rgb_of_hdr(
-        intensify(HdrColor::new(50000.0, 1000.0, 300.0), score_intensity),
-        &HdrColor::zero(),
-        &HdrColor::one(),
-        1.0,
-    );
+    let score_hdr = intensify(HdrColor::new(50000.0, 1000.0, 300.0), score_intensity);
+    let score_col: [f32; 4] = [score_hdr.r as f32, score_hdr.g as f32, score_hdr.b as f32, 255.0];
     let score_str = format!("SCORE {}", state.score);
     let shake = globals.screenshake.shake_score * 7.0;
     let base_l_char = (1.0 + 0.05 * globals.screenshake.shake_score) * 0.03 * sw;

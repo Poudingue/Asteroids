@@ -106,6 +106,8 @@ pub(crate) fn hdr(color: (f64, f64, f64)) -> HdrColor {
 }
 
 /// Convert an HDR color (already intensified) to renderer [u8; 4] RGBA
+/// NOTE: kept as reference, no longer called in the render path (GPU post-process handles tonemapping)
+#[allow(dead_code)]
 pub(crate) fn to_rgba(color: HdrColor, globals: &Globals) -> [u8; 4] {
     rgb_of_hdr(
         color,
@@ -113,6 +115,12 @@ pub(crate) fn to_rgba(color: HdrColor, globals: &Globals) -> [u8; 4] {
         &hdr(globals.exposure.mul_color),
         globals.exposure.game_exposure,
     )
+}
+
+/// Convert an HDR color to raw HDR [f32; 4] for GPU tonemapping.
+/// Colors are in 0-255 HDR range (may exceed 255). Alpha is always 255.
+pub(crate) fn to_hdr_rgba(color: HdrColor) -> [f32; 4] {
+    [color.r as f32, color.g as f32, color.b as f32, 255.0]
 }
 
 // ============================================================================
@@ -1031,12 +1039,11 @@ pub fn render_frame(
 
     // Background
     if globals.visual.retro {
-        renderer.fill_rect(0, 0, w, h, [0, 0, 0, 255]);
+        renderer.fill_rect(0, 0, w, h, [0.0, 0.0, 0.0, 255.0]);
     } else {
-        let bg_color = to_rgba(
-            intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure),
-            globals,
-        );
+        // Emit HDR value (exposure baked in); GPU post-process applies add_color/mul_color/redirect
+        let bg = intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure);
+        let bg_color = [bg.r as f32, bg.g as f32, bg.b as f32, 255.0];
         renderer.fill_rect(0, 0, w, h, bg_color);
     }
 
