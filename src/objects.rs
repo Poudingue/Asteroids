@@ -551,7 +551,7 @@ pub fn spawn_muzzle(projectile: &Entity, rng: &mut impl Rng) -> Entity {
     }
 }
 
-pub fn spawn_fire(ship: &Entity, rng: &mut impl Rng) -> Entity {
+pub fn spawn_fire(ship: &Entity, thrust_angle: f64, rng: &mut impl Rng) -> Entity {
     Entity {
         kind: EntityKind::Smoke,
         visuals: Visuals {
@@ -573,7 +573,7 @@ pub fn spawn_fire(ship: &Entity, rng: &mut impl Rng) -> Entity {
         phys_ratio: 0.0,
         position: add_vec(
             ship.position,
-            from_polar(ship.orientation + PI, ship.hitbox.int_radius),
+            from_polar(thrust_angle + PI, ship.hitbox.int_radius),
         ),
         velocity: {
             // Backward kick scales with ship speed so fire always ejects visually
@@ -584,7 +584,7 @@ pub fn spawn_fire(ship: &Entity, rng: &mut impl Rng) -> Entity {
             add_vec(
                 ship.velocity,
                 add_vec(
-                    from_polar(ship.orientation + PI, kick),
+                    from_polar(thrust_angle + PI, kick),
                     from_polar(
                         rng.gen::<f64>() * 2.0 * PI,
                         rng.gen::<f64>() * FIRE_MAX_RANDOM,

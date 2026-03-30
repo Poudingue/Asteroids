@@ -52,9 +52,10 @@ pub fn world_space_thrust_keyboard(
             scale_vec(normalized, SHIP_MAX_ACCEL),
             globals,
         );
-        // Engine fire while thrusting
+        // Engine fire while thrusting — ejects opposite to thrust direction
         if state.ship.health > 0.0 && globals.visual.smoke_enabled {
-            let fire = spawn_fire(&state.ship, &mut state.rng);
+            let thrust_angle = normalized.y.atan2(normalized.x);
+            let fire = spawn_fire(&state.ship, thrust_angle, &mut state.rng);
             state.smoke.push(fire);
         }
     }
@@ -248,9 +249,10 @@ pub fn world_space_thrust_stick(state: &mut GameState, globals: &Globals, stick:
             scale_vec(direction, SHIP_MAX_ACCEL * clamped_mag),
             globals,
         );
-        // Engine fire while thrusting via stick
+        // Engine fire while thrusting via stick — ejects opposite to thrust direction
         if state.ship.health > 0.0 && globals.visual.smoke_enabled {
-            let fire = spawn_fire(&state.ship, &mut state.rng);
+            let thrust_angle = direction.y.atan2(direction.x);
+            let fire = spawn_fire(&state.ship, thrust_angle, &mut state.rng);
             state.smoke.push(fire);
         }
     }
