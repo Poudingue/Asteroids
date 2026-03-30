@@ -995,10 +995,13 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
 
     // === Explosion damage to asteroids ===
     // Explosions are one-frame entities; we do a simple O(n*m) check here.
+    // Scale damage by dt*60 so total damage per second is framerate-independent
+    // (baseline: 60fps → scale=1.0; 120fps → scale=0.5 per frame but 2× frames = same total).
+    let explo_dt_scale = globals.dt() * 60.0;
     for explo in &state.explosions {
         let explo_pos = explo.position;
         let explo_rad = explo.hitbox.ext_radius;
-        let explo_mass = explo.mass;
+        let explo_mass = explo.mass * explo_dt_scale;
         for obj in state
             .objects
             .iter_mut()
