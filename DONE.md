@@ -1,5 +1,17 @@
 # Asteroids Rust Port - Completed Items
 
+## Gamepad + World-Space Controls (2026-03-29)
+
+- [x] Task 1: Remove ShipControlConfig and old rotation/strafe controls (completed: 2026-03-29)
+- [x] Task 2: World-space WASD movement + left-click fires (completed: 2026-03-29)
+- [x] Task 3: GamepadState struct and gamepad/teleport constants (completed: 2026-03-29)
+- [x] Task 4: Dead zone processing, stick thrust, aim, drift compensation (completed: 2026-03-29)
+- [x] Task 5: SDL2 GameController integration (completed: 2026-03-29)
+- [x] Task 6: Visual aim smoothing for ship rotation (completed: 2026-03-29)
+- [x] Task 7: Cone-based teleport targeting with asteroid destruction (completed: 2026-03-29)
+- [x] Task 8: Final cleanup — clippy fixes, cargo fmt, comments (completed: 2026-03-29)
+- [x] Player-facing game manual (MANUAL.md) for V2 controls (completed: 2026-03-30)
+
 ## V2 Phase 1 - Rendering Pipeline Overhaul (2026-03-28)
 
 - [x] Phase 1 Task 10: Particle budgets with graceful degradation (completed: 2026-03-28)
