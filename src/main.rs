@@ -51,6 +51,12 @@ fn main() {
         SimulationMode::RealTime
     };
 
+    // Headless mode: skip all SDL2/wgpu init, run scenario directly
+    if !simulation_mode.needs_window() {
+        run_headless(&cli);
+        return;
+    }
+
     // SDL2 init
     let sdl_context = sdl2::init().expect("Failed to init SDL2");
     let video_subsystem = sdl_context.video().expect("Failed to init video");
@@ -483,4 +489,47 @@ fn main() {
     }
 
     println!("Bye bye!");
+}
+
+fn run_headless(cli: &Cli) {
+    let scenario_path = cli
+        .scenario
+        .as_ref()
+        .expect("Headless mode requires --scenario");
+
+    let scenario =
+        asteroids::scenario::Scenario::load(scenario_path).expect("Failed to load scenario");
+
+    println!(
+        "Running headless: {} ({} frames at {} fps)",
+        scenario.def.name, scenario.def.run_until, scenario.def.target_fps
+    );
+
+    let start = std::time::Instant::now();
+    let result = scenario.run();
+    let elapsed = start.elapsed();
+
+    println!(
+        "Completed in {:.2}s ({:.0} sim-fps)",
+        elapsed.as_secs_f64(),
+        scenario.def.run_until as f64 / elapsed.as_secs_f64()
+    );
+
+    if result.assertion_failures.is_empty() {
+        println!("All assertions passed.");
+    } else {
+        eprintln!("Assertion failures:");
+        for failure in &result.assertion_failures {
+            eprintln!("  - {}", failure);
+        }
+        std::process::exit(1);
+    }
+
+    // Write snapshots to disk
+    for snapshot in &result.snapshots {
+        let path = format!("{}.snapshot.{}", scenario_path, snapshot.frame);
+        std::fs::write(&path, &snapshot.data)
+            .unwrap_or_else(|e| eprintln!("Failed to write snapshot: {}", e));
+        println!("Snapshot written: {}", path);
+    }
 }
