@@ -417,12 +417,49 @@ pub const FLASHES_HALF_LIFE: f64 = 0.01;
 // ============================================================================
 
 /// Time, speed, and game flow control.
+/// Simulation time stepping mode.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SimulationMode {
+    /// Variable dt from wall clock, capped at MAX_DT. Default gameplay mode.
+    RealTime,
+    /// Fixed dt = 1/target_fps. Sleeps if frame is faster. Playable + deterministic.
+    FixedInteractive(u32),
+    /// Fixed dt = 1/target_fps. No sleeping — runs as fast as possible.
+    FixedFullSpeed(u32),
+    /// Fixed dt, no window, no renderer. Pure simulation.
+    Headless(u32),
+}
+
+impl SimulationMode {
+    /// Returns the fixed dt if in a fixed mode, None for RealTime.
+    pub fn fixed_dt(&self) -> Option<f64> {
+        match self {
+            SimulationMode::RealTime => None,
+            SimulationMode::FixedInteractive(fps)
+            | SimulationMode::FixedFullSpeed(fps)
+            | SimulationMode::Headless(fps) => Some(1.0 / *fps as f64),
+        }
+    }
+
+    /// Whether this mode requires a window and renderer.
+    pub fn needs_window(&self) -> bool {
+        !matches!(self, SimulationMode::Headless(_))
+    }
+
+    /// Whether this mode should sleep to maintain target framerate.
+    pub fn should_sleep(&self) -> bool {
+        matches!(self, SimulationMode::FixedInteractive(_))
+    }
+}
+
 pub struct TimeConfig {
+    pub simulation_mode: SimulationMode,
     pub game_speed: f64,
     pub game_speed_target: f64,
     pub time_last_frame: f64,
     pub time_current_frame: f64,
     pub time_of_death: f64,
+    pub frame_count: u64,
     pub pause: bool,
     pub restart: bool,
     pub quit: bool,
@@ -540,11 +577,13 @@ impl Globals {
 
         Self {
             time: TimeConfig {
+                simulation_mode: SimulationMode::RealTime,
                 game_speed: 1.0,
                 game_speed_target: 1.0,
                 time_last_frame: 0.0,
                 time_current_frame: 0.0,
                 time_of_death: 0.0,
+                frame_count: 0,
                 pause: false,
                 restart: false,
                 quit: false,

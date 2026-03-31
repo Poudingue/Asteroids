@@ -113,13 +113,22 @@ fn main() {
     while running {
         let frame_start = Instant::now();
 
-        // Update time, capping dt to MAX_DT to prevent physics explosions on
-        // frame stalls (alt-tab, window drag, etc.). This is equivalent to a
-        // 20fps floor: physics never sees more than 50ms per frame.
+        // Update time
         globals.time.time_last_frame = globals.time.time_current_frame;
-        let raw_elapsed = start_time.elapsed().as_secs_f64();
-        globals.time.time_current_frame =
-            globals.time.time_last_frame + (raw_elapsed - globals.time.time_last_frame).min(MAX_DT);
+        match globals.time.simulation_mode.fixed_dt() {
+            Some(dt) => {
+                // Fixed-dt mode: advance by exactly 1/target_fps
+                globals.time.time_current_frame += dt;
+            }
+            None => {
+                // RealTime mode: wall-clock dt, capped at MAX_DT to prevent
+                // physics explosions on frame stalls (alt-tab, window drag).
+                let raw_elapsed = start_time.elapsed().as_secs_f64();
+                globals.time.time_current_frame = globals.time.time_last_frame
+                    + (raw_elapsed - globals.time.time_last_frame).min(MAX_DT);
+            }
+        }
+        globals.time.frame_count += 1;
 
         // Snapshot mouse position and button state before poll_iter
         let (mouse_x_snap, mouse_y_snap, mouse_left_snap) = {
@@ -413,6 +422,16 @@ fn main() {
         renderer.end_frame(&device, &queue, &view, [0.0, 0.0, 0.0, 1.0]);
         globals.framerate.frame_compute_secs = frame_start.elapsed().as_secs_f64();
         output.present();
+
+        // Frame pacing for FixedInteractive mode
+        if globals.time.simulation_mode.should_sleep() {
+            if let Some(target_dt) = globals.time.simulation_mode.fixed_dt() {
+                let elapsed = frame_start.elapsed().as_secs_f64();
+                if elapsed < target_dt {
+                    std::thread::sleep(std::time::Duration::from_secs_f64(target_dt - elapsed));
+                }
+            }
+        }
     }
 
     println!("Bye bye!");
