@@ -8,5 +8,6 @@ pub mod objects;
 pub mod parameters;
 pub mod pause_menu;
 pub mod physics;
+pub mod recording;
 pub mod rendering;
 pub mod scenario;

@@ -164,6 +164,11 @@ fn main() {
         }
     }
 
+    // Input recording (when --record is passed)
+    let mut recorder = cli.record.as_ref().map(|_| {
+        recording::InputRecorder::new(cli.seed, cli.fps)
+    });
+
     while running {
         let frame_start = Instant::now();
 
@@ -422,6 +427,31 @@ fn main() {
                 );
             }
 
+            // Capture input frame for recording
+            if let Some(ref mut rec) = recorder {
+                let mut frame = recording::InputFrame::new();
+                if keyboard.is_scancode_pressed(Scancode::W) {
+                    frame.set_button(recording::BTN_MOVE_W);
+                }
+                if keyboard.is_scancode_pressed(Scancode::A) {
+                    frame.set_button(recording::BTN_MOVE_A);
+                }
+                if keyboard.is_scancode_pressed(Scancode::S) {
+                    frame.set_button(recording::BTN_MOVE_S);
+                }
+                if keyboard.is_scancode_pressed(Scancode::D) {
+                    frame.set_button(recording::BTN_MOVE_D);
+                }
+                if mouse_left_snap {
+                    frame.set_button(recording::BTN_FIRE);
+                }
+                frame.left_stick_x = state.gamepad.left_stick_raw.x as f32;
+                frame.left_stick_y = state.gamepad.left_stick_raw.y as f32;
+                frame.right_stick_x = state.gamepad.right_stick_raw.x as f32;
+                frame.right_stick_y = state.gamepad.right_stick_raw.y as f32;
+                rec.push_frame(frame);
+            }
+
             // Update game state (physics, wrapping, asteroids, etc.)
             game::update_game(&mut state, &mut globals);
         }
@@ -485,6 +515,17 @@ fn main() {
                     std::thread::sleep(std::time::Duration::from_secs_f64(target_dt - elapsed));
                 }
             }
+        }
+    }
+
+    // Save recording if active
+    if let Some(rec) = recorder {
+        if let Some(path) = &cli.record {
+            rec.save(path).expect("Failed to save recording");
+            println!(
+                "Recording saved: {} ({} frames)",
+                path, rec.header.frame_count
+            );
         }
     }
 
