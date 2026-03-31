@@ -3,7 +3,7 @@
 /// Provides arithmetic operators, geometric helpers, and conversions.
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
 pub struct Vec2 {
     pub x: f64,
     pub y: f64,

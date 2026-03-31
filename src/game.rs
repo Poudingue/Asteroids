@@ -20,6 +20,7 @@ use crate::rendering::Renderer2D;
 // ============================================================================
 
 /// Runtime state for gamepad input processing.
+#[derive(serde::Serialize)]
 pub struct GamepadState {
     /// Whether a gamepad is currently connected
     pub connected: bool,
@@ -67,6 +68,7 @@ impl Default for GamepadState {
 // GameState
 // ============================================================================
 
+#[derive(serde::Serialize)]
 pub struct GameState {
     pub score: i32,
     pub lives: i32,
@@ -92,8 +94,10 @@ pub struct GameState {
     pub smoke_oos: Vec<Entity>,
     pub sparks: Vec<Entity>,
     pub stars: Vec<Star>,
+    #[serde(skip)]
     pub rng: SmallRng,
     /// Pause menu interactive buttons.
+    #[serde(skip)]
     pub buttons: Vec<ButtonBoolean>,
     /// Left mouse button state — used for rising-edge click detection.
     pub mouse_button_down: bool,

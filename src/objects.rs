@@ -9,7 +9,7 @@ use std::f64::consts::PI;
 // Types
 // ============================================================================
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub enum EntityKind {
     Asteroid,
     /// Chunk particle ejected by explosion (distinct from asteroid, no collision)
@@ -23,24 +23,24 @@ pub enum EntityKind {
     Machinegun,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Polygon(pub Vec<(f64, f64)>);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Hitbox {
     pub ext_radius: f64,
     pub int_radius: f64,
     pub points: Polygon,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Visuals {
     pub color: (f64, f64, f64), // (r, v, b) tuple for now
     pub radius: f64,
     pub shapes: Vec<((f64, f64, f64), Polygon)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Entity {
     pub kind: EntityKind,
     pub hitbox: Hitbox,
@@ -60,7 +60,7 @@ pub struct Entity {
     pub hdr_exposure: f64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Star {
     pub last_pos: Vec2,
     pub pos: Vec2,

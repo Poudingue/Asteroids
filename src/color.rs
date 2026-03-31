@@ -1,6 +1,6 @@
 /// HDR Color type with no arbitrary limits on brightness
 /// Negative values are accepted and represent black
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize)]
 pub struct HdrColor {
     pub r: f64,
     pub g: f64,
