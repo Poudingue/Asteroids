@@ -387,6 +387,109 @@ fn check_assertion(state: &GameState, check: &AssertionCheck, frame: u64) -> Opt
     }
 }
 
+// ============================================================================
+// Builder API (for programmatic scenario creation in tests)
+// ============================================================================
+
+/// Builder for creating scenarios programmatically.
+pub struct ScenarioBuilder {
+    def: ScenarioDef,
+}
+
+impl ScenarioBuilder {
+    pub fn new() -> Self {
+        Self {
+            def: ScenarioDef {
+                name: "programmatic".to_string(),
+                seed: 42,
+                target_fps: 60,
+                mode: ScenarioMode::Headless,
+                setup: Vec::new(),
+                actions: Vec::new(),
+                run_until: 60,
+                input_file: None,
+                snapshots_at: Vec::new(),
+                trajectory_interval: 0,
+                assertions: Vec::new(),
+            },
+        }
+    }
+
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.def.seed = seed;
+        self
+    }
+
+    pub fn fps(mut self, fps: u32) -> Self {
+        self.def.target_fps = fps;
+        self
+    }
+
+    pub fn spawn_asteroid(mut self, pos: (f64, f64), radius: f64) -> Self {
+        self.def.setup.push(SetupAction::SpawnAsteroid {
+            pos,
+            radius,
+            velocity: (0.0, 0.0),
+        });
+        self
+    }
+
+    pub fn spawn_asteroid_with_velocity(
+        mut self,
+        pos: (f64, f64),
+        radius: f64,
+        vel: (f64, f64),
+    ) -> Self {
+        self.def.setup.push(SetupAction::SpawnAsteroid {
+            pos,
+            radius,
+            velocity: vel,
+        });
+        self
+    }
+
+    pub fn ship_at(mut self, x: f64, y: f64) -> Self {
+        self.def.setup.push(SetupAction::SetShipPosition(x, y));
+        self
+    }
+
+    pub fn at_frame(mut self, frame: u64, action: Action) -> Self {
+        self.def.actions.push(TimedAction { frame, action });
+        self
+    }
+
+    pub fn snapshot_at(mut self, frame: u64) -> Self {
+        self.def.snapshots_at.push(frame);
+        self
+    }
+
+    pub fn run_until(mut self, frame: u64) -> Self {
+        self.def.run_until = frame;
+        self
+    }
+
+    pub fn build(self) -> Scenario {
+        Scenario { def: self.def }
+    }
+
+    /// Build and run immediately, returning results.
+    pub fn run(self) -> ScenarioResult {
+        self.build().run()
+    }
+}
+
+impl Default for ScenarioBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Scenario {
+    pub fn builder() -> ScenarioBuilder {
+        ScenarioBuilder::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
