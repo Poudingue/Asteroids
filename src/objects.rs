@@ -30,6 +30,7 @@ pub struct Polygon(pub Vec<(f64, f64)>);
 pub struct Hitbox {
     pub ext_radius: f64,
     pub int_radius: f64,
+    pub avg_radius: f64,
     pub points: Polygon,
 }
 
@@ -154,6 +155,7 @@ pub fn spawn_ship() -> Entity {
         hitbox: Hitbox {
             ext_radius: 3.0 * SHIP_RADIUS,
             int_radius: SHIP_RADIUS,
+            avg_radius: (3.0 * SHIP_RADIUS + SHIP_RADIUS) / 2.0,
             points: Polygon(vec![
                 (0.0, 3.0 * SHIP_RADIUS),
                 (3.0 * PI / 4.0, 2.0 * SHIP_RADIUS),
@@ -188,6 +190,7 @@ pub fn spawn_projectile(position: Vec2, velocity: Vec2, proper_time: f64) -> Ent
         hitbox: Hitbox {
             int_radius: PROJECTILE_RADIUS_HITBOX,
             ext_radius: PROJECTILE_RADIUS_HITBOX,
+            avg_radius: PROJECTILE_RADIUS_HITBOX,
             points: Polygon(vec![]),
         },
         mass: 10000.0,
@@ -254,6 +257,7 @@ pub fn spawn_explosion_chunk(
         hitbox: Hitbox {
             int_radius: 0.0,
             ext_radius: 0.0,
+            avg_radius: 0.0,
             points: Polygon(vec![]),
         },
         mass: 100.0,
@@ -309,6 +313,7 @@ pub fn spawn_explosion(projectile: &Entity, rng: &mut impl Rng) -> Entity {
         hitbox: Hitbox {
             int_radius: rad,
             ext_radius: rad,
+            avg_radius: rad,
             points: Polygon(vec![]),
         },
         mass: EXPLOSION_DAMAGES_PROJECTILE,
@@ -390,6 +395,7 @@ pub fn spawn_explosion_object(
         hitbox: Hitbox {
             int_radius: rad,
             ext_radius: rad,
+            avg_radius: rad,
             points: Polygon(vec![]),
         },
         mass: EXPLOSION_DAMAGES_OBJET,
@@ -427,6 +433,7 @@ pub fn spawn_explosion_death(ship: &Entity, elapsed_time: f64, rng: &mut impl Rn
         hitbox: Hitbox {
             int_radius: rad,
             ext_radius: rad,
+            avg_radius: rad,
             points: Polygon(vec![]),
         },
         mass: EXPLOSION_DAMAGES_DEATH * elapsed_time,
@@ -489,6 +496,7 @@ pub fn spawn_chunk_explosion(
         hitbox: Hitbox {
             int_radius: rad,
             ext_radius: rad,
+            avg_radius: rad,
             points: Polygon(vec![]),
         },
         mass: EXPLOSION_DAMAGES_CHUNK,
@@ -533,6 +541,7 @@ pub fn spawn_muzzle(projectile: &Entity, rng: &mut impl Rng) -> Entity {
         hitbox: Hitbox {
             int_radius: 0.0,
             ext_radius: 0.0,
+            avg_radius: 0.0,
             points: Polygon(vec![]),
         },
         mass: 0.0,
@@ -562,6 +571,7 @@ pub fn spawn_fire(ship: &Entity, thrust_angle: f64, rng: &mut impl Rng) -> Entit
         hitbox: Hitbox {
             int_radius: 0.0,
             ext_radius: 0.0,
+            avg_radius: 0.0,
             points: Polygon(vec![]),
         },
         mass: 0.0,
@@ -631,6 +641,7 @@ pub fn spawn_asteroid(pos: Vec2, vel: Vec2, radius: f64, rng: &mut impl Rng) -> 
         hitbox: Hitbox {
             int_radius: radius,
             ext_radius: radius * ASTEROID_POLYGON_MAX,
+            avg_radius: radius * (1.0 + ASTEROID_POLYGON_MAX) / 2.0,
             points: shape,
         },
         mass: PI * squared(radius) * ASTEROID_DENSITY,

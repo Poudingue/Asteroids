@@ -19,6 +19,7 @@ fn entity_with_health(health: f64) -> Entity {
         hitbox: Hitbox {
             ext_radius: 100.0,
             int_radius: 100.0,
+            avg_radius: 100.0,
             points: Polygon(vec![]),
         },
         visuals: Visuals {
