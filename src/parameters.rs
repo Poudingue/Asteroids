@@ -304,6 +304,11 @@ pub const EXPLOSION_SATURATE: f64 = 10.0;
 pub const EXPLOSION_MIN_EXPOSURE_HERITATE: f64 = 2.0;
 pub const EXPLOSION_MAX_EXPOSURE_HERITATE: f64 = 6.0;
 
+/// Scaling factor for shockwave velocity impulse. Higher = stronger push.
+pub const SHOCKWAVE_IMPULSE_SCALE: f64 = 0.5;
+/// Blast range as a multiplier of explosion ext_radius.
+pub const SHOCKWAVE_RANGE_MULTIPLIER: f64 = 1.5;
+
 // ============================================================================
 // Constants (Muzzle Flash Parameters)
 // ============================================================================

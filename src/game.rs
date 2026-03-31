@@ -1066,6 +1066,42 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         }
     }
 
+    // === Explosion shockwave push ===
+    // One-shot velocity impulse: no dt scaling needed (explosions are one-frame).
+    // Linear falloff within SHOCKWAVE_RANGE_MULTIPLIER × blast radius.
+    for explo in &state.explosions {
+        let explo_pos = explo.position;
+        let blast_range = explo.hitbox.ext_radius * SHOCKWAVE_RANGE_MULTIPLIER;
+        if blast_range < 1e-6 {
+            continue;
+        }
+        let explo_impulse = explo.mass * SHOCKWAVE_IMPULSE_SCALE;
+
+        for obj in state
+            .objects
+            .iter_mut()
+            .chain(state.objects_oos.iter_mut())
+            .chain(state.toosmall.iter_mut())
+            .chain(state.toosmall_oos.iter_mut())
+            .chain(state.chunks.iter_mut())
+            .chain(state.chunks_oos.iter_mut())
+        {
+            let diff = obj.position - explo_pos;
+            let center_dist = diff.length();
+            if center_dist < 1e-6 {
+                continue; // Avoid NaN from normalization
+            }
+            let effective_dist = (center_dist - obj.hitbox.avg_radius).max(0.0);
+            if effective_dist >= blast_range {
+                continue;
+            }
+            let strength = 1.0 - (effective_dist / blast_range);
+            let impulse = explo_impulse * strength / obj.mass;
+            let direction = diff * (1.0 / center_dist);
+            obj.velocity += direction * impulse;
+        }
+    }
+
     // === Projectile damage to asteroids + self-kill on hit ===
     for proj in state.projectiles.iter_mut() {
         let proj_pos = proj.position;
