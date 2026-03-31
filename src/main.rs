@@ -139,6 +139,20 @@ fn main() {
     } else {
         game::GameState::new(&globals)
     };
+    // Load scenario if provided (windowed mode)
+    let scenario_def = cli.scenario.as_ref().map(|path| {
+        let def = asteroids::scenario::ScenarioDef::load(path).expect("Failed to load scenario");
+        println!("Loaded scenario: {} ({} frames)", def.name, def.run_until);
+        def
+    });
+
+    // Apply setup actions if scenario loaded
+    if let Some(ref def) = scenario_def {
+        for action in &def.setup {
+            asteroids::scenario::apply_setup_action(&mut state, action);
+        }
+    }
+
     let start_time = Instant::now();
 
     // Event loop
@@ -163,6 +177,9 @@ fn main() {
             }
         }
     }
+
+    // Scenario action tracking for windowed mode
+    let mut scenario_action_idx: usize = 0;
 
     // Input recording (when --record is passed)
     let mut recorder = cli.record.as_ref().map(|_| {
@@ -450,6 +467,36 @@ fn main() {
                 frame.right_stick_x = state.gamepad.right_stick_raw.x as f32;
                 frame.right_stick_y = state.gamepad.right_stick_raw.y as f32;
                 rec.push_frame(frame);
+            }
+
+            // Apply scenario actions for this frame (windowed mode)
+            if let Some(ref def) = scenario_def {
+                while scenario_action_idx < def.actions.len()
+                    && def.actions[scenario_action_idx].frame == globals.time.frame_count
+                {
+                    use asteroids::scenario::Action;
+                    match &def.actions[scenario_action_idx].action {
+                        Action::AimAt(angle) => state.ship.orientation = *angle,
+                        Action::Fire => input::fire(&mut state, &mut globals),
+                        Action::MoveDirection(x, y) => {
+                            let keys = [*y > 0.5, *x < -0.5, *y < -0.5, *x > 0.5];
+                            input::world_space_thrust_keyboard(&mut state, &globals, keys);
+                        }
+                        Action::Teleport => input::teleport(&mut state, &mut globals),
+                        Action::StopMoving => {}
+                        Action::LeftStick(x, y) => {
+                            let stick = math::Vec2::new(*x, *y);
+                            input::world_space_thrust_stick(&mut state, &globals, stick);
+                        }
+                        Action::RightStick(_, _) => {}
+                    }
+                    scenario_action_idx += 1;
+                }
+
+                // Auto-quit when scenario ends
+                if globals.time.frame_count >= def.run_until {
+                    running = false;
+                }
             }
 
             // Update game state (physics, wrapping, asteroids, etc.)
