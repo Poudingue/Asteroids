@@ -1,4 +1,6 @@
 use rand::prelude::*;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 
 use crate::color::*;
 use crate::math_utils::*;
@@ -90,7 +92,7 @@ pub struct GameState {
     pub smoke_oos: Vec<Entity>,
     pub sparks: Vec<Entity>,
     pub stars: Vec<Star>,
-    pub rng: ThreadRng,
+    pub rng: SmallRng,
     /// Pause menu interactive buttons.
     pub buttons: Vec<ButtonBoolean>,
     /// Left mouse button state — used for rising-edge click detection.
@@ -103,7 +105,53 @@ use crate::pause_menu::ButtonBoolean;
 
 impl GameState {
     pub fn new(globals: &Globals) -> Self {
-        let mut rng = thread_rng();
+        let mut rng = SmallRng::from_entropy();
+        let mut ship = spawn_ship();
+        ship.position = Vec2::new(
+            globals.render.phys_width / 2.0,
+            globals.render.phys_height / 2.0,
+        );
+
+        Self {
+            score: 0,
+            lives: SHIP_MAX_LIVES,
+            stage: 0,
+            cooldown: 0.0,
+            cooldown_tp: 0.0,
+            last_health: SHIP_MAX_HEALTH,
+            is_dead: false,
+            time_of_death: 0.0,
+            ship,
+            objects: Vec::new(),
+            objects_oos: Vec::new(),
+            toosmall: Vec::new(),
+            toosmall_oos: Vec::new(),
+            fragments: Vec::new(),
+            chunks: Vec::new(),
+            chunks_oos: Vec::new(),
+            chunks_explo: Vec::new(),
+            projectiles: Vec::new(),
+            explosions: Vec::new(),
+            smoke: Vec::new(),
+            smoke_oos: Vec::new(),
+            sparks: Vec::new(),
+            stars: spawn_stars(
+                globals.spawn.stars_nb,
+                globals.render.phys_width,
+                globals.render.phys_height,
+                &mut rng,
+            ),
+            rng,
+            buttons: crate::pause_menu::make_buttons(globals),
+            mouse_button_down: false,
+            gamepad: GamepadState::new(),
+        }
+    }
+
+    /// Create a new GameState with a fixed seed for deterministic simulation.
+    #[allow(dead_code)]
+    pub fn new_with_seed(globals: &Globals, seed: u64) -> Self {
+        let mut rng = SmallRng::seed_from_u64(seed);
         let mut ship = spawn_ship();
         ship.position = Vec2::new(
             globals.render.phys_width / 2.0,

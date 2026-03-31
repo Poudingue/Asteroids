@@ -1,9 +1,8 @@
-use rand::prelude::*;
+use rand::Rng;
 
 use crate::parameters::{GlobalToggle, Globals};
 use crate::rendering::hud::render_string;
 use crate::rendering::Renderer2D;
-use rand::rngs::ThreadRng;
 
 // ============================================================================
 // Pause menu button system
@@ -298,7 +297,7 @@ pub fn render_pause_title(
     buttons: &mut [ButtonBoolean],
     globals: &mut Globals,
     renderer: &mut Renderer2D,
-    rng: &mut ThreadRng,
+    rng: &mut impl Rng,
     mouse_sx: f64,
     mouse_sy: f64,
     mouse_down: bool,
