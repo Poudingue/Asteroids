@@ -1,0 +1,24 @@
+ScenarioDef(
+    name: "basic_test",
+    seed: 42,
+    target_fps: 60,
+    mode: FullSpeed,
+    setup: [
+        SpawnAsteroid(pos: (500.0, 300.0), radius: 80.0, velocity: (10.0, -5.0)),
+        SpawnAsteroid(pos: (600.0, 350.0), radius: 60.0, velocity: (0.0, 0.0)),
+        SetShipPosition(400.0, 300.0),
+    ],
+    actions: [
+        (frame: 30, action: AimAt(0.52)),
+        (frame: 60, action: Fire),
+        (frame: 90, action: MoveDirection(1.0, 0.0)),
+        (frame: 120, action: Teleport),
+        (frame: 120, action: StopMoving),
+    ],
+    run_until: 300,
+    snapshots_at: [60, 120, 180, 300],
+    trajectory_interval: 10,
+    assertions: [
+        (frame: 300, check: ShipAlive),
+    ],
+)

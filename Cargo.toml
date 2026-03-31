@@ -12,3 +12,4 @@ bytemuck = { version = "1", features = ["derive"] }
 rand = { version = "0.8", features = ["small_rng"] }
 serde = { version = "1", features = ["derive"] }
 clap = { version = "4", features = ["derive"] }
+ron = "0.8"
