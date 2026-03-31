@@ -2,8 +2,7 @@ use asteroids::scenario::{Action, Scenario};
 
 #[test]
 fn test_determinism_file_based() {
-    let scenario =
-        Scenario::load("scenarios/test_basic.ron").expect("Failed to load scenario");
+    let scenario = Scenario::load("scenarios/test_basic.ron").expect("Failed to load scenario");
     let result_a = scenario.run();
     let result_b = scenario.run();
 
@@ -65,11 +64,7 @@ fn test_different_seeds_diverge() {
 
 #[test]
 fn test_assertions_pass() {
-    let result = Scenario::builder()
-        .seed(42)
-        .fps(60)
-        .run_until(60)
-        .run();
+    let result = Scenario::builder().seed(42).fps(60).run_until(60).run();
 
     assert!(result.assertion_failures.is_empty());
     assert!(result.final_state.ship.health > 0.0);

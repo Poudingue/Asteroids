@@ -182,9 +182,10 @@ fn main() {
     let mut scenario_action_idx: usize = 0;
 
     // Input recording (when --record is passed)
-    let mut recorder = cli.record.as_ref().map(|_| {
-        recording::InputRecorder::new(cli.seed, cli.fps)
-    });
+    let mut recorder = cli
+        .record
+        .as_ref()
+        .map(|_| recording::InputRecorder::new(cli.seed, cli.fps));
 
     while running {
         let frame_start = Instant::now();

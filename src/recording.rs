@@ -82,12 +82,12 @@ impl InputRecorder {
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), String> {
         let file = std::fs::File::create(path.as_ref())
             .map_err(|e| format!("Failed to create recording file: {}", e))?;
-        let mut encoder =
-            zstd::Encoder::new(file, 3).map_err(|e| format!("Failed to create zstd encoder: {}", e))?;
+        let mut encoder = zstd::Encoder::new(file, 3)
+            .map_err(|e| format!("Failed to create zstd encoder: {}", e))?;
 
         // Write header
-        let header_bytes =
-            bincode::serialize(&self.header).map_err(|e| format!("Failed to serialize header: {}", e))?;
+        let header_bytes = bincode::serialize(&self.header)
+            .map_err(|e| format!("Failed to serialize header: {}", e))?;
         let header_len = header_bytes.len() as u32;
         encoder
             .write_all(&header_len.to_le_bytes())
@@ -97,8 +97,8 @@ impl InputRecorder {
             .map_err(|e| format!("Write error: {}", e))?;
 
         // Write frames
-        let frames_bytes =
-            bincode::serialize(&self.frames).map_err(|e| format!("Failed to serialize frames: {}", e))?;
+        let frames_bytes = bincode::serialize(&self.frames)
+            .map_err(|e| format!("Failed to serialize frames: {}", e))?;
         encoder
             .write_all(&frames_bytes)
             .map_err(|e| format!("Write error: {}", e))?;
@@ -121,8 +121,8 @@ impl InputPlayback {
     pub fn load(path: impl AsRef<Path>) -> Result<Self, String> {
         let file = std::fs::File::open(path.as_ref())
             .map_err(|e| format!("Failed to open recording file: {}", e))?;
-        let mut decoder =
-            zstd::Decoder::new(file).map_err(|e| format!("Failed to create zstd decoder: {}", e))?;
+        let mut decoder = zstd::Decoder::new(file)
+            .map_err(|e| format!("Failed to create zstd decoder: {}", e))?;
 
         // Read header
         let mut len_buf = [0u8; 4];
@@ -134,16 +134,16 @@ impl InputPlayback {
         decoder
             .read_exact(&mut header_buf)
             .map_err(|e| format!("Read error: {}", e))?;
-        let header: RecordingHeader =
-            bincode::deserialize(&header_buf).map_err(|e| format!("Failed to deserialize header: {}", e))?;
+        let header: RecordingHeader = bincode::deserialize(&header_buf)
+            .map_err(|e| format!("Failed to deserialize header: {}", e))?;
 
         // Read frames
         let mut frames_buf = Vec::new();
         decoder
             .read_to_end(&mut frames_buf)
             .map_err(|e| format!("Read error: {}", e))?;
-        let frames: Vec<InputFrame> =
-            bincode::deserialize(&frames_buf).map_err(|e| format!("Failed to deserialize frames: {}", e))?;
+        let frames: Vec<InputFrame> = bincode::deserialize(&frames_buf)
+            .map_err(|e| format!("Failed to deserialize frames: {}", e))?;
 
         Ok(Self { header, frames })
     }

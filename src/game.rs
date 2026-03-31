@@ -153,7 +153,6 @@ impl GameState {
     }
 
     /// Create a new GameState with a fixed seed for deterministic simulation.
-    #[allow(dead_code)]
     pub fn new_with_seed(globals: &Globals, seed: u64) -> Self {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut ship = spawn_ship();
