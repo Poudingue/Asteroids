@@ -2,12 +2,55 @@ use asteroids::*;
 
 use std::time::Instant;
 
-use parameters::{Globals, MAX_DT};
+use clap::Parser;
+use parameters::{Globals, SimulationMode, MAX_DT};
 use rendering::Renderer2D;
 use sdl2::controller::{Axis, Button};
 use sdl2::keyboard::Scancode;
 
+/// Asteroids — a space shooter with deterministic simulation support
+#[derive(Parser, Debug)]
+#[command(name = "asteroids")]
+struct Cli {
+    /// Path to a scenario file (.ron)
+    #[arg(long)]
+    scenario: Option<String>,
+
+    /// Run headless (no window, no GPU)
+    #[arg(long)]
+    headless: bool,
+
+    /// Run at full speed (no frame pacing)
+    #[arg(long)]
+    full_speed: bool,
+
+    /// Record input to file
+    #[arg(long)]
+    record: Option<String>,
+
+    /// RNG seed for deterministic mode
+    #[arg(long, default_value_t = 42)]
+    seed: u64,
+
+    /// Target FPS for fixed-dt modes
+    #[arg(long, default_value_t = 60)]
+    fps: u32,
+}
+
 fn main() {
+    let cli = Cli::parse();
+
+    // Determine simulation mode
+    let simulation_mode = if cli.headless {
+        SimulationMode::Headless(cli.fps)
+    } else if cli.full_speed {
+        SimulationMode::FixedFullSpeed(cli.fps)
+    } else if cli.scenario.is_some() {
+        SimulationMode::FixedInteractive(cli.fps)
+    } else {
+        SimulationMode::RealTime
+    };
+
     // SDL2 init
     let sdl_context = sdl2::init().expect("Failed to init SDL2");
     let video_subsystem = sdl_context.video().expect("Failed to init video");
@@ -84,7 +127,12 @@ fn main() {
     // Game state init
     let mut globals = Globals::new();
     globals.recompute_for_resolution(width, height);
-    let mut state = game::GameState::new(&globals);
+    globals.time.simulation_mode = simulation_mode;
+    let mut state = if simulation_mode.fixed_dt().is_some() {
+        game::GameState::new_with_seed(&globals, cli.seed)
+    } else {
+        game::GameState::new(&globals)
+    };
     let start_time = Instant::now();
 
     // Event loop
