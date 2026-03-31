@@ -1,5 +1,10 @@
 # Asteroids Rust Port - Completed Items
 
+## Explosion Shockwave Push (2026-03-31)
+
+- [x] [physics] Explosion shockwave push — linear falloff velocity impulse with avg_radius closest-point (completed: 2026-03-31)
+- [x] [physics] Chunk explosion damage framerate-independence — verified already correct, dt*60 scaling covers it (completed: 2026-03-31)
+
 ## Fixed-DT Deterministic Simulation Mode (2026-03-31)
 
 - [x] Fixed-dt deterministic simulation mode — fixed timestep, seedable RNG, scripted scenarios (.ron), input recording (.inputs with zstd), headless mode, CLI interface (completed: 2026-03-31)

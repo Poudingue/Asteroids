@@ -69,3 +69,34 @@ fn test_assertions_pass() {
     assert!(result.assertion_failures.is_empty());
     assert!(result.final_state.ship.health > 0.0);
 }
+
+#[test]
+fn test_shockwave_determinism() {
+    // Spawn asteroid near ship, fire at it, verify explosion pushes second asteroid
+    let run = || {
+        Scenario::builder()
+            .seed(42)
+            .fps(60)
+            .ship_at(400.0, 300.0)
+            .spawn_asteroid((500.0, 300.0), 40.0) // Small, close — will get hit
+            .spawn_asteroid((600.0, 300.0), 80.0) // Nearby — should get pushed
+            .at_frame(1, Action::AimAt(0.0)) // Aim right
+            .at_frame(2, Action::Fire)
+            .snapshot_at(30)
+            .snapshot_at(59)
+            .run_until(60)
+            .run()
+    };
+
+    let result_a = run();
+    let result_b = run();
+
+    assert_eq!(result_a.snapshots.len(), result_b.snapshots.len());
+    for (a, b) in result_a.snapshots.iter().zip(result_b.snapshots.iter()) {
+        assert_eq!(
+            a.data, b.data,
+            "Shockwave state diverged at frame {}",
+            a.frame
+        );
+    }
+}

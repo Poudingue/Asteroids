@@ -2,8 +2,6 @@
 
 ## Open Tasks
 
-- [ ] [physics] Explosion shockwave push — explosions should push nearby objects (asteroids, chunks, smoke) within 1.5× blast radius. Direct velocity edit, single-frame effect for framerate consistency. (severity: major, 2026-03-30)
-- [ ] [physics] Chunk explosion damage framerate-independence — chunks_explo damage is currently framerate-bound (one explosion per frame). Needs dt-scaling or fixed-rate accumulator. (severity: minor, 2026-03-30)
 - [ ] [architecture] Velocity map / wind system — spatial velocity field affected by game events (explosions, weapons), influences physics and especially particle visuals for gamefeel. Future phase. (severity: minor, 2026-03-30)
 - [ ] [architecture] Spatialized spatiotemporal distortions — time dilation zones on screen where physics runs faster/slower. Could be triggered by special weapons, black holes, etc. Future phase. (severity: minor, 2026-03-30)
 - [ ] [visual] Visual testing of Phase 1 rendering changes — validate tonemapping variants (faithful, spectral bleed, ACES, Reinhard), SDF quality, MSAA 4x performance. (severity: minor, 2026-03-28)
