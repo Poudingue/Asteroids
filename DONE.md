@@ -1,5 +1,9 @@
 # Asteroids Rust Port - Completed Items
 
+## Fixed-DT Deterministic Simulation Mode (2026-03-31)
+
+- [x] Fixed-dt deterministic simulation mode — fixed timestep, seedable RNG, scripted scenarios (.ron), input recording (.inputs with zstd), headless mode, CLI interface (completed: 2026-03-31)
+
 ## Gamepad + World-Space Controls (2026-03-29)
 
 - [x] Task 1: Remove ShipControlConfig and old rotation/strafe controls (completed: 2026-03-29)
