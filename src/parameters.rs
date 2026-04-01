@@ -308,6 +308,8 @@ pub const EXPLOSION_MAX_EXPOSURE_HERITATE: f64 = 6.0;
 pub const SHOCKWAVE_IMPULSE_SCALE: f64 = 0.5;
 /// Blast range as a multiplier of explosion ext_radius.
 pub const SHOCKWAVE_RANGE_MULTIPLIER: f64 = 1.5;
+/// Fixed impulse scale for zero-mass particles (smoke, sparks). Visual flair only.
+pub const SHOCKWAVE_PARTICLE_PUSH: f64 = 0.3;
 
 // ============================================================================
 // Constants (Muzzle Flash Parameters)

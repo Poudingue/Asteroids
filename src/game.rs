@@ -1069,6 +1069,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     // === Explosion shockwave push ===
     // One-shot velocity impulse: no dt scaling needed (explosions are one-frame).
     // Linear falloff within SHOCKWAVE_RANGE_MULTIPLIER × blast radius.
+    // Two passes: physics objects (Newtonian: impulse/mass) and particles (fixed impulse for visual flair).
     for explo in &state.explosions {
         let explo_pos = explo.position;
         let blast_range = explo.hitbox.ext_radius * SHOCKWAVE_RANGE_MULTIPLIER;
@@ -1077,6 +1078,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
         }
         let explo_impulse = explo.mass * SHOCKWAVE_IMPULSE_SCALE;
 
+        // Physics objects: Newtonian impulse / mass
         for obj in state
             .objects
             .iter_mut()
@@ -1085,11 +1087,12 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             .chain(state.toosmall_oos.iter_mut())
             .chain(state.chunks.iter_mut())
             .chain(state.chunks_oos.iter_mut())
+            .chain(state.chunks_explo.iter_mut())
         {
             let diff = obj.position - explo_pos;
             let center_dist = diff.length();
             if center_dist < 1e-6 {
-                continue; // Avoid NaN from normalization
+                continue;
             }
             let effective_dist = (center_dist - obj.hitbox.avg_radius).max(0.0);
             if effective_dist >= blast_range {
@@ -1099,6 +1102,27 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             let impulse = explo_impulse * strength / obj.mass;
             let direction = diff * (1.0 / center_dist);
             obj.velocity += direction * impulse;
+        }
+
+        // Particles (zero-mass): fixed impulse scaled by SHOCKWAVE_PARTICLE_PUSH
+        let particle_impulse = explo_impulse * SHOCKWAVE_PARTICLE_PUSH;
+        for p in state
+            .smoke
+            .iter_mut()
+            .chain(state.smoke_oos.iter_mut())
+            .chain(state.sparks.iter_mut())
+        {
+            let diff = p.position - explo_pos;
+            let center_dist = diff.length();
+            if center_dist < 1e-6 {
+                continue;
+            }
+            if center_dist >= blast_range {
+                continue; // Particles have no meaningful radius, use center distance directly
+            }
+            let strength = 1.0 - (center_dist / blast_range);
+            let direction = diff * (1.0 / center_dist);
+            p.velocity += direction * (particle_impulse * strength);
         }
     }
 
