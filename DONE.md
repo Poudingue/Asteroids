@@ -1,13 +1,12 @@
 # Asteroids Rust Port - Completed Items
 
-## Explosion Shockwave Push (2026-03-31)
+## Fixed-DT Deterministic Mode + Shockwave Push (2026-04-03)
 
-- [x] [physics] Explosion shockwave push — linear falloff velocity impulse with avg_radius closest-point (completed: 2026-03-31)
-- [x] [physics] Chunk explosion damage framerate-independence — verified already correct, dt*60 scaling covers it (completed: 2026-03-31)
-
-## Fixed-DT Deterministic Simulation Mode (2026-03-31)
-
-- [x] Fixed-dt deterministic simulation mode — fixed timestep, seedable RNG, scripted scenarios (.ron), input recording (.inputs with zstd), headless mode, CLI interface (completed: 2026-03-31)
+- [x] [engine] Fixed-dt deterministic simulation mode — SmallRng, SimulationMode, clap CLI, scenario system (RON), headless mode, input recording (zstd+bincode), builder API, 305 tests passing (completed: 2026-04-03)
+- [x] [physics] Explosion shockwave push — avg_radius on Hitbox, linear falloff velocity impulse, particle push for smoke/sparks/chunks_explo (completed: 2026-04-03)
+- [x] [physics] Chunk explosion damage framerate-independence — verified already correct (dt*60 scaling), removed from backlog (completed: 2026-04-03)
+- [x] [docs] Distortion field system design spec — analytical approach, proper_time activation, phased implementation (completed: 2026-04-03)
+- [x] [docs] i18n locale system and extended glyph design spec — RON locale files, lowercase glyphs, accent composition with overrides (completed: 2026-04-03)
 
 ## Gamepad + World-Space Controls (2026-03-29)
 

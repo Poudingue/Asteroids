@@ -2,12 +2,15 @@
 
 ## Open Tasks
 
-- [ ] [architecture] Velocity map / wind system — spatial velocity field affected by game events (explosions, weapons), influences physics and especially particle visuals for gamefeel. Future phase. (severity: minor, 2026-03-30)
-- [ ] [architecture] Spatialized spatiotemporal distortions — time dilation zones on screen where physics runs faster/slower. Could be triggered by special weapons, black holes, etc. Future phase. (severity: minor, 2026-03-30)
 - [ ] [visual] Visual testing of Phase 1 rendering changes — validate tonemapping variants (faithful, spectral bleed, ACES, Reinhard), SDF quality, MSAA 4x performance. (severity: minor, 2026-03-28)
 - [ ] [visual] Visual testing of gamepad + world-space controls — verify twin-stick feel, aim smoothing, cone teleport targeting, engine fire direction (severity: minor, 2026-03-30)
 - [ ] [visual] Engine fire not visibly ejected at high ship speeds — backward kick scales with ship_speed but still doesn't look right. Consider pure ship-relative visual approach or larger base kick. (severity: minor, 2026-03-28)
-- [ ] [ui/i18n] Prepare for internationalization: extract all player-visible strings (pause menu labels, HUD text, tooltips, weapon names, calibration menu) into a centralized string table (e.g. `src/strings.rs` or `src/locale.rs`). No translation yet — just indirection so display text is not hardcoded inline. (severity: minor, 2026-03-28)
+- [ ] [i18n] Internationalization system — locale files (RON), system locale detection, string extraction from HUD/pause menu. Spec: docs/superpowers/specs/2026-04-03-i18n-locale-glyph-design.md (severity: minor, 2026-04-03)
+- [ ] [rendering] Extended glyph system — 26 hand-designed lowercase glyphs, 5 accent marks, ~15 composed French accented chars, three-tier lookup with override support. Spec: docs/superpowers/specs/2026-04-03-i18n-locale-glyph-design.md (severity: minor, 2026-04-03)
+- [ ] [i18n] Western European character support (scope B) — German ß/ä/ö/ü, Spanish ¿/¡, Scandinavian å/æ/ø, Portuguese ã/õ. ~30 additional glyph definitions. (severity: minor, 2026-04-03)
+- [ ] [i18n] Full Latin Extended character support (scope C) — Polish, Czech, Hungarian etc. 50+ additional glyphs. (severity: minor, 2026-04-03)
+- [ ] [architecture] Distortion field system — analytical field evaluation replacing one-shot shockwave, expanding ring shockwaves, gravity wells, time dilation via proper_time. Spec: docs/superpowers/specs/2026-04-01-distortion-field-design.md (severity: major, 2026-04-03)
+- [ ] [rendering] MSDF text rendering — replace polygon-based glyph system with MSDF for better quality and scalability. Future replacement for current system. (severity: minor, 2026-04-03)
 
 ## Completed Tasks
 
