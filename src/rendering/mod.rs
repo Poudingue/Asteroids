@@ -104,8 +104,6 @@ pub struct Renderer2D {
     postprocess_bind_group: wgpu::BindGroup,
     postprocess_sampler: wgpu::Sampler,
     postprocess_uniform_buffer: wgpu::Buffer,
-    // Kept for use in resize() when rebuilding pipelines
-    #[allow(dead_code)]
     surface_format: wgpu::TextureFormat,
     vertices: Vec<Vertex>,
     hud_pipeline: wgpu::RenderPipeline,
@@ -686,6 +684,168 @@ impl Renderer2D {
                     resource: self.postprocess_uniform_buffer.as_entire_binding(),
                 },
             ],
+        });
+    }
+
+    /// Recreate the postprocess and HUD pipelines with a new swapchain format.
+    /// Call this when the surface format changes (e.g. HDR toggle).
+    pub fn recreate_surface_pipelines(
+        &mut self,
+        device: &wgpu::Device,
+        new_format: wgpu::TextureFormat,
+    ) {
+        self.surface_format = new_format;
+
+        // Recreate postprocess pipeline
+        let postprocess_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Postprocess Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/postprocess.wgsl").into()),
+        });
+
+        let postprocess_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Postprocess Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        let postprocess_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Postprocess Pipeline Layout"),
+                bind_group_layouts: &[&postprocess_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        self.postprocess_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Postprocess Pipeline"),
+                layout: Some(&postprocess_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &postprocess_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &postprocess_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: new_format,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
+        // Recreate HUD pipeline
+        let hud_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("HUD Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/hud.wgsl").into()),
+        });
+
+        let hud_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("HUD Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let hud_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("HUD Pipeline Layout"),
+            bind_group_layouts: &[&hud_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        self.hud_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("HUD Pipeline"),
+            layout: Some(&hud_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &hud_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Vertex::desc()],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &hud_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: new_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
+        // Rebind HUD bind group with the new layout (hud_bind_group uses screen_size_buffer)
+        self.hud_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("HUD Bind Group"),
+            layout: &hud_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: self.screen_size_buffer.as_entire_binding(),
+            }],
         });
     }
 

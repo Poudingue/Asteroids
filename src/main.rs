@@ -2,6 +2,31 @@ use asteroids::*;
 
 use std::time::Instant;
 
+fn select_surface_format(
+    caps: &wgpu::SurfaceCapabilities,
+    hdr: bool,
+) -> wgpu::TextureFormat {
+    if hdr {
+        caps.formats
+            .iter()
+            .find(|f| **f == wgpu::TextureFormat::Rgba16Float)
+            .copied()
+            .unwrap_or_else(|| {
+                caps.formats
+                    .iter()
+                    .find(|f| !f.is_srgb())
+                    .copied()
+                    .unwrap_or(caps.formats[0])
+            })
+    } else {
+        caps.formats
+            .iter()
+            .find(|f| f.is_srgb())
+            .copied()
+            .unwrap_or(caps.formats[0])
+    }
+}
+
 use clap::Parser;
 use parameters::{Globals, SimulationMode, MAX_DT};
 use rendering::Renderer2D;
@@ -109,12 +134,7 @@ fn main() {
     .expect("Failed to create device");
 
     let surface_caps = surface.get_capabilities(&adapter);
-    let surface_format = surface_caps
-        .formats
-        .iter()
-        .find(|f| !f.is_srgb())
-        .copied()
-        .unwrap_or(surface_caps.formats[0]);
+    let surface_format = select_surface_format(&surface_caps, false);
 
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -177,6 +197,9 @@ fn main() {
             }
         }
     }
+
+    // Track HDR state to detect pause-menu toggles
+    let mut prev_hdr_enabled = globals.hdr.hdr_enabled;
 
     // Scenario action tracking for windowed mode
     let mut scenario_action_idx: usize = 0;
@@ -427,6 +450,15 @@ fn main() {
             globals.time.pause = false;
             state = game::GameState::new(&globals);
             globals.exposure.game_exposure = 0.0;
+        }
+
+        // Detect HDR toggle from pause menu and reconfigure surface + pipelines
+        if globals.hdr.hdr_enabled != prev_hdr_enabled {
+            let new_format = select_surface_format(&surface_caps, globals.hdr.hdr_enabled);
+            config.format = new_format;
+            surface.configure(&device, &config);
+            renderer.recreate_surface_pipelines(&device, new_format);
+            prev_hdr_enabled = globals.hdr.hdr_enabled;
         }
 
         // Track mouse button state in GameState
