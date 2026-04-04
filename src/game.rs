@@ -220,9 +220,9 @@ pub(crate) fn to_rgba(color: HdrColor, globals: &Globals) -> [u8; 4] {
 }
 
 /// Convert an HDR color to raw HDR [f32; 4] for GPU tonemapping.
-/// Colors are in 0-255 HDR range (may exceed 255). Alpha is always 255.
+/// Colors are in 0-255 HDR range (may exceed 255). Alpha is always 1.0 (opaque).
 pub(crate) fn to_hdr_rgba(color: HdrColor) -> [f32; 4] {
-    [color.r as f32, color.g as f32, color.b as f32, 255.0]
+    [color.r as f32, color.g as f32, color.b as f32, 1.0]
 }
 
 // ============================================================================
@@ -1476,7 +1476,7 @@ pub fn render_frame(
         hdr(globals.visual.space_color),
         globals.exposure.game_exposure,
     );
-    let bg_color = [bg.r as f32, bg.g as f32, bg.b as f32, 255.0];
+    let bg_color = [bg.r as f32, bg.g as f32, bg.b as f32, 1.0];
     renderer.fill_rect(0, 0, w, h, bg_color);
 
     // Stars

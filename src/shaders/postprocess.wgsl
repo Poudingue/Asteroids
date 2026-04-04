@@ -138,5 +138,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     else if (TONEMAP_VARIANT == 2u) { mapped = tonemap_spectral_bleed(hdr_color.rgb); }
     else if (TONEMAP_VARIANT == 3u) { mapped = tonemap_aces(hdr_color.rgb); }
     else { mapped = tonemap_reinhard(hdr_color.rgb); }
-    return vec4<f32>(mapped, hdr_color.a);
+    return vec4<f32>(mapped, 1.0);
 }
