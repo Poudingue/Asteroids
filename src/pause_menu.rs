@@ -148,7 +148,7 @@ impl PauseMenu {
             MenuEntry {
                 label: "Tonemap",
                 kind: MenuEntryKind::Cycle {
-                    labels: &["Soft Redirect", "ACES", "Reinhard", "Off"],
+                    labels: &["Passthrough", "Reinhard", "Hard Redirect", "Soft Redirect"],
                     get: |g| g.hdr.tonemap_variant as usize,
                     set: |g, idx| g.hdr.tonemap_variant = idx as u32,
                 },
@@ -238,7 +238,8 @@ impl PauseMenu {
     fn is_entry_visible(&self, i: usize, globals: &Globals) -> bool {
         let entry = &self.entries[i];
         match entry.label {
-            "HUD Nits" | "Paper White" | "Max Brightness" => globals.hdr.hdr_enabled,
+                        "HUD Nits" | "Paper White" | "Max Brightness" => globals.hdr.hdr_enabled,
+            "Game Exposure" => !globals.hdr.hdr_enabled,
             _ => {
                 // The separator at index 14 (before HDR sliders) only shows when HDR is on.
                 if matches!(entry.kind, MenuEntryKind::Separator) && i == 14 {

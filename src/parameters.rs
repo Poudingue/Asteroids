@@ -494,7 +494,7 @@ pub struct HdrConfig {
     pub game_exposure_target_sdr: f64,
     /// Remembered exposure target for HDR mode.
     pub game_exposure_target_hdr: f64,
-    /// Tonemap algorithm: 0 = Soft Redirect (default), 1 = ACES, 2 = Reinhard, 3 = Off.
+    /// Tonemap algorithm: 0 = Passthrough, 1 = Reinhard, 2 = Hard Redirect, 3 = Soft Redirect (default).
     pub tonemap_variant: u32,
 }
 
@@ -509,7 +509,7 @@ impl Default for HdrConfig {
             msaa_sample_count: 4,
             game_exposure_target_sdr: 2.0,
             game_exposure_target_hdr: 2.0,
-            tonemap_variant: 0,
+            tonemap_variant: 3,
         }
     }
 }
