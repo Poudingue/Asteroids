@@ -52,8 +52,8 @@ pub struct PauseMenu {
     pub scroll_offset: usize,
     /// Number of entries that fit on screen at once.
     pub visible_rows: usize,
-    /// Is the user currently dragging a slider?
-    pub dragging_slider: bool,
+    /// Index of the entry being dragged (slider), or None.
+    pub dragging_entry: Option<usize>,
     /// Last frame's mouse button state (for rising-edge detection).
     pub last_mouse_down: bool,
 }
@@ -65,15 +65,13 @@ pub struct PauseMenu {
 fn msaa_get(globals: &Globals) -> usize {
     match globals.hdr.msaa_sample_count {
         1 => 0,
-        2 => 1,
-        _ => 2, // 4 or anything else → x4
+        _ => 1, // 4 or anything else → x4
     }
 }
 
 fn msaa_set(globals: &mut Globals, idx: usize) {
     globals.hdr.msaa_sample_count = match idx {
         0 => 1,
-        1 => 2,
         _ => 4,
     };
 }
@@ -138,7 +136,7 @@ impl PauseMenu {
             MenuEntry {
                 label: "MSAA",
                 kind: MenuEntryKind::Cycle {
-                    labels: &["Off", "x2", "x4"],
+                    labels: &["Off", "x4"],
                     get: msaa_get,
                     set: msaa_set,
                 },
@@ -185,6 +183,20 @@ impl PauseMenu {
                     set: |g, v| g.hdr.max_brightness = v,
                 },
             },
+            MenuEntry {
+                label: "",
+                kind: MenuEntryKind::Separator,
+            },
+            MenuEntry {
+                label: "Game Exposure",
+                kind: MenuEntryKind::Slider {
+                    min: 0.5,
+                    max: 4.0,
+                    step: 0.1,
+                    get: |g| g.exposure.game_exposure_target,
+                    set: |g, v| g.exposure.game_exposure_target = v,
+                },
+            },
         ];
 
         Self {
@@ -192,7 +204,7 @@ impl PauseMenu {
             selected: 0,
             scroll_offset: 0,
             visible_rows: 12,
-            dragging_slider: false,
+            dragging_entry: None,
             last_mouse_down: false,
         }
     }
@@ -665,9 +677,9 @@ impl PauseMenu {
 
                         // Drag: if mouse is inside this row and button is held, map mx to value
                         if mouse_down && hovered && mx >= track_left && mx <= track_right {
-                            self.dragging_slider = true;
+                            self.dragging_entry = Some(entry_idx);
                         }
-                        if self.dragging_slider
+                        if self.dragging_entry == Some(entry_idx)
                             && mouse_down
                             && mx >= track_left
                             && mx <= track_right
@@ -677,7 +689,7 @@ impl PauseMenu {
                             set(globals, snap_to_step(raw_val, *min, *step));
                         }
                         if !mouse_down {
-                            self.dragging_slider = false;
+                            self.dragging_entry = None;
                         }
                     }
                     MenuEntryKind::Separator => unreachable!(),
