@@ -82,6 +82,12 @@ fn msaa_set(globals: &mut Globals, idx: usize) {
 // PauseMenu construction
 // ============================================================================
 
+impl Default for PauseMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PauseMenu {
     pub fn new() -> Self {
         let entries = vec![
@@ -271,7 +277,14 @@ impl PauseMenu {
     /// Handle A/Left or D/Right on sliders.
     pub fn handle_slider_step(&mut self, decrease: bool, globals: &mut Globals) {
         let entry = &self.entries[self.selected];
-        if let MenuEntryKind::Slider { min, max, step, get, set } = &entry.kind {
+        if let MenuEntryKind::Slider {
+            min,
+            max,
+            step,
+            get,
+            set,
+        } = &entry.kind
+        {
             let cur = get(globals);
             let new_val = if decrease {
                 (cur - step).max(*min)
@@ -405,8 +418,7 @@ impl PauseMenu {
 
         let mut hovered_entry: Option<usize> = None;
 
-        for vis_pos in show_from..show_to {
-            let entry_idx = vis_indices[vis_pos];
+        for &entry_idx in &vis_indices[show_from..show_to] {
             let entry = &self.entries[entry_idx];
 
             let is_sep = matches!(entry.kind, MenuEntryKind::Separator);
@@ -421,11 +433,18 @@ impl PauseMenu {
                 let px1 = (menu_left * rr) as i32;
                 let px2 = (menu_right * rr) as i32;
                 let py = (line_y * rr) as i32;
-                renderer.hud_draw_line(px1, py, px2, py, [80.0, 80.0, 80.0, 255.0], 2.0 * rr as f32);
+                renderer.hud_draw_line(
+                    px1,
+                    py,
+                    px2,
+                    py,
+                    [80.0, 80.0, 80.0, 255.0],
+                    2.0 * rr as f32,
+                );
             } else {
                 // Determine hover
-                let hovered = mx >= menu_left && mx <= menu_right
-                    && my >= row_bottom && my <= row_top;
+                let hovered =
+                    mx >= menu_left && mx <= menu_right && my >= row_bottom && my <= row_top;
 
                 if hovered {
                     hovered_entry = Some(entry_idx);
@@ -534,7 +553,7 @@ impl PauseMenu {
                         );
 
                         // Handle click
-                        if (hovered && click_rising) || (is_selected && click_rising) {
+                        if (hovered || is_selected) && click_rising {
                             let new_val = !globals.get_toggle(toggle);
                             globals.set_toggle(toggle, new_val);
                         }
@@ -563,12 +582,18 @@ impl PauseMenu {
                             rng,
                         );
 
-                        if (hovered && click_rising) || (is_selected && click_rising) {
+                        if (hovered || is_selected) && click_rising {
                             let new_idx = (cur_idx + 1) % labels.len();
                             set(globals, new_idx);
                         }
                     }
-                    MenuEntryKind::Slider { min, max, step, get, set } => {
+                    MenuEntryKind::Slider {
+                        min,
+                        max,
+                        step,
+                        get,
+                        set,
+                    } => {
                         let cur_val = get(globals);
                         let ratio = ((cur_val - min) / (max - min)).clamp(0.0, 1.0);
 
@@ -584,13 +609,23 @@ impl PauseMenu {
                         let track_py2 = ((track_mid_y + track_h) * rr) as i32;
 
                         // Track background
-                        let track_bg = [(track_px1, track_py1), (track_px2, track_py1), (track_px2, track_py2), (track_px1, track_py2)];
+                        let track_bg = [
+                            (track_px1, track_py1),
+                            (track_px2, track_py1),
+                            (track_px2, track_py2),
+                            (track_px1, track_py2),
+                        ];
                         renderer.hud_fill_poly(&track_bg, [60.0, 60.0, 60.0, 255.0]);
 
                         // Filled portion
-                        let fill_px2 = (((track_left + ratio * track_width) * rr)) as i32;
+                        let fill_px2 = ((track_left + ratio * track_width) * rr) as i32;
                         if fill_px2 > track_px1 {
-                            let fill_pts = [(track_px1, track_py1), (fill_px2, track_py1), (fill_px2, track_py2), (track_px1, track_py2)];
+                            let fill_pts = [
+                                (track_px1, track_py1),
+                                (fill_px2, track_py1),
+                                (fill_px2, track_py2),
+                                (track_px1, track_py2),
+                            ];
                             renderer.hud_fill_poly(&fill_pts, [100.0, 180.0, 255.0, 255.0]);
                         }
 
@@ -632,12 +667,14 @@ impl PauseMenu {
                         if mouse_down && hovered && mx >= track_left && mx <= track_right {
                             self.dragging_slider = true;
                         }
-                        if self.dragging_slider && mouse_down {
-                            if mx >= track_left && mx <= track_right {
-                                let new_ratio = ((mx - track_left) / track_width).clamp(0.0, 1.0);
-                                let raw_val = min + new_ratio * (max - min);
-                                set(globals, snap_to_step(raw_val, *min, *step));
-                            }
+                        if self.dragging_slider
+                            && mouse_down
+                            && mx >= track_left
+                            && mx <= track_right
+                        {
+                            let new_ratio = ((mx - track_left) / track_width).clamp(0.0, 1.0);
+                            let raw_val = min + new_ratio * (max - min);
+                            set(globals, snap_to_step(raw_val, *min, *step));
                         }
                         if !mouse_down {
                             self.dragging_slider = false;
@@ -648,7 +685,7 @@ impl PauseMenu {
 
                 // Handle Action click
                 if let MenuEntryKind::Action(toggle) = &entry.kind {
-                    if (hovered && click_rising) || (is_selected && click_rising) {
+                    if (hovered || is_selected) && click_rising {
                         globals.set_toggle(toggle, true);
                     }
                 }

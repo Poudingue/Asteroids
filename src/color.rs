@@ -102,32 +102,6 @@ pub fn half_color(col1: HdrColor, col2: HdrColor, half_life: f64, dt: f64) -> Hd
     )
 }
 
-/// Redirect saturation of a color towards neighboring colors
-/// When a channel exceeds 255, redistribute the excess to neighboring channels
-pub fn redirect_spectre(col: HdrColor) -> HdrColor {
-    HdrColor {
-        r: if col.g > 255. {
-            col.r + col.g - 255.
-        } else {
-            col.r
-        },
-        g: if col.b > 255. && col.r > 255. {
-            col.g + col.r + col.b - 510.
-        } else if col.r > 255. {
-            col.g + col.r - 255.
-        } else if col.b > 255. {
-            col.g + col.b - 255.
-        } else {
-            col.g
-        },
-        b: if col.g > 255. {
-            col.b + col.g - 255.
-        } else {
-            col.b
-        },
-    }
-}
-
 /// Redirect saturation with more aggressive redistribution for extreme saturation
 pub fn redirect_spectre_wide(col: HdrColor) -> HdrColor {
     HdrColor {
