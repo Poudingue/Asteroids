@@ -9,7 +9,6 @@ struct VertexOutput {
 };
 
 @group(0) @binding(0) var<uniform> screen_size: vec2<f32>;
-@group(0) @binding(1) var<uniform> zoom_factor: f32;
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {

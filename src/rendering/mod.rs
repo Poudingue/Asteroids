@@ -94,9 +94,6 @@ impl CapsuleInstance {
 pub struct Renderer2D {
     world_pipeline: wgpu::RenderPipeline,
     screen_size_buffer: wgpu::Buffer,
-    // Kept for future zoom control (Phase 1.2+)
-    #[allow(dead_code)]
-    zoom_factor_buffer: wgpu::Buffer,
     world_bind_group: wgpu::BindGroup,
     offscreen_texture: wgpu::Texture,
     offscreen_view: wgpu::TextureView,
@@ -185,28 +182,12 @@ impl Renderer2D {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let zoom_factor_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Zoom Factor Buffer"),
-            contents: bytemuck::cast_slice(&[1.0f32]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
         let world_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("World Bind Group Layout"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
                         visibility: wgpu::ShaderStages::VERTEX,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
@@ -225,10 +206,6 @@ impl Renderer2D {
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: screen_size_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: zoom_factor_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -598,7 +575,6 @@ impl Renderer2D {
         Self {
             world_pipeline,
             screen_size_buffer,
-            zoom_factor_buffer,
             world_bind_group,
             offscreen_texture,
             offscreen_view,
