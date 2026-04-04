@@ -14,10 +14,11 @@ pub struct PostProcessUniforms {
     pub mul_color_r: f32,
     pub mul_color_g: f32,
     pub mul_color_b: f32,
-    pub hdr_enabled: f32,      // 0.0 = SDR, 1.0 = HDR
+    pub hdr_enabled: f32, // 0.0 = SDR, 1.0 = HDR
     pub paper_white: f32,
     pub max_brightness: f32,
-    pub _padding: [f32; 2],    // pad to 48 bytes (3 × vec4)
+    pub tonemap_variant: f32, // 0=soft redirect, 1=ACES, 2=Reinhard, 3=Off
+    pub _padding: f32,        // pad to 48 bytes (3 × vec4)
 }
 
 #[repr(C)]
@@ -196,29 +197,25 @@ impl Renderer2D {
         let world_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("World Bind Group Layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
-                ],
+                    count: None,
+                }],
             });
 
         let world_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("World Bind Group"),
             layout: &world_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: screen_size_buffer.as_entire_binding(),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: screen_size_buffer.as_entire_binding(),
+            }],
         });
 
         let world_pipeline_layout =
@@ -314,7 +311,8 @@ impl Renderer2D {
                     hdr_enabled: 0.0,
                     paper_white: 200.0,
                     max_brightness: 1000.0,
-                    _padding: [0.0; 2],
+                    tonemap_variant: 0.0,
+                    _padding: 0.0,
                 }]),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });

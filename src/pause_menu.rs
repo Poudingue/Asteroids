@@ -146,6 +146,14 @@ impl PauseMenu {
                 kind: MenuEntryKind::Toggle(GlobalToggle::Smaa),
             },
             MenuEntry {
+                label: "Tonemap",
+                kind: MenuEntryKind::Cycle {
+                    labels: &["Soft Redirect", "ACES", "Reinhard", "Off"],
+                    get: |g| g.hdr.tonemap_variant as usize,
+                    set: |g, idx| g.hdr.tonemap_variant = idx as u32,
+                },
+            },
+            MenuEntry {
                 label: "HDR",
                 kind: MenuEntryKind::Toggle(GlobalToggle::Hdr),
             },
@@ -193,8 +201,21 @@ impl PauseMenu {
                     min: 0.5,
                     max: 4.0,
                     step: 0.1,
-                    get: |g| g.exposure.game_exposure_target,
-                    set: |g, v| g.exposure.game_exposure_target = v,
+                    get: |g| {
+                        if g.hdr.hdr_enabled {
+                            g.hdr.game_exposure_target_hdr
+                        } else {
+                            g.hdr.game_exposure_target_sdr
+                        }
+                    },
+                    set: |g, v| {
+                        if g.hdr.hdr_enabled {
+                            g.hdr.game_exposure_target_hdr = v;
+                        } else {
+                            g.hdr.game_exposure_target_sdr = v;
+                        }
+                        g.exposure.game_exposure_target = v;
+                    },
                 },
             },
         ];

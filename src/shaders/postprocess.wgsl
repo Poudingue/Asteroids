@@ -9,8 +9,8 @@ struct PostProcessUniforms {
     hdr_enabled: f32,
     paper_white: f32,
     max_brightness: f32,
-    _padding0: f32,
-    _padding1: f32,
+    tonemap_variant: f32,
+    _padding: f32,
 }
 
 @group(0) @binding(0) var offscreen_texture: texture_2d<f32>;
@@ -75,6 +75,19 @@ fn soft_redirect(col: vec3<f32>, threshold: f32) -> vec3<f32> {
     return clamp(vec3<f32>(r_out, g_out, b_out), vec3<f32>(0.0), vec3<f32>(threshold));
 }
 
+fn tonemap_aces(color: vec3<f32>) -> vec3<f32> {
+    let a = 2.51;
+    let b = 0.03;
+    let c = 2.43;
+    let d = 0.59;
+    let e = 0.14;
+    return clamp((color * (a * color + b)) / (color * (c * color + d) + e), vec3(0.0), vec3(1.0));
+}
+
+fn tonemap_reinhard(color: vec3<f32>) -> vec3<f32> {
+    return color / (color + vec3(1.0));
+}
+
 fn tonemap(hdr_color: vec3<f32>) -> vec3<f32> {
     let add_color = vec3<f32>(uniforms.add_color_r, uniforms.add_color_g, uniforms.add_color_b);
     let mul_color = vec3<f32>(uniforms.mul_color_r, uniforms.mul_color_g, uniforms.mul_color_b);
@@ -82,15 +95,31 @@ fn tonemap(hdr_color: vec3<f32>) -> vec3<f32> {
     let with_add = hdr_color + add_color * uniforms.game_exposure;
     let with_mul = with_add * mul_color;
 
+    let variant = u32(uniforms.tonemap_variant);
+
     if uniforms.hdr_enabled > 0.5 {
-        // HDR path: scale to nits, passthrough below max, soft redirect above
         let nits = with_mul * (uniforms.paper_white / 255.0);
-        let redirected = soft_redirect(nits, uniforms.max_brightness);
-        return redirected / uniforms.max_brightness;
+        if variant == 1u {
+            return tonemap_aces(nits / uniforms.max_brightness);
+        } else if variant == 2u {
+            return tonemap_reinhard(nits / uniforms.max_brightness);
+        } else if variant == 3u {
+            return clamp(nits / uniforms.max_brightness, vec3(0.0), vec3(1.0));
+        } else {
+            let redirected = soft_redirect(nits, uniforms.max_brightness);
+            return redirected / uniforms.max_brightness;
+        }
     } else {
-        // SDR path: soft redirect at 255
-        let redirected = soft_redirect(with_mul, 255.0);
-        return redirected / 255.0;
+        if variant == 1u {
+            return tonemap_aces(with_mul / 255.0);
+        } else if variant == 2u {
+            return tonemap_reinhard(with_mul / 255.0);
+        } else if variant == 3u {
+            return clamp(with_mul / 255.0, vec3(0.0), vec3(1.0));
+        } else {
+            let redirected = soft_redirect(with_mul, 255.0);
+            return redirected / 255.0;
+        }
     }
 }
 

@@ -490,6 +490,12 @@ pub struct HdrConfig {
     pub max_brightness: f64,
     pub smaa_enabled: bool,
     pub msaa_sample_count: u32,
+    /// Remembered exposure target for SDR mode.
+    pub game_exposure_target_sdr: f64,
+    /// Remembered exposure target for HDR mode.
+    pub game_exposure_target_hdr: f64,
+    /// Tonemap algorithm: 0 = Soft Redirect (default), 1 = ACES, 2 = Reinhard, 3 = Off.
+    pub tonemap_variant: u32,
 }
 
 impl Default for HdrConfig {
@@ -501,6 +507,9 @@ impl Default for HdrConfig {
             max_brightness: 1000.0,
             smaa_enabled: false,
             msaa_sample_count: 4,
+            game_exposure_target_sdr: 2.0,
+            game_exposure_target_hdr: 2.0,
+            tonemap_variant: 0,
         }
     }
 }

@@ -2,10 +2,7 @@ use asteroids::*;
 
 use std::time::Instant;
 
-fn select_surface_format(
-    caps: &wgpu::SurfaceCapabilities,
-    hdr: bool,
-) -> wgpu::TextureFormat {
+fn select_surface_format(caps: &wgpu::SurfaceCapabilities, hdr: bool) -> wgpu::TextureFormat {
     if hdr {
         caps.formats
             .iter()
@@ -473,6 +470,12 @@ fn main() {
             surface.configure(&device, &config);
             renderer.recreate_surface_pipelines(&device, new_format);
             prev_hdr_enabled = globals.hdr.hdr_enabled;
+            // Restore the appropriate exposure target for the new mode.
+            globals.exposure.game_exposure_target = if globals.hdr.hdr_enabled {
+                globals.hdr.game_exposure_target_hdr
+            } else {
+                globals.hdr.game_exposure_target_sdr
+            };
         }
 
         // Detect MSAA change from pause menu and rebuild world pipeline + MSAA texture
@@ -654,7 +657,8 @@ fn main() {
                 hdr_enabled: if globals.hdr.hdr_enabled { 1.0 } else { 0.0 },
                 paper_white: globals.hdr.paper_white as f32,
                 max_brightness: globals.hdr.max_brightness as f32,
-                _padding: [0.0; 2],
+                tonemap_variant: globals.hdr.tonemap_variant as f32,
+                _padding: 0.0,
             },
         );
         let hud_brightness = if globals.hdr.hdr_enabled {
