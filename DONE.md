@@ -1,5 +1,16 @@
 # Asteroids Rust Port - Completed Items
 
+## HDR Pipeline & Pause Menu Redesign (2026-04-04)
+
+- [x] [rendering] Fix alpha=255 blend bug causing B&W/XOR artifacts (completed: 2026-04-04)
+- [x] [rendering] Soft redirect tonemap with 80% shoulder (completed: 2026-04-04)
+- [x] [rendering/hdr] HDR pipeline: surface format switching, paper_white/max_brightness/hud_nits (completed: 2026-04-04)
+- [x] [rendering] HUD brightness scaling for HDR mode (completed: 2026-04-04)
+- [x] [rendering] Runtime MSAA configurability Off/x2/x4 (completed: 2026-04-04)
+- [x] [ui] Pause menu redesign as vertical scrollable list with toggles/cycles/sliders (completed: 2026-04-04)
+- [x] [cleanup] Remove dead zoom_factor uniform and buffer (completed: 2026-04-04)
+- [x] [cleanup] Fix clippy warnings, remove dead redirect_spectre (completed: 2026-04-04)
+
 ## Fixed-DT Deterministic Mode + Shockwave Push (2026-04-03)
 
 - [x] [engine] Fixed-dt deterministic simulation mode — SmallRng, SimulationMode, clap CLI, scenario system (RON), headless mode, input recording (zstd+bincode), builder API, 305 tests passing (completed: 2026-04-03)
