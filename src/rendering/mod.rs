@@ -1,7 +1,7 @@
 pub mod hud;
 pub mod world;
 
-use crate::parameters::MSAA_SAMPLE_COUNT;
+use crate::parameters::DEFAULT_MSAA_SAMPLE_COUNT;
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -247,7 +247,7 @@ impl Renderer2D {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState {
-                count: MSAA_SAMPLE_COUNT,
+                count: DEFAULT_MSAA_SAMPLE_COUNT,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
@@ -259,13 +259,13 @@ impl Renderer2D {
         let offscreen_texture = create_offscreen_texture(device, width, height);
         let offscreen_view = offscreen_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // --- MSAA texture (None when MSAA_SAMPLE_COUNT == 1) ---
+        // --- MSAA texture (None when DEFAULT_MSAA_SAMPLE_COUNT == 1) ---
         let msaa_offscreen_texture = create_msaa_texture(
             device,
             width,
             height,
             wgpu::TextureFormat::Rgba16Float,
-            MSAA_SAMPLE_COUNT,
+            DEFAULT_MSAA_SAMPLE_COUNT,
         );
         let msaa_offscreen_view = msaa_offscreen_texture
             .as_ref()
@@ -592,7 +592,7 @@ impl Renderer2D {
             sdf_capsule_pipeline,
             sdf_capsule_instances: Vec::with_capacity(2048),
             sdf_bind_group,
-            msaa_sample_count: MSAA_SAMPLE_COUNT,
+            msaa_sample_count: DEFAULT_MSAA_SAMPLE_COUNT,
             msaa_offscreen_texture,
             msaa_offscreen_view,
             width,

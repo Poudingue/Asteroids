@@ -99,7 +99,7 @@ pub const STAR_SATURATION: f64 = 8.0;
 // SDF anti-aliasing is controlled by compile-time const `SDF_AA_ENABLED` in src/shaders/sdf.wgsl.
 // true = smoothstep AA (default), false = hard edges.
 // This is independent of MSAA, which only affects polygon geometry.
-pub const MSAA_SAMPLE_COUNT: u32 = 4;
+pub const DEFAULT_MSAA_SAMPLE_COUNT: u32 = 4;
 
 // Button colors (stored as u32: (r << 16) | (g << 8) | b)
 pub const TRUECOLOR: u32 = 128 << 8; // rgb 0 128 0
@@ -481,6 +481,30 @@ pub struct ExposureConfig {
     pub mul_base: (f64, f64, f64),
 }
 
+/// HDR output and anti-aliasing configuration.
+#[derive(Clone, Debug)]
+pub struct HdrConfig {
+    pub hdr_enabled: bool,
+    pub hud_nits: f64,
+    pub paper_white: f64,
+    pub max_brightness: f64,
+    pub smaa_enabled: bool,
+    pub msaa_sample_count: u32,
+}
+
+impl Default for HdrConfig {
+    fn default() -> Self {
+        Self {
+            hdr_enabled: false,
+            hud_nits: 155.0,
+            paper_white: 200.0,
+            max_brightness: 1000.0,
+            smaa_enabled: false,
+            msaa_sample_count: 4,
+        }
+    }
+}
+
 /// Visual/rendering toggles and color goals.
 pub struct VisualConfig {
     pub motion_blur: bool,
@@ -570,6 +594,7 @@ pub struct Globals {
     pub weapon: WeaponState,
     pub advanced_hitbox: bool,
     pub observer_proper_time: f64,
+    pub hdr: HdrConfig,
 }
 
 impl Globals {
@@ -661,6 +686,7 @@ impl Globals {
             },
             advanced_hitbox: true,
             observer_proper_time: 1.0,
+            hdr: HdrConfig::default(),
         }
     }
 }
@@ -717,6 +743,8 @@ impl Globals {
             GlobalToggle::Flashes => self.visual.flashes_enabled,
             GlobalToggle::Chunks => self.visual.chunks_enabled,
             GlobalToggle::DynColor => self.visual.dyn_color,
+            GlobalToggle::Hdr => self.hdr.hdr_enabled,
+            GlobalToggle::Smaa => self.hdr.smaa_enabled,
         }
     }
 
@@ -732,6 +760,8 @@ impl Globals {
             GlobalToggle::Flashes => self.visual.flashes_enabled = val,
             GlobalToggle::Chunks => self.visual.chunks_enabled = val,
             GlobalToggle::DynColor => self.visual.dyn_color = val,
+            GlobalToggle::Hdr => self.hdr.hdr_enabled = val,
+            GlobalToggle::Smaa => self.hdr.smaa_enabled = val,
         }
     }
 }
@@ -749,4 +779,6 @@ pub enum GlobalToggle {
     Flashes,
     Chunks,
     DynColor,
+    Hdr,
+    Smaa,
 }
