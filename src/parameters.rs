@@ -494,7 +494,7 @@ pub struct HdrConfig {
     pub game_exposure_target_sdr: f64,
     /// Remembered exposure target for HDR mode.
     pub game_exposure_target_hdr: f64,
-    /// Tonemap algorithm: 0 = Passthrough, 1 = Reinhard, 2 = Hard Redirect, 3 = Soft Redirect (default).
+    /// Tonemap algorithm: 0 = Passthrough, 1 = Pseudo-Reinhard, 2 = Hard Redirect, 3 = Soft Redirect (default).
     pub tonemap_variant: u32,
 }
 

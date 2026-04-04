@@ -324,7 +324,7 @@ fn main() {
                             screen_width: new_w as f32,
                             screen_height: new_h as f32,
                             brightness_scale: if globals.hdr.hdr_enabled {
-                                (globals.hdr.hud_nits / globals.hdr.max_brightness) as f32
+                                (globals.hdr.hud_nits / 80.0) as f32
                             } else {
                                 1.0
                             },
@@ -662,7 +662,7 @@ fn main() {
             },
         );
         let hud_brightness = if globals.hdr.hdr_enabled {
-            (globals.hdr.hud_nits / globals.hdr.max_brightness) as f32
+            (globals.hdr.hud_nits / 80.0) as f32
         } else {
             1.0
         };

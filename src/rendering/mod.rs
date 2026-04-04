@@ -17,7 +17,7 @@ pub struct PostProcessUniforms {
     pub hdr_enabled: f32, // 0.0 = SDR, 1.0 = HDR
     pub paper_white: f32,
     pub max_brightness: f32,
-    pub tonemap_variant: f32, // 0=soft redirect, 1=ACES, 2=Reinhard, 3=Off
+    pub tonemap_variant: f32, // 0=Passthrough, 1=Pseudo-Reinhard, 2=Hard Redirect, 3=Soft Redirect
     pub _padding: f32,        // pad to 48 bytes (3 × vec4)
 }
 

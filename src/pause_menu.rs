@@ -148,7 +148,7 @@ impl PauseMenu {
             MenuEntry {
                 label: "Tonemap",
                 kind: MenuEntryKind::Cycle {
-                    labels: &["Passthrough", "Reinhard", "Hard Redirect", "Soft Redirect"],
+                    labels: &["Passthrough", "Pseudo-Reinhard", "Hard Redirect", "Soft Redirect"],
                     get: |g| g.hdr.tonemap_variant as usize,
                     set: |g, idx| g.hdr.tonemap_variant = idx as u32,
                 },
