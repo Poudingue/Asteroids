@@ -238,7 +238,7 @@ impl PauseMenu {
     fn is_entry_visible(&self, i: usize, globals: &Globals) -> bool {
         let entry = &self.entries[i];
         match entry.label {
-                        "HUD Nits" | "Paper White" | "Max Brightness" => globals.hdr.hdr_enabled,
+            "HUD Nits" | "Paper White" | "Max Brightness" => globals.hdr.hdr_enabled,
             "Game Exposure" => !globals.hdr.hdr_enabled,
             _ => {
                 // The separator at index 14 (before HDR sliders) only shows when HDR is on.

@@ -105,7 +105,6 @@ pub struct GameState {
     pub gamepad: GamepadState,
 }
 
-
 impl GameState {
     pub fn new(globals: &Globals) -> Self {
         let mut rng = SmallRng::from_entropy();

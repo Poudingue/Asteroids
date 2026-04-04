@@ -2,6 +2,13 @@
 
 ## HDR Pipeline & Pause Menu Redesign (2026-04-04)
 
+- [x] [ui] Tonemap variant cycle: Passthrough/Reinhard/Hard Redirect/Soft Redirect (completed: 2026-04-04)
+- [x] [ui] Separate SDR/HDR game exposure values, exposure SDR-only (completed: 2026-04-04)
+- [x] [ui] Fix slider drag applying to all sliders simultaneously (completed: 2026-04-04)
+- [x] [ui] Fix MSAA x2 crash (removed, WebGPU only guarantees 1 and 4) (completed: 2026-04-04)
+
+## HDR Pipeline & Pause Menu Redesign (2026-04-04)
+
 - [x] [rendering] Fix alpha=255 blend bug causing B&W/XOR artifacts (completed: 2026-04-04)
 - [x] [rendering] Soft redirect tonemap with 80% shoulder (completed: 2026-04-04)
 - [x] [rendering/hdr] HDR pipeline: surface format switching, paper_white/max_brightness/hud_nits (completed: 2026-04-04)

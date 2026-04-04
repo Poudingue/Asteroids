@@ -2,6 +2,8 @@
 
 ## Open Tasks
 
+- [ ] [rendering] NEEDS VISUAL TESTING: All new rendering and UI features from 2026-04-04 session (severity: major, 2026-04-04)
+
 - [ ] [visual] Visual testing of Phase 1 rendering changes — validate tonemapping variants (faithful, spectral bleed, ACES, Reinhard), SDF quality, MSAA 4x performance, HDR pipeline, pause menu redesign. (severity: minor, 2026-04-04)
 - [ ] [visual] Visual testing of gamepad + world-space controls — verify twin-stick feel, aim smoothing, cone teleport targeting, engine fire direction (severity: minor, 2026-03-30)
 - [ ] [visual] Engine fire not visibly ejected at high ship speeds — backward kick scales with ship_speed but still doesn't look right. Consider pure ship-relative visual approach or larger base kick. (severity: minor, 2026-03-28)
