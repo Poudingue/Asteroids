@@ -354,6 +354,66 @@ fn main() {
                 Event::ControllerButtonUp { .. } => {
                     state.gamepad.any_button_pressed = false;
                 }
+                // Pause menu navigation
+                Event::MouseWheel { y, .. } if globals.time.pause => {
+                    state.pause_menu.handle_scroll(y, &globals);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::W),
+                    repeat: false,
+                    ..
+                } if globals.time.pause => {
+                    state.pause_menu.handle_key_nav(true, &globals);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::S),
+                    repeat: false,
+                    ..
+                } if globals.time.pause => {
+                    state.pause_menu.handle_key_nav(false, &globals);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Up),
+                    repeat: false,
+                    ..
+                } if globals.time.pause => {
+                    state.pause_menu.handle_key_nav(true, &globals);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Down),
+                    repeat: false,
+                    ..
+                } if globals.time.pause => {
+                    state.pause_menu.handle_key_nav(false, &globals);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::A),
+                    repeat: false,
+                    ..
+                } if globals.time.pause => {
+                    state.pause_menu.handle_slider_step(true, &mut globals);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::D),
+                    repeat: false,
+                    ..
+                } if globals.time.pause => {
+                    state.pause_menu.handle_slider_step(false, &mut globals);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Left),
+                    repeat: false,
+                    ..
+                } if globals.time.pause => {
+                    state.pause_menu.handle_slider_step(true, &mut globals);
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Right),
+                    repeat: false,
+                    ..
+                } if globals.time.pause => {
+                    state.pause_menu.handle_slider_step(false, &mut globals);
+                }
                 _ => {}
             }
         }

@@ -98,14 +98,13 @@ pub struct GameState {
     pub rng: SmallRng,
     /// Pause menu interactive buttons.
     #[serde(skip)]
-    pub buttons: Vec<ButtonBoolean>,
+    pub pause_menu: crate::pause_menu::PauseMenu,
     /// Left mouse button state — used for rising-edge click detection.
     pub mouse_button_down: bool,
     /// Gamepad input and processing state.
     pub gamepad: GamepadState,
 }
 
-use crate::pause_menu::ButtonBoolean;
 
 impl GameState {
     pub fn new(globals: &Globals) -> Self {
@@ -146,7 +145,7 @@ impl GameState {
                 &mut rng,
             ),
             rng,
-            buttons: crate::pause_menu::make_buttons(globals),
+            pause_menu: crate::pause_menu::PauseMenu::new(),
             mouse_button_down: false,
             gamepad: GamepadState::new(),
         }
@@ -191,7 +190,7 @@ impl GameState {
                 &mut rng,
             ),
             rng,
-            buttons: crate::pause_menu::make_buttons(globals),
+            pause_menu: crate::pause_menu::PauseMenu::new(),
             mouse_button_down: false,
             gamepad: GamepadState::new(),
         }
@@ -1530,10 +1529,9 @@ pub fn render_frame(
         render_hud(state, globals, renderer);
     }
 
-    // Pause title overlay + interactive buttons
+    // Pause menu overlay
     if globals.time.pause {
-        crate::pause_menu::render_pause_title(
-            &mut state.buttons,
+        state.pause_menu.render(
             globals,
             renderer,
             &mut state.rng,
