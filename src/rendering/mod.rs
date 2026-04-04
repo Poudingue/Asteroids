@@ -709,6 +709,94 @@ impl Renderer2D {
         });
     }
 
+    /// Recreate the world pipeline and MSAA texture with a new sample count.
+    /// Call this when the user changes MSAA from the pause menu.
+    pub fn set_msaa_sample_count(&mut self, device: &wgpu::Device, sample_count: u32) {
+        if sample_count == self.msaa_sample_count {
+            return;
+        }
+        self.msaa_sample_count = sample_count;
+
+        // Recreate MSAA texture (None when sample_count == 1)
+        self.msaa_offscreen_texture = create_msaa_texture(
+            device,
+            self.width,
+            self.height,
+            wgpu::TextureFormat::Rgba16Float,
+            sample_count,
+        );
+        self.msaa_offscreen_view = self
+            .msaa_offscreen_texture
+            .as_ref()
+            .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()));
+
+        // Recreate world pipeline with new sample count
+        let world_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("World Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/world.wgsl").into()),
+        });
+
+        let world_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("World Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let world_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("World Pipeline Layout"),
+                bind_group_layouts: &[&world_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        self.world_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("World Pipeline"),
+            layout: Some(&world_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &world_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Vertex::desc()],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &world_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba16Float,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: sample_count,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
+    }
+
     /// Recreate the postprocess and HUD pipelines with a new swapchain format.
     /// Call this when the surface format changes (e.g. HDR toggle).
     pub fn recreate_surface_pipelines(

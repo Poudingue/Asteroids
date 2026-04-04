@@ -198,8 +198,9 @@ fn main() {
         }
     }
 
-    // Track HDR state to detect pause-menu toggles
+    // Track HDR and MSAA state to detect pause-menu toggles
     let mut prev_hdr_enabled = globals.hdr.hdr_enabled;
+    let mut prev_msaa = globals.hdr.msaa_sample_count;
 
     // Scenario action tracking for windowed mode
     let mut scenario_action_idx: usize = 0;
@@ -472,6 +473,12 @@ fn main() {
             surface.configure(&device, &config);
             renderer.recreate_surface_pipelines(&device, new_format);
             prev_hdr_enabled = globals.hdr.hdr_enabled;
+        }
+
+        // Detect MSAA change from pause menu and rebuild world pipeline + MSAA texture
+        if globals.hdr.msaa_sample_count != prev_msaa {
+            renderer.set_msaa_sample_count(&device, globals.hdr.msaa_sample_count);
+            prev_msaa = globals.hdr.msaa_sample_count;
         }
 
         // Track mouse button state in GameState
