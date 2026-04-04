@@ -320,6 +320,19 @@ fn main() {
                     surface.configure(&device, &config);
                     renderer.resize(&device, &queue, new_w, new_h);
                     globals.recompute_for_resolution(new_w, new_h);
+                    renderer.update_hud_uniforms(
+                        &queue,
+                        &rendering::HudUniforms {
+                            screen_width: new_w as f32,
+                            screen_height: new_h as f32,
+                            brightness_scale: if globals.hdr.hdr_enabled {
+                                (globals.hdr.hud_nits / globals.hdr.max_brightness) as f32
+                            } else {
+                                1.0
+                            },
+                            _padding: 0.0,
+                        },
+                    );
                 }
                 // `which` here is the device index (not instance ID) — used to open the controller
                 Event::ControllerDeviceAdded { which, .. } => {
@@ -635,6 +648,20 @@ fn main() {
                 paper_white: globals.hdr.paper_white as f32,
                 max_brightness: globals.hdr.max_brightness as f32,
                 _padding: [0.0; 2],
+            },
+        );
+        let hud_brightness = if globals.hdr.hdr_enabled {
+            (globals.hdr.hud_nits / globals.hdr.max_brightness) as f32
+        } else {
+            1.0
+        };
+        renderer.update_hud_uniforms(
+            &queue,
+            &rendering::HudUniforms {
+                screen_width: renderer.width as f32,
+                screen_height: renderer.height as f32,
+                brightness_scale: hud_brightness,
+                _padding: 0.0,
             },
         );
         renderer.begin_frame();

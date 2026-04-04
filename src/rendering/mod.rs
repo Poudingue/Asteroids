@@ -22,6 +22,15 @@ pub struct PostProcessUniforms {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct HudUniforms {
+    pub screen_width: f32,
+    pub screen_height: f32,
+    pub brightness_scale: f32,
+    pub _padding: f32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     pub position: [f32; 2],
     pub color: [f32; 4],
@@ -109,6 +118,7 @@ pub struct Renderer2D {
     hud_pipeline: wgpu::RenderPipeline,
     hud_vertices: Vec<Vertex>,
     hud_bind_group: wgpu::BindGroup,
+    hud_uniform_buffer: wgpu::Buffer,
     sdf_circle_pipeline: wgpu::RenderPipeline,
     sdf_circle_instances: Vec<CircleInstance>,
     sdf_capsule_pipeline: wgpu::RenderPipeline,
@@ -512,12 +522,23 @@ impl Renderer2D {
             source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/hud.wgsl").into()),
         });
 
+        let hud_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("HUD Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[HudUniforms {
+                screen_width: width as f32,
+                screen_height: height as f32,
+                brightness_scale: 1.0,
+                _padding: 0.0,
+            }]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
         let hud_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("HUD Bind Group Layout"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -532,7 +553,7 @@ impl Renderer2D {
             layout: &hud_bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: screen_size_buffer.as_entire_binding(),
+                resource: hud_uniform_buffer.as_entire_binding(),
             }],
         });
 
@@ -591,6 +612,7 @@ impl Renderer2D {
             hud_pipeline,
             hud_vertices: Vec::with_capacity(16384),
             hud_bind_group,
+            hud_uniform_buffer,
             sdf_circle_pipeline,
             sdf_circle_instances: Vec::with_capacity(4096),
             sdf_capsule_pipeline,
@@ -788,7 +810,7 @@ impl Renderer2D {
                 label: Some("HUD Bind Group Layout"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -838,13 +860,13 @@ impl Renderer2D {
             cache: None,
         });
 
-        // Rebind HUD bind group with the new layout (hud_bind_group uses screen_size_buffer)
+        // Rebind HUD bind group with the new layout (uses dedicated hud_uniform_buffer)
         self.hud_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("HUD Bind Group"),
             layout: &hud_bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: self.screen_size_buffer.as_entire_binding(),
+                resource: self.hud_uniform_buffer.as_entire_binding(),
             }],
         });
     }
@@ -852,6 +874,14 @@ impl Renderer2D {
     pub fn update_postprocess_uniforms(&self, queue: &wgpu::Queue, uniforms: &PostProcessUniforms) {
         queue.write_buffer(
             &self.postprocess_uniform_buffer,
+            0,
+            bytemuck::cast_slice(std::slice::from_ref(uniforms)),
+        );
+    }
+
+    pub fn update_hud_uniforms(&self, queue: &wgpu::Queue, uniforms: &HudUniforms) {
+        queue.write_buffer(
+            &self.hud_uniform_buffer,
             0,
             bytemuck::cast_slice(std::slice::from_ref(uniforms)),
         );
