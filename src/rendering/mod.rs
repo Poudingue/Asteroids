@@ -14,7 +14,10 @@ pub struct PostProcessUniforms {
     pub mul_color_r: f32,
     pub mul_color_g: f32,
     pub mul_color_b: f32,
-    pub _padding: f32,
+    pub hdr_enabled: f32,      // 0.0 = SDR, 1.0 = HDR
+    pub paper_white: f32,
+    pub max_brightness: f32,
+    pub _padding: [f32; 2],    // pad to 48 bytes (3 × vec4)
 }
 
 #[repr(C)]
@@ -300,7 +303,10 @@ impl Renderer2D {
                     mul_color_r: 1.0,
                     mul_color_g: 1.0,
                     mul_color_b: 1.0,
-                    _padding: 0.0,
+                    hdr_enabled: 0.0,
+                    paper_white: 200.0,
+                    max_brightness: 1000.0,
+                    _padding: [0.0; 2],
                 }]),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });

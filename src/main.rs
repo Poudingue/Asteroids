@@ -599,7 +599,10 @@ fn main() {
                 mul_color_r: globals.exposure.mul_color.0 as f32,
                 mul_color_g: globals.exposure.mul_color.1 as f32,
                 mul_color_b: globals.exposure.mul_color.2 as f32,
-                _padding: 0.0,
+                hdr_enabled: if globals.hdr.hdr_enabled { 1.0 } else { 0.0 },
+                paper_white: globals.hdr.paper_white as f32,
+                max_brightness: globals.hdr.max_brightness as f32,
+                _padding: [0.0; 2],
             },
         );
         renderer.begin_frame();

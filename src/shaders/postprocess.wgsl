@@ -6,7 +6,11 @@ struct PostProcessUniforms {
     mul_color_r: f32,
     mul_color_g: f32,
     mul_color_b: f32,
-    _padding: f32,
+    hdr_enabled: f32,
+    paper_white: f32,
+    max_brightness: f32,
+    _padding0: f32,
+    _padding1: f32,
 }
 
 @group(0) @binding(0) var offscreen_texture: texture_2d<f32>;
@@ -78,10 +82,16 @@ fn tonemap(hdr_color: vec3<f32>) -> vec3<f32> {
     let with_add = hdr_color + add_color * uniforms.game_exposure;
     let with_mul = with_add * mul_color;
 
-    let threshold = 255.0;
-    let redirected = soft_redirect(with_mul, threshold);
-
-    return redirected / threshold;
+    if uniforms.hdr_enabled > 0.5 {
+        // HDR path: scale to nits, passthrough below max, soft redirect above
+        let nits = with_mul * (uniforms.paper_white / 255.0);
+        let redirected = soft_redirect(nits, uniforms.max_brightness);
+        return redirected / uniforms.max_brightness;
+    } else {
+        // SDR path: soft redirect at 255
+        let redirected = soft_redirect(with_mul, 255.0);
+        return redirected / 255.0;
+    }
 }
 
 @fragment
