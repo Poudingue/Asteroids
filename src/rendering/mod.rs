@@ -58,14 +58,15 @@ pub struct CircleInstance {
     pub center: [f32; 2],
     pub radius: f32,
     pub color: [f32; 4],
-    pub _padding: f32,
+    pub falloff_width: f32,
 }
 
 impl CircleInstance {
-    const ATTRIBS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    const ATTRIBS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
         2 => Float32x2,   // center
         3 => Float32,     // radius
         4 => Float32x4,   // color
+        5 => Float32,     // falloff_width
     ];
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -980,7 +981,14 @@ impl Renderer2D {
         self.sdf_capsule_instances.clear();
     }
 
-    pub fn push_circle_instance(&mut self, cx: f32, cy: f32, radius: f32, color: [f32; 4]) {
+    pub fn push_circle_instance(
+        &mut self,
+        cx: f32,
+        cy: f32,
+        radius: f32,
+        color: [f32; 4],
+        falloff_width: f32,
+    ) {
         if radius <= 0.0 {
             return;
         }
@@ -988,7 +996,7 @@ impl Renderer2D {
             center: [cx, cy],
             radius,
             color,
-            _padding: 0.0,
+            falloff_width,
         });
     }
 
@@ -1416,5 +1424,24 @@ impl Renderer2D {
         }
 
         queue.submit(std::iter::once(encoder.finish()));
+    }
+}
+
+#[cfg(test)]
+mod circle_instance_tests {
+    use super::*;
+    #[test]
+    fn circle_instance_size_unchanged() {
+        assert_eq!(std::mem::size_of::<CircleInstance>(), 32);
+    }
+    #[test]
+    fn circle_instance_falloff_stored() {
+        let c = CircleInstance {
+            center: [10.0, 20.0],
+            radius: 5.0,
+            color: [1.0, 0.5, 0.0, 1.0],
+            falloff_width: 0.2,
+        };
+        assert!((c.falloff_width - 0.2).abs() < 1e-6);
     }
 }

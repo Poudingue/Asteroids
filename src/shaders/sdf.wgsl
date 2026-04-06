@@ -4,6 +4,7 @@ struct CircleInstance {
     @location(2) center: vec2<f32>,
     @location(3) radius: f32,
     @location(4) color: vec4<f32>,
+    @location(5) falloff_width: f32,
 };
 
 struct VertexOutput {
@@ -11,6 +12,7 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
     @location(1) color: vec4<f32>,
     @location(2) radius_px: f32,
+    @location(3) falloff_width: f32,
 };
 
 @group(0) @binding(0) var<uniform> screen_size: vec2<f32>;
@@ -37,6 +39,7 @@ fn vs_circle(
     out.uv = local * (instance.radius + margin);
     out.color = instance.color;
     out.radius_px = instance.radius;
+    out.falloff_width = instance.falloff_width;
     return out;
 }
 
@@ -46,6 +49,15 @@ fn fs_circle(in: VertexOutput) -> @location(0) vec4<f32> {
     var alpha: f32;
     if (SDF_AA_ENABLED) { alpha = smoothstep(0.5, -0.5, dist); }
     else { alpha = select(0.0, 1.0, dist < 0.0); }
+
+    // Soft falloff: fade opacity over outer fraction of radius
+    if (in.falloff_width > 0.0 && in.radius_px > 0.0) {
+        let frac = length(in.uv) / in.radius_px;
+        let falloff_start = 1.0 - in.falloff_width;
+        let inner_alpha = smoothstep(1.0, falloff_start, frac);
+        alpha = alpha * inner_alpha;
+    }
+
     if (alpha < 0.001) { discard; }
     return vec4<f32>(in.color.rgb, in.color.a * alpha);
 }

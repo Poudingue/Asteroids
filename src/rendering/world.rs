@@ -77,7 +77,8 @@ pub fn render_visuals(
             DITHER_POWER_RADIUS,
             rng,
         );
-        renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color);
+        let falloff = if entity.kind == EntityKind::Smoke { 0.2 } else { 0.0 };
+        renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color, falloff);
     }
 
     // Polygon shapes on top
@@ -114,7 +115,7 @@ pub fn render_chunk(
         DITHER_POWER_RADIUS,
         rng,
     );
-    renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color);
+    renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color, 0.0);
 }
 
 /// Render a star with motion trail
