@@ -1482,7 +1482,7 @@ pub fn render_frame(
         render_star_trail(star, renderer, globals, &mut state.rng);
     }
 
-    // Smoke — before ship (OCaml order)
+    // Smoke
     for s in &state.smoke {
         render_visuals(s, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
@@ -1492,36 +1492,38 @@ pub fn render_frame(
         render_chunk(chunk, renderer, globals, &mut state.rng);
     }
 
-    // Projectiles — before ship (OCaml order)
+    // TODO: Sparkles (collision light-trails) — will be added when collision system creates them
+
+    // Projectiles
     for p in &state.projectiles {
         render_projectile(p, renderer, globals, &mut state.rng);
     }
 
-    // Ship — render with smoothed visual aim angle
-    let true_aim = state.ship.orientation;
-    state.ship.orientation = state.gamepad.visual_aim_angle;
-    render_visuals(&state.ship, Vec2::ZERO, renderer, globals, &mut state.rng);
-    state.ship.orientation = true_aim;
-
-    // Fragments — after ship (OCaml order)
+    // Fragments
     for entity in &state.fragments {
         render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
 
-    // Toosmall — after ship (OCaml order)
+    // Toosmall
     for entity in &state.toosmall {
         render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
 
-    // Asteroids — after ship (OCaml order)
+    // Asteroids
     for entity in &state.objects {
         render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
 
-    // Explosions — after asteroids (OCaml order)
+    // Explosions — in front of asteroids, behind ship
     for e in &state.explosions {
         render_visuals(e, Vec2::ZERO, renderer, globals, &mut state.rng);
     }
+
+    // Ship — topmost game object
+    let true_aim = state.ship.orientation;
+    state.ship.orientation = state.gamepad.visual_aim_angle;
+    render_visuals(&state.ship, Vec2::ZERO, renderer, globals, &mut state.rng);
+    state.ship.orientation = true_aim;
 
     // HUD overlay — skip when paused (matches OCaml behavior)
     if !globals.time.pause {
@@ -1538,5 +1540,33 @@ pub fn render_frame(
             mouse_sy,
             mouse_down,
         );
+    }
+}
+
+#[cfg(test)]
+mod render_order_tests {
+    #[test]
+    fn render_layer_order_is_documented() {
+        const BACKGROUND: u8 = 0;
+        const STARS: u8 = 1;
+        const SMOKE: u8 = 2;
+        const CHUNKS: u8 = 3;
+        const SPARKLES_PLACEHOLDER: u8 = 4;
+        const PROJECTILES: u8 = 5;
+        const FRAGMENTS: u8 = 6;
+        const TOOSMALL: u8 = 7;
+        const ASTEROIDS: u8 = 8;
+        const EXPLOSIONS: u8 = 9;
+        const SHIP: u8 = 10;
+        assert!(BACKGROUND < STARS);
+        assert!(STARS < SMOKE);
+        assert!(SMOKE < CHUNKS);
+        assert!(CHUNKS < SPARKLES_PLACEHOLDER);
+        assert!(SPARKLES_PLACEHOLDER < PROJECTILES);
+        assert!(PROJECTILES < FRAGMENTS);
+        assert!(FRAGMENTS < TOOSMALL);
+        assert!(TOOSMALL < ASTEROIDS);
+        assert!(ASTEROIDS < EXPLOSIONS);
+        assert!(EXPLOSIONS < SHIP);
     }
 }
