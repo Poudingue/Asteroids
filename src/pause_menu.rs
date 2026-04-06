@@ -215,6 +215,7 @@ impl PauseMenu {
                             g.hdr.game_exposure_target_sdr = v;
                         }
                         g.exposure.game_exposure_target = v;
+                        g.exposure.game_exposure = v;
                     },
                 },
             },
