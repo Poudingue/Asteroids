@@ -174,9 +174,9 @@ impl PauseMenu {
             MenuEntry {
                 label: "Exposure",
                 kind: MenuEntryKind::Slider {
-                    min: 10.0,
-                    max: 500.0,
-                    step: 5.0,
+                    min: 0.1,
+                    max: 4.0,
+                    step: 0.1,
                     get: |g| g.hdr.exposure,
                     set: |g, v| g.hdr.exposure = v,
                 },
@@ -239,16 +239,11 @@ impl PauseMenu {
     fn is_entry_visible(&self, i: usize, globals: &Globals) -> bool {
         let entry = &self.entries[i];
         match entry.label {
-            "HUD Nits" | "Exposure" | "Max Brightness" => globals.hdr.hdr_enabled,
-            "Game Exposure" => !globals.hdr.hdr_enabled,
-            _ => {
-                // The separator at index 14 (before HDR sliders) only shows when HDR is on.
-                if matches!(entry.kind, MenuEntryKind::Separator) && i == 14 {
-                    globals.hdr.hdr_enabled
-                } else {
-                    true
-                }
-            }
+            // HDR-specific: only visible when HDR is on
+            "HUD Nits" | "Max Brightness" => globals.hdr.hdr_enabled,
+            // Generic multipliers: always visible
+            "Exposure" | "Game Exposure" => true,
+            _ => true,
         }
     }
 

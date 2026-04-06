@@ -309,7 +309,7 @@ impl Renderer2D {
                     mul_color_g: 1.0,
                     mul_color_b: 1.0,
                     hdr_enabled: 0.0,
-                    exposure: 200.0,
+                    exposure: 1.0,
                     max_brightness: 1000.0,
                     tonemap_variant: 0.0,
                     _padding: 0.0,

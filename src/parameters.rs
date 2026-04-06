@@ -503,7 +503,7 @@ impl Default for HdrConfig {
         Self {
             hdr_enabled: false,
             hud_nits: 155.0,
-            exposure: 200.0,
+            exposure: 1.0,
             max_brightness: 1000.0,
             smaa_enabled: false,
             msaa_sample_count: 4,

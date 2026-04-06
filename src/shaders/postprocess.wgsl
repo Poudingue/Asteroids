@@ -111,12 +111,12 @@ fn tonemap(hdr_color: vec3<f32>) -> vec3<f32> {
     let add_color = vec3<f32>(uniforms.add_color_r, uniforms.add_color_g, uniforms.add_color_b);
     let mul_color = vec3<f32>(uniforms.mul_color_r, uniforms.mul_color_g, uniforms.mul_color_b);
     let with_add = hdr_color + add_color;
-    let with_mul = with_add * mul_color * uniforms.game_exposure;
+    let with_mul = with_add * mul_color * uniforms.game_exposure * uniforms.exposure;
     let variant = u32(uniforms.tonemap_variant);
 
     if uniforms.hdr_enabled > 0.5 {
-        // Convert to nits: game 255 at exposure 1.0 = exposure nits
-        let nits = with_mul * (uniforms.exposure / 255.0);
+        // Convert to nits: game 255 = 200 nits reference white (fixed constant)
+        let nits = with_mul * (200.0 / 255.0);
         // Tonemap in nits space, then convert to scRGB (1.0 = 80 nits)
         if variant == 0u { let r = clamp(nits, vec3(0.0), vec3(uniforms.max_brightness)); return r / 80.0; }
         if variant == 1u { let r = tonemap_pseudo_reinhard(nits, uniforms.max_brightness); return r / 80.0; }
