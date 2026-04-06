@@ -7,7 +7,7 @@ struct PostProcessUniforms {
     mul_color_g: f32,
     mul_color_b: f32,
     hdr_enabled: f32,
-    paper_white: f32,
+    exposure: f32,
     max_brightness: f32,
     tonemap_variant: f32,
     _padding: f32,
@@ -115,8 +115,8 @@ fn tonemap(hdr_color: vec3<f32>) -> vec3<f32> {
     let variant = u32(uniforms.tonemap_variant);
 
     if uniforms.hdr_enabled > 0.5 {
-        // Convert to nits: game 255 at exposure 1.0 = paper_white nits
-        let nits = with_mul * (uniforms.paper_white / 255.0);
+        // Convert to nits: game 255 at exposure 1.0 = exposure nits
+        let nits = with_mul * (uniforms.exposure / 255.0);
         // Tonemap in nits space, then convert to scRGB (1.0 = 80 nits)
         if variant == 0u { let r = clamp(nits, vec3(0.0), vec3(uniforms.max_brightness)); return r / 80.0; }
         if variant == 1u { let r = tonemap_pseudo_reinhard(nits, uniforms.max_brightness); return r / 80.0; }

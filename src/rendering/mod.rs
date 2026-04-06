@@ -15,7 +15,7 @@ pub struct PostProcessUniforms {
     pub mul_color_g: f32,
     pub mul_color_b: f32,
     pub hdr_enabled: f32, // 0.0 = SDR, 1.0 = HDR
-    pub paper_white: f32,
+    pub exposure: f32,
     pub max_brightness: f32,
     pub tonemap_variant: f32, // 0=Passthrough, 1=Pseudo-Reinhard, 2=Hard Redirect, 3=Soft Redirect
     pub _padding: f32,        // pad to 48 bytes (3 × vec4)
@@ -309,7 +309,7 @@ impl Renderer2D {
                     mul_color_g: 1.0,
                     mul_color_b: 1.0,
                     hdr_enabled: 0.0,
-                    paper_white: 200.0,
+                    exposure: 200.0,
                     max_brightness: 1000.0,
                     tonemap_variant: 0.0,
                     _padding: 0.0,

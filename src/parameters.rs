@@ -486,7 +486,7 @@ pub struct ExposureConfig {
 pub struct HdrConfig {
     pub hdr_enabled: bool,
     pub hud_nits: f64,
-    pub paper_white: f64,
+    pub exposure: f64,
     pub max_brightness: f64,
     pub smaa_enabled: bool,
     pub msaa_sample_count: u32,
@@ -503,7 +503,7 @@ impl Default for HdrConfig {
         Self {
             hdr_enabled: false,
             hud_nits: 155.0,
-            paper_white: 200.0,
+            exposure: 200.0,
             max_brightness: 1000.0,
             smaa_enabled: false,
             msaa_sample_count: 4,
