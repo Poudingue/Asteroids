@@ -325,6 +325,9 @@ pub const MUZZLE_RATIO_SPEED: f64 = 0.05;
 pub const FIRE_MAX_RANDOM: f64 = 300.0;
 pub const FIRE_MIN_SPEED: f64 = 1000.0;
 pub const FIRE_MAX_SPEED: f64 = 2000.0;
+/// Ratio applied to ship speed when computing fire kick velocity.
+/// >1.0 ensures fire always moves backward relative to ship even with scatter.
+pub const FIRE_SPEED_RATIO: f64 = 1.2;
 pub const FIRE_RATIO_RADIUS: f64 = 1.4;
 
 // ============================================================================
