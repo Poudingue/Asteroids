@@ -215,6 +215,16 @@ pub const SHIP_HALF_STOP: f64 = 10.0; // Time needed to lose half inertia.
 pub const SHIP_MAX_MOMENT: f64 = 0.5; // In radian/s²
 pub const SHIP_HALF_STOP_ROTAT: f64 = 0.2; // Time needed to lose half angular momentum
 
+// Ship visual colors (HDR range: values >255 use wider color gamut in HDR mode)
+pub const SHIP_COLOR_PRIMARY: (f64, f64, f64) = (1400.0, 60.0, 20.0);
+pub const SHIP_COLOR_FIN: (f64, f64, f64) = (180.0, 15.0, 10.0);
+pub const SHIP_COLOR_FIN_HIGHLIGHT: (f64, f64, f64) = (280.0, 20.0, 15.0);
+pub const SHIP_COLOR_FIN_SHADOW: (f64, f64, f64) = (100.0, 3.0, 3.0);
+pub const SHIP_COLOR_SHADOW_DARK: (f64, f64, f64) = (8.0, 8.0, 8.0);
+pub const SHIP_COLOR_SHADOW_MID: (f64, f64, f64) = (25.0, 25.0, 25.0);
+pub const SHIP_COLOR_HIGHLIGHT: (f64, f64, f64) = (220.0, 190.0, 160.0);
+pub const SHIP_COLOR_ACCENT: (f64, f64, f64) = (18.0, 28.0, 45.0);
+
 // Minimum time between random teleportations
 pub const COOLDOWN_TP: f64 = 5.0;
 pub const TP_TIME_INVIC: f64 = 1.0; // Invincibility time after tp. TODO: Implement

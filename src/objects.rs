@@ -85,9 +85,9 @@ pub fn spawn_ship() -> Entity {
         .collect();
 
     let shapes = vec![
-        ((1000.0, 100.0, 25.0), Polygon(circle_poly)),
+        (SHIP_COLOR_PRIMARY, Polygon(circle_poly)),
         (
-            (200.0, 20.0, 20.0),
+            SHIP_COLOR_FIN,
             Polygon(vec![
                 (0.0, 3.0 * SHIP_RADIUS),
                 (3.0 * PI / 4.0, 2.0 * SHIP_RADIUS),
@@ -96,7 +96,7 @@ pub fn spawn_ship() -> Entity {
             ]),
         ),
         (
-            (250.0, 25.0, 25.0),
+            SHIP_COLOR_FIN_HIGHLIGHT,
             Polygon(vec![
                 (0.0, 3.0 * SHIP_RADIUS),
                 (PI, SHIP_RADIUS),
@@ -104,7 +104,7 @@ pub fn spawn_ship() -> Entity {
             ]),
         ),
         (
-            (120.0, 5.0, 5.0),
+            SHIP_COLOR_FIN_SHADOW,
             Polygon(vec![
                 (0.0, 3.0 * SHIP_RADIUS),
                 (3.0 * PI / 4.0, 2.0 * SHIP_RADIUS),
@@ -112,7 +112,7 @@ pub fn spawn_ship() -> Entity {
             ]),
         ),
         (
-            (10.0, 10.0, 10.0),
+            SHIP_COLOR_SHADOW_DARK,
             Polygon(vec![
                 (PI, SHIP_RADIUS / 3.0),
                 (PI, SHIP_RADIUS),
@@ -120,7 +120,7 @@ pub fn spawn_ship() -> Entity {
             ]),
         ),
         (
-            (30.0, 30.0, 30.0),
+            SHIP_COLOR_SHADOW_MID,
             Polygon(vec![
                 (PI, SHIP_RADIUS / 3.0),
                 (3.0 * PI / 4.0, 2.0 * SHIP_RADIUS),
@@ -128,7 +128,7 @@ pub fn spawn_ship() -> Entity {
             ]),
         ),
         (
-            (200.0, 180.0, 160.0),
+            SHIP_COLOR_HIGHLIGHT,
             Polygon(vec![
                 (0.0, 3.0 * SHIP_RADIUS),
                 (0.0, 1.5 * SHIP_RADIUS),
@@ -136,7 +136,7 @@ pub fn spawn_ship() -> Entity {
             ]),
         ),
         (
-            (20.0, 30.0, 40.0),
+            SHIP_COLOR_ACCENT,
             Polygon(vec![
                 (0.0, 3.0 * SHIP_RADIUS),
                 (PI / 8.0, 1.5 * SHIP_RADIUS),
@@ -148,7 +148,7 @@ pub fn spawn_ship() -> Entity {
     Entity {
         kind: EntityKind::Ship,
         visuals: Visuals {
-            color: (1000.0, 100.0, 25.0),
+            color: SHIP_COLOR_PRIMARY,
             radius: SHIP_RADIUS * 0.9,
             shapes,
         },
@@ -866,6 +866,19 @@ mod smoke_velocity_tests {
             .sum();
         let avg_vy = total_vy / samples as f64;
         assert!(avg_vy < -200.0, "avg_vy={avg_vy}, expected ~-500.0");
+    }
+}
+
+#[cfg(test)]
+mod ship_color_tests {
+    use super::*;
+    #[test]
+    fn ship_primary_color_is_saturated_red() {
+        let ship = spawn_ship();
+        let (r, g, b) = ship.visuals.color;
+        assert!(r > g * 5.0, "ship red={r} not dominant over green={g}");
+        assert!(r > b * 5.0, "ship red={r} not dominant over blue={b}");
+        assert!(r > 255.0, "ship red={r} should exceed 255 for HDR wide gamut");
     }
 }
 
