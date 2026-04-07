@@ -27,6 +27,10 @@ pub struct HudUniforms {
     pub screen_width: f32,
     pub screen_height: f32,
     pub brightness_scale: f32,
+    pub hdr_enabled: f32,
+    pub max_brightness: f32,
+    pub tonemap_variant: f32,
+    pub exposure: f32,
     pub _padding: f32,
 }
 
@@ -527,6 +531,10 @@ impl Renderer2D {
                 screen_width: width as f32,
                 screen_height: height as f32,
                 brightness_scale: 1.0,
+                hdr_enabled: 0.0,
+                max_brightness: 1000.0,
+                tonemap_variant: 3.0,
+                exposure: 1.0,
                 _padding: 0.0,
             }]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
@@ -1424,6 +1432,15 @@ impl Renderer2D {
         }
 
         queue.submit(std::iter::once(encoder.finish()));
+    }
+}
+
+#[cfg(test)]
+mod hud_uniforms_tests {
+    use super::*;
+    #[test]
+    fn hud_uniforms_size_is_32_bytes() {
+        assert_eq!(std::mem::size_of::<HudUniforms>(), 32);
     }
 }
 

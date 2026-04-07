@@ -328,6 +328,10 @@ fn main() {
                             } else {
                                 1.0
                             },
+                            hdr_enabled: if globals.hdr.hdr_enabled { 1.0 } else { 0.0 },
+                            max_brightness: globals.hdr.max_brightness as f32,
+                            tonemap_variant: globals.hdr.tonemap_variant as f32,
+                            exposure: globals.hdr.exposure as f32,
                             _padding: 0.0,
                         },
                     );
@@ -672,6 +676,10 @@ fn main() {
                 screen_width: renderer.width as f32,
                 screen_height: renderer.height as f32,
                 brightness_scale: hud_brightness,
+                hdr_enabled: if globals.hdr.hdr_enabled { 1.0 } else { 0.0 },
+                max_brightness: globals.hdr.max_brightness as f32,
+                tonemap_variant: globals.hdr.tonemap_variant as f32,
+                exposure: globals.hdr.exposure as f32,
                 _padding: 0.0,
             },
         );
