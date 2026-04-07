@@ -8,6 +8,70 @@ use crate::parameters::*;
 use crate::rendering::Renderer2D;
 
 // ============================================================================
+// Trail rendering
+// ============================================================================
+
+/// Configuration for motion-blur capsule trail rendering.
+pub struct TrailConfig {
+    pub radius: f64,
+    pub brightness_falloff: f64,
+    pub shutter_speed: f64,
+}
+
+impl TrailConfig {
+    pub fn star() -> Self {
+        TrailConfig { radius: 1.0, brightness_falloff: 1.0, shutter_speed: 1.0 }
+    }
+    pub fn bullet(radius: f64) -> Self {
+        TrailConfig { radius, brightness_falloff: 0.5, shutter_speed: 1.0 }
+    }
+}
+
+/// Render a motion-blur capsule trail between two screen-space endpoints.
+/// Brightness conservation: brightness×area stays constant as circle→capsule.
+/// Scale = π·r² / (π·r² + 2·r·L) = 1 / (1 + 2L/(π·r))
+pub fn render_trail(
+    renderer: &mut Renderer2D,
+    p0: (f64, f64),
+    p1: (f64, f64),
+    cfg: &TrailConfig,
+    base_color: [f32; 4],
+) {
+    let (x1, y1) = p0;
+    let (x2, y2) = p1;
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    let trail_len = (dx * dx + dy * dy).sqrt();
+
+    let r = cfg.radius.max(0.001);
+    let area_scale = if trail_len < 0.001 {
+        1.0
+    } else {
+        let pi_r2 = std::f64::consts::PI * r * r;
+        pi_r2 / (pi_r2 + 2.0 * r * trail_len)
+    };
+
+    let trail_lum = if cfg.brightness_falloff <= 0.0 {
+        1.0
+    } else if cfg.brightness_falloff >= 1.0 {
+        (1.0 / (1.0 + trail_len)).sqrt()
+    } else {
+        cfg.brightness_falloff * (r / (r + trail_len)).sqrt()
+    };
+
+    let combined_scale = (area_scale * trail_lum) as f32;
+    let color = [
+        base_color[0] * combined_scale,
+        base_color[1] * combined_scale,
+        base_color[2] * combined_scale,
+        base_color[3],
+    ];
+
+    let radius = (cfg.radius * cfg.shutter_speed).max(1.0) as f32;
+    renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, radius, color);
+}
+
+// ============================================================================
 // Polygon rendering helpers
 // ============================================================================
 
@@ -227,4 +291,26 @@ pub fn render_projectile(
     let radius = dither_radius(rad, DITHER_AA, DITHER_POWER_RADIUS, rng).max(1) as f32;
 
     renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, radius, color);
+}
+
+#[cfg(test)]
+mod trail_config_tests {
+    use super::*;
+    #[test]
+    fn trail_config_star_defaults() {
+        let cfg = TrailConfig::star();
+        assert!((cfg.radius - 1.0).abs() < 1e-9);
+        assert!((cfg.shutter_speed - 1.0).abs() < 1e-9);
+    }
+    #[test]
+    fn trail_config_bullet_defaults() {
+        let cfg = TrailConfig::bullet(15.0);
+        assert!((cfg.radius - 15.0).abs() < 1e-9);
+        assert!((cfg.shutter_speed - 1.0).abs() < 1e-9);
+    }
+    #[test]
+    fn trail_config_shutter_zero_means_no_trail() {
+        let cfg = TrailConfig { radius: 5.0, brightness_falloff: 0.5, shutter_speed: 0.0 };
+        assert!((cfg.shutter_speed).abs() < 1e-9);
+    }
 }
