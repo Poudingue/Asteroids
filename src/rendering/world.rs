@@ -302,3 +302,96 @@ mod trail_config_tests {
         assert!((cfg.shutter_speed).abs() < 1e-9);
     }
 }
+
+#[cfg(test)]
+mod brightness_conservation_tests {
+    use std::f64::consts::PI;
+
+    /// Compute the brightness conservation scale factor.
+    /// This mirrors the formula in render_trail().
+    fn area_scale(radius: f64, trail_len: f64) -> f64 {
+        let r = radius.max(0.001);
+        if trail_len < 0.001 {
+            1.0
+        } else {
+            let pi_r2 = PI * r * r;
+            pi_r2 / (pi_r2 + 2.0 * r * trail_len)
+        }
+    }
+
+    /// Circle area = π·r²
+    fn circle_area(r: f64) -> f64 {
+        PI * r * r
+    }
+
+    /// Capsule area = π·r² + 2·r·L (two semicircles + rectangle)
+    fn capsule_area(r: f64, l: f64) -> f64 {
+        PI * r * r + 2.0 * r * l
+    }
+
+    #[test]
+    fn stationary_object_has_unit_scale() {
+        // No trail → scale = 1.0 (circle unchanged)
+        assert!((area_scale(5.0, 0.0) - 1.0).abs() < 1e-9);
+        assert!((area_scale(100.0, 0.0) - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn total_luminous_flux_is_conserved() {
+        // For any (radius, trail_length), brightness×area must equal the circle's brightness×area
+        // circle: flux = 1.0 × π·r²
+        // capsule: flux = scale × (π·r² + 2·r·L)
+        // These must be equal.
+        let test_cases = [
+            (1.0, 10.0),
+            (5.0, 5.0),
+            (10.0, 100.0),
+            (0.5, 1000.0),
+            (50.0, 0.1),
+            (1.0, 1.0),
+        ];
+        for (r, l) in test_cases {
+            let circle_flux = 1.0 * circle_area(r);
+            let scale = area_scale(r, l);
+            let capsule_flux = scale * capsule_area(r, l);
+            let relative_error = ((capsule_flux - circle_flux) / circle_flux).abs();
+            assert!(
+                relative_error < 1e-10,
+                "Conservation violated: r={r}, l={l}, circle_flux={circle_flux}, capsule_flux={capsule_flux}, error={relative_error}"
+            );
+        }
+    }
+
+    #[test]
+    fn scale_decreases_with_trail_length() {
+        // Longer trail → dimmer (more area to spread light over)
+        let r = 5.0;
+        let s1 = area_scale(r, 1.0);
+        let s2 = area_scale(r, 10.0);
+        let s3 = area_scale(r, 100.0);
+        assert!(s1 > s2, "s1={s1} should be > s2={s2}");
+        assert!(s2 > s3, "s2={s2} should be > s3={s3}");
+    }
+
+    #[test]
+    fn scale_approaches_zero_for_infinite_trail() {
+        // Very long trail relative to radius → scale approaches 0
+        let scale = area_scale(1.0, 1_000_000.0);
+        assert!(scale < 0.001, "scale={scale} should approach 0 for very long trail");
+    }
+
+    #[test]
+    fn scale_is_independent_of_absolute_size() {
+        // Scaling both radius and length by same factor should give same scale
+        // (the formula simplifies: πr²/(πr²+2rL) = πr/(πr+2L))
+        // Actually this is NOT true — let's verify the actual behavior.
+        // scale(r, L) = πr / (πr + 2L) when simplified by r
+        // So scale(2r, 2L) = π·2r / (π·2r + 2·2L) = 2πr / (2πr + 4L) = πr / (πr + 2L)
+        // Yes, it IS scale-invariant when both scale together!
+        let s1 = area_scale(1.0, 10.0);
+        let s2 = area_scale(2.0, 20.0);
+        let s3 = area_scale(0.5, 5.0);
+        assert!((s1 - s2).abs() < 1e-10, "Should be scale-invariant: s1={s1}, s2={s2}");
+        assert!((s1 - s3).abs() < 1e-10, "Should be scale-invariant: s1={s1}, s3={s3}");
+    }
+}
