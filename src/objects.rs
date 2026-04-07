@@ -324,10 +324,10 @@ pub fn spawn_explosion(projectile: &Entity, rng: &mut impl Rng) -> Entity {
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: projectile.position,
-        velocity: from_polar(
-            rng.gen::<f64>() * 2.0 * PI,
-            rng.gen::<f64>() * SMOKE_MAX_SPEED,
-        ),
+        velocity: {
+            let rand_vel = from_polar(rng.gen::<f64>() * 2.0 * PI, rng.gen::<f64>() * SMOKE_MAX_SPEED);
+            crate::math_utils::add_vec(projectile.velocity, rand_vel)
+        },
         orientation: 0.0,
         moment: 0.0,
         proper_time: 1.0,
@@ -406,10 +406,10 @@ pub fn spawn_explosion_object(
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: obj.position,
-        velocity: from_polar(
-            rng.gen::<f64>() * 2.0 * PI,
-            rng.gen::<f64>() * SMOKE_MAX_SPEED,
-        ),
+        velocity: {
+            let rand_vel = from_polar(rng.gen::<f64>() * 2.0 * PI, rng.gen::<f64>() * SMOKE_MAX_SPEED);
+            crate::math_utils::add_vec(obj.velocity, rand_vel)
+        },
         orientation: 0.0,
         moment: 0.0,
         proper_time: obj.proper_time,
@@ -444,10 +444,10 @@ pub fn spawn_explosion_death(ship: &Entity, elapsed_time: f64, rng: &mut impl Rn
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: ship.position,
-        velocity: from_polar(
-            rng.gen::<f64>() * 2.0 * PI,
-            rng.gen::<f64>() * SMOKE_MAX_SPEED,
-        ),
+        velocity: {
+            let rand_vel = from_polar(rng.gen::<f64>() * 2.0 * PI, rng.gen::<f64>() * SMOKE_MAX_SPEED);
+            crate::math_utils::add_vec(ship.velocity, rand_vel)
+        },
         orientation: 0.0,
         moment: 0.0,
         proper_time: ship.proper_time,
@@ -507,10 +507,10 @@ pub fn spawn_chunk_explosion(
         phys_res: 0.0,
         phys_ratio: 0.0,
         position: obj.position,
-        velocity: from_polar(
-            rng.gen::<f64>() * 2.0 * PI,
-            rng.gen::<f64>() * SMOKE_MAX_SPEED,
-        ),
+        velocity: {
+            let rand_vel = from_polar(rng.gen::<f64>() * 2.0 * PI, rng.gen::<f64>() * SMOKE_MAX_SPEED);
+            crate::math_utils::add_vec(obj.velocity, rand_vel)
+        },
         orientation: 0.0,
         moment: 0.0,
         proper_time: obj.proper_time,
@@ -828,4 +828,43 @@ pub fn check_spawn(e: &Entity, phys_w: f64, phys_h: f64) -> bool {
 
 pub fn check_not_spawn(e: &Entity, phys_w: f64, phys_h: f64) -> bool {
     !check_spawn(e, phys_w, phys_h)
+}
+
+#[cfg(test)]
+mod smoke_velocity_tests {
+    use super::*;
+    use rand::SeedableRng;
+    use rand::rngs::SmallRng;
+    use crate::math::Vec2;
+
+    fn make_entity_at_velocity(vx: f64, vy: f64) -> Entity {
+        let mut e = spawn_ship();
+        e.velocity = Vec2::new(vx, vy);
+        e.position = Vec2::new(100.0, 100.0);
+        e
+    }
+
+    #[test]
+    fn spawn_explosion_velocity_includes_parent() {
+        let mut rng = SmallRng::seed_from_u64(42);
+        let parent = make_entity_at_velocity(1000.0, 0.0);
+        let samples = 200;
+        let total_vx: f64 = (0..samples)
+            .map(|_| spawn_explosion(&parent, &mut rng).velocity.x)
+            .sum();
+        let avg_vx = total_vx / samples as f64;
+        assert!(avg_vx > 500.0, "avg_vx={avg_vx}, expected ~1000.0");
+    }
+
+    #[test]
+    fn spawn_explosion_death_velocity_includes_parent() {
+        let mut rng = SmallRng::seed_from_u64(42);
+        let ship = make_entity_at_velocity(0.0, -500.0);
+        let samples = 200;
+        let total_vy: f64 = (0..samples)
+            .map(|_| spawn_explosion_death(&ship, 1.0, &mut rng).velocity.y)
+            .sum();
+        let avg_vy = total_vy / samples as f64;
+        assert!(avg_vy < -200.0, "avg_vy={avg_vy}, expected ~-500.0");
+    }
 }
