@@ -54,7 +54,6 @@ pub fn render_visuals(
     offset: Vec2,
     renderer: &mut Renderer2D,
     globals: &Globals,
-    rng: &mut impl Rng,
 ) {
     let visuals = &entity.visuals;
     let position = scale_vec(
@@ -71,14 +70,9 @@ pub fn render_visuals(
     if visuals.radius > 0.0 && visuals.shapes.is_empty() {
         let color = to_hdr_rgba(intensify(hdr(visuals.color), exposure));
         let (x, y) = dither_vec(position, DITHER_AA, globals.render.current_jitter_double);
-        let r = dither_radius(
-            visuals.radius * globals.render.render_scale,
-            DITHER_AA,
-            DITHER_POWER_RADIUS,
-            rng,
-        );
+        let r = (visuals.radius * globals.render.render_scale).max(1.0);
         let falloff = if entity.kind == EntityKind::Smoke { 0.2 } else { 0.0 };
-        renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color, falloff);
+        renderer.push_circle_instance(x as f32, y as f32, r as f32, color, falloff);
     }
 
     // Polygon shapes on top
@@ -97,7 +91,6 @@ pub fn render_chunk(
     entity: &Entity,
     renderer: &mut Renderer2D,
     globals: &Globals,
-    rng: &mut impl Rng,
 ) {
     let pos = scale_vec(
         add_vec(entity.position, globals.screenshake.game_screenshake_pos),
@@ -109,13 +102,8 @@ pub fn render_chunk(
         intensity_chunk * globals.exposure.game_exposure * entity.hdr_exposure,
     ));
     let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
-    let r = dither_radius(
-        globals.render.render_scale * entity.visuals.radius,
-        DITHER_AA,
-        DITHER_POWER_RADIUS,
-        rng,
-    );
-    renderer.push_circle_instance(x as f32, y as f32, r.max(1) as f32, color, 0.0);
+    let r = (globals.render.render_scale * entity.visuals.radius).max(1.0);
+    renderer.push_circle_instance(x as f32, y as f32, r as f32, color, 0.0);
 }
 
 /// Render a star with motion trail

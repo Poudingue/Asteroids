@@ -1484,12 +1484,12 @@ pub fn render_frame(
 
     // Smoke
     for s in &state.smoke {
-        render_visuals(s, Vec2::ZERO, renderer, globals, &mut state.rng);
+        render_visuals(s, Vec2::ZERO, renderer, globals);
     }
 
     // Chunks
     for chunk in &state.chunks {
-        render_chunk(chunk, renderer, globals, &mut state.rng);
+        render_chunk(chunk, renderer, globals);
     }
 
     // TODO: Sparkles (collision light-trails) — will be added when collision system creates them
@@ -1501,28 +1501,28 @@ pub fn render_frame(
 
     // Fragments
     for entity in &state.fragments {
-        render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
+        render_visuals(entity, Vec2::ZERO, renderer, globals);
     }
 
     // Toosmall
     for entity in &state.toosmall {
-        render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
+        render_visuals(entity, Vec2::ZERO, renderer, globals);
     }
 
     // Asteroids
     for entity in &state.objects {
-        render_visuals(entity, Vec2::ZERO, renderer, globals, &mut state.rng);
+        render_visuals(entity, Vec2::ZERO, renderer, globals);
     }
 
     // Explosions — in front of asteroids, behind ship
     for e in &state.explosions {
-        render_visuals(e, Vec2::ZERO, renderer, globals, &mut state.rng);
+        render_visuals(e, Vec2::ZERO, renderer, globals);
     }
 
     // Ship — topmost game object
     let true_aim = state.ship.orientation;
     state.ship.orientation = state.gamepad.visual_aim_angle;
-    render_visuals(&state.ship, Vec2::ZERO, renderer, globals, &mut state.rng);
+    render_visuals(&state.ship, Vec2::ZERO, renderer, globals);
     state.ship.orientation = true_aim;
 
     // HUD overlay — skip when paused (matches OCaml behavior)
