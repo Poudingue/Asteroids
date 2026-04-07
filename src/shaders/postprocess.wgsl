@@ -107,6 +107,18 @@ fn hard_redirect(col: vec3<f32>, threshold: f32) -> vec3<f32> {
     return clamp(vec3<f32>(r_out, g_out, b_out), vec3<f32>(0.0), vec3<f32>(threshold));
 }
 
+// ============================================================================
+// Color Effect Architecture
+// ============================================================================
+// Two-tier color effects:
+//   1. Per-object (forward pass, vertex data): entity visuals.color × hdr_exposure
+//      - Asteroid tints, bullet colors, ship shading — vary per entity
+//   2. Global (post-process, uniforms): add_color + mul_color × game_exposure × exposure
+//      - Screen flash (add_color): e.g. white flash on hit, red flash on damage
+//      - Damage tint (mul_color): e.g. red tint when health is low
+//      - Brightness (game_exposure, exposure): overall scene intensity
+// Do NOT mix these: per-object colors must never be passed via PostProcessUniforms.
+// ============================================================================
 fn tonemap(hdr_color: vec3<f32>) -> vec3<f32> {
     let add_color = vec3<f32>(uniforms.add_color_r, uniforms.add_color_g, uniforms.add_color_b);
     let mul_color = vec3<f32>(uniforms.mul_color_r, uniforms.mul_color_g, uniforms.mul_color_b);
