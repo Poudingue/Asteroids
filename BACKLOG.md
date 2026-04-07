@@ -18,20 +18,17 @@
 
 ## Rendering Pipeline
 
-- [ ] [rendering] Fix rendering layer order: background → stars → smoke → chunks → sparkles (light-trails from physical collisions, intensity dosed by collision force) → bullets → asteroids → explosions → ship (severity: major, 2026-04-06)
-- [ ] [rendering] Mutualize stars/bullets/sparkles rendering — same visual principles (configurable capsule size, brightness falloff rate, color, "shutter speed" param defaulting to 100%). Shutter speed: 0% = pure circle (no streak), 100% = physically correct trail length, >100% exaggerates trail beyond physical. Time-exposure metaphor: lower = shorter trail. (severity: major, 2026-04-06)
-- [ ] [rendering] Remove radius dithering for circles (severity: minor, 2026-04-06)
-- [ ] [rendering] Soft falloff for all SDF-based alpha — pixel-sized smoothstep, but falloff width configurable. Smoke: 20% falloff (full opacity at 80% diameter, 0% at 100% spawn diameter) (severity: major, 2026-04-06)
-- [ ] [rendering] MSAA is useless for SDF-based effects — document this, remove MSAA from affected passes, plan pass-aware AA strategy (severity: minor, 2026-04-06)
-- [ ] [rendering] Add SSAA modes: 4×, 9×, 16× — for evaluating AA quality and scale-independence (severity: minor, 2026-04-06)
+- [ ] [rendering] Merge "exposure" and "game exposure" into single "exposure" slider � game exposure is internal state only (affected by events), not user-adjustable. Remove separate game_exposure slider from pause menu (severity: major, 2026-04-07)
+- [ ] [rendering/hdr] Clarify max_brightness role: it IS the tonemap threshold � for pseudo-Reinhard it's the target at +infinity input. Ensure all tonemap variants use it correctly as their threshold parameter (severity: major, 2026-04-07)
+
+- [ ] [rendering] Document that MSAA only affects polygon geometry (ship/asteroid edges), not SDF circles/capsules. MSAA stays for polygon AA (severity: minor, 2026-04-06)
+- [ ] [rendering] SMAA post-process AA — optional pass between scene render and final output. Complements MSAA (geometry) and SSAA (supersample). All three independently toggleable and stackable. Pipeline order: MSAA scene -> SMAA post-process -> SSAA downsample (severity: major, 2026-04-07)
+- [ ] [rendering] SSAA modes (4x, 9x, 16x) — render offscreen at higher resolution, downsample in postprocess. Purpose: generate pixel-perfect reference renders for visual comparison via screenshot tools. Optional, default Off (severity: major, 2026-04-06)
 - [ ] [rendering] MSDF text rendering — replace polygon-based glyph system with MSDF for better quality and scalability (severity: minor, 2026-04-03)
+- [ ] [rendering] Velocity buffer (motion vectors) — per-pixel screen-space velocity render target (Rg16Float), written in world+SDF passes. Enables TAA/TSSAA temporal reprojection, post-process motion blur, wind visual effects, GPU particle trails. Prerequisite for temporal AA and advanced post-process effects (severity: major, 2026-04-07)
 
 ### Brightness & Color Correctness
 
-- [ ] [rendering] Mathematically exact brightness conservation for SDF capsules — brightness×area must remain constant as circle becomes streak. Focus circle→capsule first; soft attenuation deferred (severity: major, 2026-04-06)
-- [ ] [rendering] Global color effects (screen flash, damage tint, slow-mo color shift) must be post-process. Per-object color (asteroid tint, bullet color) stays in forward/instance pass — do not move these to post-process (severity: major, 2026-04-06)
-- [ ] [rendering] Use widest available color gamut — ship should render at maximum displayable red (severity: minor, 2026-04-06)
-- [ ] [rendering/hdr] HUD brightness: reach target nits, then skip tonemapping if below max_brightness, otherwise apply same tonemap as scene. Current behavior is dull/washed-out (severity: major, 2026-04-06)
 - [ ] [rendering/hdr] Gamut mapping when display gamut info is available (sRGB display gets gamut-mapped P3 colors) (severity: minor, 2026-04-04)
 
 ---
@@ -67,7 +64,18 @@
 
 ---
 
+## Controls & Gameplay
+
+- [ ] [controls] Gamepad: orienting ship should trigger continuous shooting by default (severity: major, 2026-04-07)
+- [ ] [controls] Gamepad: left button triggers teleport+explosion (was: separate action) (severity: major, 2026-04-07)
+- [ ] [controls] KB+Mouse: right-click triggers teleport+explosion (severity: major, 2026-04-07)
+- [ ] [gameplay] Teleport invulnerability: ship should not be damaged by the asteroid it teleports into (or its fragments) until they move far enough to become "normal" objects � similar to explosion fragment grace period (severity: major, 2026-04-07)
+
+---
+
 ## Haptics
+
+- [ ] [ui] Pause menu should be navigable via gamepad (severity: minor, 2026-04-07)
 
 - [ ] [haptics] Gamepad vibration system — configurable, any game event as vibration source (severity: minor, 2026-04-06)
 - [ ] [haptics] Advanced haptics research & plan — DualSense adaptive triggers/HD haptics, Switch HD Rumble, Xbox impulse triggers; document what's available per platform (severity: minor, 2026-04-06)

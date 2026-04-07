@@ -1,5 +1,18 @@
 # Asteroids Rust Port - Completed Items
 
+## Phase 2A — Rendering Visual Quality (2026-04-07)
+
+- [x] [rendering] Fix rendering layer order: ship now renders on top of all game objects (completed: 2026-04-07)
+- [x] [rendering] Soft SDF alpha falloff — configurable falloff_width on CircleInstance, smoke gets 0.2 (completed: 2026-04-07)
+- [x] [rendering] Remove radius dithering for SDF circles — smoothstep handles AA (completed: 2026-04-07)
+- [x] [rendering] TrailConfig + shared render_trail() with brightness conservation formula (completed: 2026-04-07)
+- [x] [rendering] Mutualized star/bullet trail rendering via render_trail() (completed: 2026-04-07)
+- [x] [rendering] Documented two-tier color effect architecture in postprocess.wgsl (completed: 2026-04-07)
+- [x] [rendering/hdr] HUD tonemap — same compression curve as scene, HudUniforms expanded to 32 bytes (completed: 2026-04-07)
+- [x] [physics] Explosion smoke inherits parent velocity in all 4 spawn functions (completed: 2026-04-07)
+- [x] [physics] Engine fire always ejects backward using FIRE_SPEED_RATIO (completed: 2026-04-07)
+- [x] [rendering] Ship color pushed to HDR-range red (1400, 60, 20) for maximum gamut width (completed: 2026-04-07)
+
 ## HDR Pipeline & Pause Menu Redesign (2026-04-04)
 
 - [x] [ui] Tonemap variant cycle: Passthrough/Reinhard/Hard Redirect/Soft Redirect (completed: 2026-04-04)
