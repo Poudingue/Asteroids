@@ -170,7 +170,6 @@ pub fn render_chunk(
     renderer.push_circle_instance(x as f32, y as f32, r as f32, color, 0.0);
 }
 
-/// Render a star with motion trail
 pub fn render_star_trail(
     star: &Star,
     renderer: &mut Renderer2D,
@@ -224,23 +223,15 @@ pub fn render_star_trail(
         renderer.plot(x1 - 1, y1 - 1, diag_color);
     } else {
         // Moving star: render as a thin SDF capsule trail
-        let dist = magnitude(sub_vec(pos1, pos2));
-        let trail_lum = (1.0 / (1.0 + dist)).sqrt();
-        let trail_color = hdr_add(
-            intensify(star_color_tmp, trail_lum),
+        let cfg = TrailConfig::star();
+        let base_color = to_hdr_rgba(hdr_add(
+            star_color_tmp,
             hdr_add(
-                intensify(
-                    hdr(globals.visual.space_color),
-                    globals.exposure.game_exposure,
-                ),
-                intensify(
-                    hdr(globals.exposure.add_color),
-                    globals.exposure.game_exposure,
-                ),
+                intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure),
+                intensify(hdr(globals.exposure.add_color), globals.exposure.game_exposure),
             ),
-        );
-        let color = to_hdr_rgba(trail_color);
-        renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, 1.0, color);
+        ));
+        render_trail(renderer, (x1 as f64, y1 as f64), (x2 as f64, y2 as f64), &cfg, base_color);
     }
 }
 
@@ -248,7 +239,6 @@ pub fn render_star_trail(
 // Projectile rendering
 // ============================================================================
 
-/// Render a projectile as an SDF capsule (motion-blur trail). Ported from OCaml render_projectile.
 pub fn render_projectile(
     entity: &Entity,
     renderer: &mut Renderer2D,
@@ -282,15 +272,13 @@ pub fn render_projectile(
     );
     let pos2 = lerp_vec(last_pos, pos1, SHUTTER_SPEED);
 
-    let dist = magnitude(sub_vec(pos1, pos2));
-    let trail_lum = 0.5 * (rad / (rad + dist)).sqrt();
-    let color = to_hdr_rgba(intensify(col, trail_lum));
-
     let (x1, y1) = dither_vec(pos1, DITHER_AA, globals.render.current_jitter_double);
     let (x2, y2) = dither_vec(pos2, DITHER_AA, globals.render.current_jitter_double);
-    let radius = dither_radius(rad, DITHER_AA, DITHER_POWER_RADIUS, rng).max(1) as f32;
+    let radius_px = dither_radius(rad, DITHER_AA, DITHER_POWER_RADIUS, rng).max(1) as f64;
 
-    renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, radius, color);
+    let cfg = TrailConfig::bullet(radius_px);
+    let base_color = to_hdr_rgba(col);
+    render_trail(renderer, (x1 as f64, y1 as f64), (x2 as f64, y2 as f64), &cfg, base_color);
 }
 
 #[cfg(test)]
