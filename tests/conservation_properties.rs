@@ -6,9 +6,10 @@ use asteroids::math_utils::{add_vec, magnitude, scale_vec, squared, Vec2};
 /// implementation violates physics, marked with #[ignore].
 ///
 /// Goal: document violations, not hide them.
-use asteroids::objects::{
+use asteroids::objects::Entity;
+use asteroids::spawning::{
     fragment_asteroid, spawn_asteroid, spawn_explosion, spawn_explosion_chunk, spawn_fragments,
-    spawn_n_chunks, spawn_projectile, Entity,
+    spawn_n_chunks, spawn_projectile,
 };
 use asteroids::parameters::{
     Globals, ASTEROID_DENSITY, ASTEROID_MIN_SIZE, CHUNKS_EXPLO_MAX_SPEED, FRAGMENT_NUMBER,

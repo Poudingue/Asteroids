@@ -5,6 +5,7 @@ use crate::color::*;
 use crate::math_utils::*;
 use crate::objects::*;
 use crate::parameters::*;
+use crate::spawning::*;
 use crate::update::*;
 pub use crate::physics::{collision_circles, collision_point};
 use crate::physics::{
@@ -480,7 +481,7 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
             .chain(state.toosmall.iter())
             .chain(state.toosmall_oos.iter())
             .chain(state.fragments.iter())
-            .filter(|e| crate::update::is_dead(e))
+            .filter(|e| crate::objects::is_dead(e))
             .cloned()
             .collect();
         for obj in &dead_objects {
@@ -799,11 +800,11 @@ pub fn update_game(state: &mut GameState, globals: &mut Globals) {
     }
 
     // === Destroyed entity accounting (asteroids + fragments) ===
-    let nb_destroyed = state.objects.iter().filter(|e| crate::update::is_dead(e)).count()
-        + state.objects_oos.iter().filter(|e| crate::update::is_dead(e)).count()
-        + state.toosmall.iter().filter(|e| crate::update::is_dead(e)).count()
-        + state.toosmall_oos.iter().filter(|e| crate::update::is_dead(e)).count()
-        + state.fragments.iter().filter(|e| crate::update::is_dead(e)).count();
+    let nb_destroyed = state.objects.iter().filter(|e| crate::objects::is_dead(e)).count()
+        + state.objects_oos.iter().filter(|e| crate::objects::is_dead(e)).count()
+        + state.toosmall.iter().filter(|e| crate::objects::is_dead(e)).count()
+        + state.toosmall_oos.iter().filter(|e| crate::objects::is_dead(e)).count()
+        + state.fragments.iter().filter(|e| crate::objects::is_dead(e)).count();
     globals.time.game_speed *= RATIO_TIME_DESTR_ASTEROID.powi(nb_destroyed as i32);
     state.score += nb_destroyed as i32;
     globals.screenshake.shake_score += nb_destroyed as f64;

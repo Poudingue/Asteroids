@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::game::{self, GameState};
 use crate::input;
 use crate::math::Vec2;
-use crate::objects::spawn_asteroid;
+use crate::spawning::spawn_asteroid;
 use crate::parameters::{Globals, SimulationMode};
 
 // ============================================================================

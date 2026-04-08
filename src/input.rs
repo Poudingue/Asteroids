@@ -6,6 +6,7 @@ use crate::update::accelerate_entity;
 use crate::math_utils::*;
 use crate::objects::*;
 use crate::parameters::*;
+use crate::spawning::*;
 
 // ============================================================================
 // Input handlers

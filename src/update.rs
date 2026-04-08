@@ -101,29 +101,19 @@ pub fn wrap_entities(entities: &mut [Entity], globals: &Globals) {
 }
 
 // --- Entity predicates ---
-
-pub fn is_alive(entity: &Entity) -> bool {
-    entity.health > 0.0
-}
-
-pub fn is_dead(entity: &Entity) -> bool {
-    entity.health <= 0.0
-}
+// Note: is_alive, is_dead, positive_radius are defined in objects.rs (imported via use crate::objects::*)
 
 pub fn ischunk(entity: &Entity) -> bool {
     entity.hitbox.int_radius < CHUNK_MAX_SIZE
 }
 
+/// big_enough uses int_radius (update semantics — differs from objects::big_enough which uses ext_radius)
 pub fn big_enough(entity: &Entity) -> bool {
     entity.hitbox.int_radius >= ASTEROID_MIN_SIZE
 }
 
 pub fn too_small(entity: &Entity) -> bool {
     !big_enough(entity)
-}
-
-pub fn positive_radius(entity: &Entity) -> bool {
-    entity.visuals.radius > 0.0
 }
 
 /// Check if entity is within visible screen area (with radius margin)

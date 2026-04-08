@@ -11,4 +11,5 @@ pub mod physics;
 pub mod recording;
 pub mod rendering;
 pub mod scenario;
+pub mod spawning;
 pub mod update;

@@ -6,6 +6,7 @@ use asteroids::game::*;
 use asteroids::math_utils::*;
 use asteroids::objects::*;
 use asteroids::parameters::*;
+use asteroids::spawning::*;
 use asteroids::update::*;
 
 const EPS: f64 = 1e-10;

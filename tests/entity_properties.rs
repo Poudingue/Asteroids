@@ -4,9 +4,9 @@ use asteroids::math_utils::Vec2;
 /// before V2 refactoring begins.
 use asteroids::objects::{
     big_enough, check_not_spawn, check_spawn, close_enough, is_alive, is_chunk, is_dead, not_chunk,
-    positive_radius, spawn_asteroid, spawn_explosion, spawn_projectile, spawn_ship, too_far,
-    too_small, Entity, EntityKind, Hitbox, Polygon, Visuals,
+    positive_radius, too_far, too_small, Entity, EntityKind, Hitbox, Polygon, Visuals,
 };
+use asteroids::spawning::{spawn_asteroid, spawn_explosion, spawn_projectile, spawn_ship};
 use rand::thread_rng;
 
 // ============================================================================
