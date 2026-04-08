@@ -20,40 +20,44 @@ Replace the 2-pass system with an **ordered layer system** inspired by compositi
 
 | Layer | Content | Type | AA |
 |-------|---------|------|----|
-| 0 | Background rect | Polygon | None (single color) |
-| 1 | Star trails | SDF capsules | Analytic (smoothstep) |
-| 2 | Bullet trails | SDF capsules | Analytic |
-| 3 | Smoke | SDF circles | Analytic |
-| 4 | Polygons: asteroids, fragments, ship | Polygon batch | MSAA (if enabled) → resolve |
-| 5 | Effects: explosion circles, sparkles, future FX | SDF circles | Analytic |
-| 6 | HUD | Polygon + SDF glyphs | MSAA (if enabled) → resolve |
+| 0 | Background | Clear color | None |
+| 1 | Star trails | SDF capsules | Analytic (smoothstep) + ssaa_global |
+| 2 | Bullet trails | SDF capsules | Analytic + ssaa_global |
+| 3 | Smoke | SDF circles | Analytic + ssaa_global |
+| 4 | Polygons: asteroids, fragments, ship | Polygon batch | ssaa_polygon × ssaa_global |
+| 5 | Effects: explosion circles, sparkles, future FX | SDF circles | Analytic + ssaa_global |
+| 6 | HUD | Polygon + SDF glyphs | ssaa_hud |
 
 **Postprocess (tonemap)** happens after layer 5, before HUD (layer 6). This matches current behavior — HUD applies its own tonemap via HudUniforms.
 
 ### Render target layout
 
-- **offscreen**: `Rgba16Float`, single-sample — the compositing surface
-- **msaa_texture**: `Rgba16Float`, 4x MSAA — used only during polygon layers (4, 6)
+- **offscreen**: `Rgba16Float`, single-sample — the compositing surface. Dimensions: `native × ssaa_global`.
+- **polygon_texture**: `Rgba16Float`, single-sample — polygon-only SSAA target. Dimensions: `offscreen × ssaa_polygon`. Only allocated when `ssaa_polygon > 1`.
+- **hud_texture**: surface format, single-sample — HUD-only SSAA target. Dimensions: `native × ssaa_hud`. Only allocated when `ssaa_hud > 1`.
 - **swapchain**: final output after postprocess
-
-**MSAA compositing (skybox approach):** wgpu MSAA resolve OVERWRITES the resolve target. Naively resolving onto offscreen would destroy SDF content from layers 1-3. Solution: **seed the MSAA texture with offscreen content** before drawing polygons — like a skybox fills the MSAA target before objects draw on top. A fullscreen blit pass copies offscreen → MSAA texture (fills all samples). Polygons then draw on top, and MSAA edge samples correctly mix polygon edges with the SDF background. The resolve writes back to offscreen with correct compositing and proper edge anti-aliasing.
 
 **Per-frame sequence:**
 
 ```
-1. Clear offscreen to background color
+1. Clear offscreen to background color (at native × ssaa_global resolution)
 2. Layer 1: SDF capsule pass — star trails → offscreen (Load, additive blend)
 3. Layer 2: SDF capsule pass — bullet trails → offscreen (Load, additive blend)
 4. Layer 3: SDF circle pass — smoke → offscreen (Load, alpha blend)
-5. Layer 4: If MSAA on:
-     a. Blit offscreen → msaa_texture (fullscreen pass, seeds all samples with SDF content)
-     b. Draw polygon entities → msaa_texture (Load, polygons on top of SDF background)
-     c. Resolve msaa_texture → offscreen (edges anti-alias against SDF background)
-   If MSAA off:
+5. Layer 4: If ssaa_polygon > 1:
+     a. Clear polygon_texture to transparent
+     b. Draw polygon entities → polygon_texture (at higher resolution)
+     c. Downsample + alpha-blend polygon_texture → offscreen (composite pass)
+   If ssaa_polygon == 1:
      Draw polygon entities directly → offscreen (Load, alpha blend)
 6. Layer 5: SDF circle pass — explosions, sparkles → offscreen (Load, additive blend)
-7. Postprocess pass: tonemap offscreen → swapchain
-8. Layer 6: HUD → swapchain (Load, alpha blend, no MSAA)
+7. Postprocess pass: tonemap + downsample (if ssaa_global > 1) offscreen → swapchain
+8. Layer 6: If ssaa_hud > 1:
+     a. Clear hud_texture to transparent
+     b. Draw HUD → hud_texture (at higher resolution)
+     c. Downsample + alpha-blend hud_texture → swapchain
+   If ssaa_hud == 1:
+     Draw HUD directly → swapchain (Load, alpha blend)
 ```
 
 Note: Layers 1-3 and layer 5 can potentially be batched into fewer draw calls if they share the same pipeline (SDF circles vs capsules). The layer ordering is logical — the implementation may merge consecutive same-type layers into one draw call with ordered instance data.
@@ -64,11 +68,43 @@ Capsule layers (1, 2) and explosion circles (layer 5) should support **additive 
 
 A second SDF pipeline variant with additive blend state is created at init time. Layers select which pipeline to bind.
 
-### MSAA changes
+### AA: Unified SSAA (replaces MSAA)
 
-MSAA remains **polygon-only** (layers 4 and 6). SDF layers use analytic AA (smoothstep in shader). MSAA toggle (Off/x4) stays in the pause menu.
+MSAA is removed entirely. All anti-aliasing uses a unified mechanism: **render to a larger texture, downsample with a pluggable filter, composite**.
 
-When MSAA is Off, polygon layers draw directly to offscreen (no resolve step). The msaa_texture is not allocated.
+Three independent SSAA parameters, all defaulting to 1 (off):
+
+| Parameter | Scope | Render target | Downsample onto |
+|-----------|-------|---------------|-----------------|
+| `ssaa_global` | All layers (0-5) | offscreen at `native × factor` | swapchain (in postprocess shader) |
+| `ssaa_polygon` | Layer 4 only | polygon texture at `offscreen × factor` | offscreen (alpha-blend pass) |
+| `ssaa_hud` | Layer 6 only | HUD texture at `native × factor` | swapchain (alpha-blend pass) |
+
+Parameters stack multiplicatively: global 2× + polygon 2× = polygons effectively at 4×.
+
+**Downsample filter architecture:**
+
+```rust
+enum DownsampleFilter {
+    Box,      // Simple average — initial implementation
+    Lanczos,  // Sharper, slight ringing — future
+}
+```
+
+One filter shared across all three SSAA paths. The postprocess shader and composite passes use the same `sample_box_filter` (or future Lanczos) function.
+
+**Polygon-only SSAA compositing (layer 4):**
+1. Clear polygon texture to transparent (at `offscreen × ssaa_polygon` resolution)
+2. Render polygons at higher resolution
+3. Downsample to offscreen resolution
+4. Alpha-blend onto offscreen — edge pixels have fractional alpha from coverage, compositing correctly against SDF background
+
+No MSAA texture, no skybox blit, no resolve quirks. Same mechanism for all three SSAA knobs.
+
+**Pause menu entries:**
+- "GLOBAL AA" cycle: OFF / 2X / 3X / 4X
+- "POLYGON AA" cycle: OFF / 2X / 3X / 4X
+- "HUD AA" cycle: OFF / 2X / 3X / 4X
 
 ---
 
@@ -89,7 +125,7 @@ When MSAA is Off, polygon layers draw directly to offscreen (no resolve step). T
 | New file | Content |
 |----------|---------|
 | `src/rendering/pipeline.rs` | Pipeline creation (polygon, SDF circle, SDF capsule, postprocess, HUD), bind group layouts, shader loading |
-| `src/rendering/textures.rs` | `create_offscreen_texture`, `create_msaa_texture`, SSAA scaling logic, texture management |
+| `src/rendering/textures.rs` | `create_offscreen_texture`, SSAA texture creation, scaling logic, texture management |
 | `src/rendering/mod.rs` (residual) | `Renderer2D` struct, `new`, `resize`, `render` (layer orchestration), surface management (~400-500 lines) |
 
 ### rendering/hud.rs (1093 lines) → split
@@ -106,42 +142,47 @@ When MSAA is Off, polygon layers draw directly to offscreen (no resolve step). T
 
 ---
 
-## 3. AA Pipeline
+## 3. AA Pipeline — Unified SSAA
 
-### MSAA (primary, existing)
+MSAA is removed entirely. All anti-aliasing uses one unified mechanism: **render to a larger texture, downsample with a pluggable filter, composite.**
 
-- Polygon layers only (4, 6)
-- Toggle: Off / x4 (existing pause menu entry)
-- No changes to MSAA logic, just moved to per-layer-group resolve
+### Three independent SSAA parameters
 
-### SSAA (reference mode, new)
+| Parameter | Config field | Scope | Default |
+|-----------|-------------|-------|---------|
+| Global AA | `ssaa_global: u32` | All layers (0-5) — scales offscreen target | 1 (off) |
+| Polygon AA | `ssaa_polygon: u32` | Layer 4 only — polygon edges | 1 (off) |
+| HUD AA | `ssaa_hud: u32` | Layer 6 only — text/UI crispness | 1 (off) |
 
-- Scales the offscreen render target by integer factor: 1x (off), 2x, 3x, 4x
-- ALL layers benefit (polygons + SDF)
-- HUD always renders at native resolution (not scaled)
-- Downsample happens in postprocess pass
+Values: 1 (off), 2, 3, 4. Parameters stack multiplicatively.
 
-**Downsample filter architecture:**
+### Downsample filter architecture
 
 ```rust
-enum DownsampleFilter {
-    Box,      // Simple average — Phase 2B
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DownsampleFilter {
+    Box,      // Simple average — initial implementation
     Lanczos,  // Sharper, slight ringing — future
 }
 ```
 
-The postprocess shader receives `ssaa_factor` as a uniform. When `ssaa_factor > 1`, the shader samples the scaled offscreen texture and applies the selected filter kernel.
+One filter shared across all three SSAA paths. The postprocess shader and composite passes use the same `sample_box_filter` function (or future Lanczos kernel).
 
-- **Box filter**: Average `ssaa_factor × ssaa_factor` texels per output pixel. Implemented as a loop in the postprocess shader.
-- **Lanczos filter**: Future addition. Requires a larger kernel (e.g., Lanczos-3 = 6×6 tap). Same shader entry point, different kernel weights passed via uniform buffer.
+- **Box filter**: Average `factor × factor` texels per output pixel. Loop in shader.
+- **Lanczos filter**: Future. Larger kernel (Lanczos-3 = 6×6 tap), passed via uniform buffer.
 
-Pause menu entry: "SSAA" cycle (Off / 2x / 3x / 4x). Default: Off.
+### Pause menu entries
 
-### Combined AA
+- "GLOBAL AA" cycle: OFF / 2X / 3X / 4X
+- "POLYGON AA" cycle: OFF / 2X / 3X / 4X
+- "HUD AA" cycle: OFF / 2X / 3X / 4X
 
-MSAA and SSAA are independently toggleable and stack. MSAA handles polygon edges at render resolution. SSAA provides whole-image quality boost. Typical usage:
-- Gameplay: MSAA x4 only (cheap)
-- Screenshots: MSAA x4 + SSAA 4x (maximum quality)
+### Typical usage
+
+- Gameplay: Polygon AA 2× (cheap, smooths ship/asteroid edges)
+- Quality: Global AA 2× + Polygon AA 2× (4× effective on polygons, 2× on SDF)
+- Screenshots: Global AA 4× (maximum quality, all layers)
+- HUD readability: HUD AA 2× (crisper text independently of game AA)
 
 ---
 
