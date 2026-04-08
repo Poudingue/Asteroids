@@ -104,6 +104,9 @@ pub struct GameState {
     pub mouse_button_down: bool,
     /// Gamepad input and processing state.
     pub gamepad: GamepadState,
+    /// Active distortion field sources (shockwaves, gravity wells, etc.).
+    #[serde(skip)]
+    pub field_sources: Vec<crate::field::FieldSource>,
 }
 
 impl GameState {
@@ -148,6 +151,7 @@ impl GameState {
             pause_menu: crate::pause_menu::PauseMenu::new(),
             mouse_button_down: false,
             gamepad: GamepadState::new(),
+            field_sources: Vec::new(),
         }
     }
 
@@ -193,6 +197,7 @@ impl GameState {
             pause_menu: crate::pause_menu::PauseMenu::new(),
             mouse_button_down: false,
             gamepad: GamepadState::new(),
+            field_sources: Vec::new(),
         }
     }
 }

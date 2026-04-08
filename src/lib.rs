@@ -1,7 +1,9 @@
 pub mod camera;
-pub mod glyphs;
+pub mod capture;
+pub mod field;
 pub mod color;
 pub mod game;
+pub mod glyphs;
 pub mod input;
 pub mod math;
 pub mod math_utils;
