@@ -166,10 +166,15 @@ pub enum DownsampleFilter {
 }
 ```
 
-One filter shared across all three SSAA paths. The postprocess shader and composite passes use the same `sample_box_filter` function (or future Lanczos kernel).
+- **Box filter**: Average `factor × factor` texels per output pixel. Loop in shader. Safe for all paths.
+- **Lanczos filter**: Future. Sharper (Lanczos-3 = 6×6 tap), passed via uniform buffer. **Global SSAA only** — Lanczos negative lobes cause alpha overshoot/undershoot on transparent edges, producing dark fringes and color bleeding in polygon/HUD paths.
+- **Mitchell-Netravali** (B=1/3, C=1/3): Future. Sharper than box, no negative lobes. Safe for all paths including alpha edges. Good candidate for polygon/HUD SSAA.
 
-- **Box filter**: Average `factor × factor` texels per output pixel. Loop in shader.
-- **Lanczos filter**: Future. Larger kernel (Lanczos-3 = 6×6 tap), passed via uniform buffer.
+| Filter | Global SSAA | Polygon SSAA | HUD SSAA |
+|--------|-------------|-------------|----------|
+| Box | OK | OK | OK |
+| Lanczos | OK (opaque) | Unsafe (alpha fringes) | Unsafe (alpha fringes) |
+| Mitchell | OK | OK | OK |
 
 ### Pause menu entries
 
