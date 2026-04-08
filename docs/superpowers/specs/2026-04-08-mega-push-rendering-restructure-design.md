@@ -34,10 +34,9 @@ Replace the 2-pass system with an **ordered layer system** inspired by compositi
 
 - **offscreen**: `Rgba16Float`, single-sample — the compositing surface
 - **msaa_texture**: `Rgba16Float`, 4x MSAA — used only during polygon layers (4, 6)
-- **polygon_resolve_texture**: `Rgba16Float`, single-sample — temp target for MSAA resolve (avoids overwriting offscreen)
 - **swapchain**: final output after postprocess
 
-**MSAA compositing note:** wgpu MSAA resolve OVERWRITES the resolve target — it does not alpha-blend. Resolving directly onto offscreen would destroy SDF content from layers 1-3 in non-polygon areas. Solution: resolve to `polygon_resolve_texture`, then alpha-blend it onto offscreen via a fullscreen composite pass.
+**MSAA compositing (skybox approach):** wgpu MSAA resolve OVERWRITES the resolve target. Naively resolving onto offscreen would destroy SDF content from layers 1-3. Solution: **seed the MSAA texture with offscreen content** before drawing polygons — like a skybox fills the MSAA target before objects draw on top. A fullscreen blit pass copies offscreen → MSAA texture (fills all samples). Polygons then draw on top, and MSAA edge samples correctly mix polygon edges with the SDF background. The resolve writes back to offscreen with correct compositing and proper edge anti-aliasing.
 
 **Per-frame sequence:**
 
@@ -47,9 +46,9 @@ Replace the 2-pass system with an **ordered layer system** inspired by compositi
 3. Layer 2: SDF capsule pass — bullet trails → offscreen (Load, additive blend)
 4. Layer 3: SDF circle pass — smoke → offscreen (Load, alpha blend)
 5. Layer 4: If MSAA on:
-     a. Draw polygon entities → msaa_texture (Clear transparent)
-     b. Resolve msaa_texture → polygon_resolve_texture
-     c. Composite pass: alpha-blend polygon_resolve_texture → offscreen (Load)
+     a. Blit offscreen → msaa_texture (fullscreen pass, seeds all samples with SDF content)
+     b. Draw polygon entities → msaa_texture (Load, polygons on top of SDF background)
+     c. Resolve msaa_texture → offscreen (edges anti-alias against SDF background)
    If MSAA off:
      Draw polygon entities directly → offscreen (Load, alpha blend)
 6. Layer 5: SDF circle pass — explosions, sparkles → offscreen (Load, additive blend)

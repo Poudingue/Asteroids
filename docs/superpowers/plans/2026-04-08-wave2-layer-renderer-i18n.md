@@ -35,11 +35,9 @@ pub polygon_vertex_start: usize,
 // Layer 5: effects — explosions, sparkles (additive blend circles)
 pub effect_circles: Vec<CircleInstance>,
 
-// MSAA compositing: temp texture for polygon resolve (avoids overwriting SDF layers)
-pub polygon_resolve_texture: Option<wgpu::Texture>,
-pub polygon_resolve_view: wgpu::TextureView,  // initialized when MSAA > 1
-pub polygon_resolve_bind_group: Option<wgpu::BindGroup>,
-pub composite_pipeline: wgpu::RenderPipeline,  // fullscreen blit with alpha blend
+// MSAA compositing: blit pipeline to seed MSAA texture with SDF background
+pub blit_to_msaa_pipeline: wgpu::RenderPipeline,  // fullscreen blit, writes to MSAA target
+pub blit_bind_group: Option<wgpu::BindGroup>,      // samples offscreen texture
 ```
 
 - [ ] **Step 2: Add `clear_layer_buffers()` method:**
@@ -109,29 +107,37 @@ pub sdf_circle_additive_pipeline: wgpu::RenderPipeline,
 pub sdf_capsule_additive_pipeline: wgpu::RenderPipeline,
 ```
 
-- [ ] **Step 3: Add composite pipeline** to pipeline.rs — a fullscreen-triangle blit with alpha blending:
+- [ ] **Step 3: Add blit-to-MSAA pipeline** to pipeline.rs — a fullscreen-triangle blit that seeds the MSAA texture:
 
 ```rust
-pub fn create_composite_pipeline(
+pub fn create_blit_to_msaa_pipeline(
     device: &wgpu::Device,
-    format: wgpu::TextureFormat,  // Rgba16Float — targets offscreen
+    format: wgpu::TextureFormat,  // Rgba16Float — targets MSAA texture
+    msaa_samples: u32,
     bind_group_layout: &wgpu::BindGroupLayout,  // texture + sampler (same as postprocess)
 ) -> wgpu::RenderPipeline {
     // Uses the SAME postprocess vertex shader (fullscreen triangle from vertex_index)
-    // Fragment shader: just samples the texture, no tonemap
-    // Blend: standard alpha blending (SrcAlpha, OneMinusSrcAlpha)
-    // This composites the resolved polygon layer onto the offscreen target
+    // Fragment shader: just samples the source texture, no tonemap — add a `fs_passthrough`
+    //   entry point to postprocess.wgsl that returns textureSample directly
+    // Blend: None (overwrite — we're seeding the MSAA texture)
+    // MSAA: must match msaa_samples (this pipeline writes to the MSAA target)
 }
 ```
 
-This needs a small WGSL shader (or a variant entry point in postprocess.wgsl) that does `textureSample` without tonemapping. Simplest: add a `fs_passthrough` entry point to postprocess.wgsl that returns the sampled color directly.
+This needs a `fs_passthrough` entry point in postprocess.wgsl:
+```wgsl
+@fragment
+fn fs_passthrough(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+    return textureSample(offscreen_texture, offscreen_sampler, uv);
+}
+```
 
-- [ ] **Step 4: Create all new pipelines in `Renderer2D::new()`** — additive SDF variants + composite
+- [ ] **Step 4: Create all new pipelines in `Renderer2D::new()`** — additive SDF variants + blit-to-MSAA
 
-- [ ] **Step 5: Create `polygon_resolve_texture`** in `Renderer2D::new()` and `resize()` — same format as offscreen (Rgba16Float), same dimensions, single-sample. Only allocated when MSAA > 1. Create its bind group (texture + sampler, same layout as postprocess).
+- [ ] **Step 5: Create `blit_bind_group`** in `Renderer2D::new()` and `resize()` — binds offscreen texture + sampler. Only needed when MSAA > 1. Can reuse the postprocess bind group layout since it reads the same offscreen texture.
 
 - [ ] **Step 6: Run `cargo check`**
-- [ ] **Step 7: Commit** — `git commit -m "feat: add additive-blend SDF + composite pipeline variants"`
+- [ ] **Step 7: Commit** — `git commit -m "feat: add additive-blend SDF + blit-to-MSAA pipeline variants"`
 
 ---
 
@@ -220,27 +226,47 @@ pub fn end_frame(&mut self, surface: &wgpu::Surface, device: &wgpu::Device, queu
         // Draw smoke_circles
     }
 
-    // === Layer 4: Polygon entities → MSAA → resolve-then-blend onto offscreen ===
+    // === Layer 4: Polygon entities → MSAA (skybox approach) ===
     //
-    // IMPORTANT: wgpu MSAA resolve OVERWRITES the resolve target — it does NOT blend.
-    // If we resolved directly onto offscreen, non-polygon areas would be overwritten
-    // with transparent black, destroying SDF content from layers 1-3.
+    // wgpu MSAA resolve OVERWRITES the resolve target. To preserve SDF content:
+    // 1. Blit offscreen → MSAA texture (seeds all samples with SDF background)
+    // 2. Draw polygons → MSAA texture (edges get mixed samples with SDF bg)
+    // 3. Resolve MSAA → offscreen (correct composite with proper edge AA)
     //
-    // Solution: resolve to a SEPARATE temp texture (polygon_resolve_texture), then
-    // alpha-blend that onto offscreen in a subsequent fullscreen pass.
+    // This is identical to how a skybox works: fill MSAA target with background,
+    // then draw objects on top. Edge samples naturally anti-alias against the
+    // actual background content.
     //
     let polygon_count = self.vertices.len() - self.polygon_vertex_start;
     if polygon_count > 0 {
         if self.msaa_sample_count > 1 {
-            // Step A: Draw polygons to MSAA texture, resolve to polygon_resolve_texture
+            // Step A: Blit offscreen → MSAA texture (seed with SDF background)
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("layer4_blit_to_msaa"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: self.msaa_offscreen_view.as_ref().unwrap(),
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    ..Default::default()
+                });
+                pass.set_pipeline(&self.blit_to_msaa_pipeline);
+                pass.set_bind_group(0, self.blit_bind_group.as_ref().unwrap(), &[]);
+                pass.draw(0..3, 0..1); // fullscreen triangle — samples offscreen, writes to all MSAA samples
+            }
+            // Step B: Draw polygons on top of the seeded MSAA texture
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("layer4_polygons_msaa"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: self.msaa_offscreen_view.as_ref().unwrap(),
-                        resolve_target: Some(&self.polygon_resolve_view),
+                        resolve_target: Some(&self.offscreen_view), // resolve back to offscreen
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            load: wgpu::LoadOp::Load, // preserve the blitted SDF background
                             store: wgpu::StoreOp::Store,
                         },
                     })],
@@ -249,23 +275,7 @@ pub fn end_frame(&mut self, surface: &wgpu::Surface, device: &wgpu::Device, queu
                 pass.set_pipeline(&self.world_pipeline);
                 pass.set_bind_group(0, &self.world_bind_group, &[]);
                 // Draw vertices[polygon_vertex_start..]
-            }
-            // Step B: Alpha-blend polygon_resolve_texture onto offscreen
-            // Uses a fullscreen triangle pass with the postprocess pipeline structure
-            // but with alpha blending enabled and no tonemap — just samples + blends.
-            {
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("layer4_composite"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &self.offscreen_view,
-                        resolve_target: None,
-                        ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
-                    })],
-                    ..Default::default()
-                });
-                pass.set_pipeline(&self.composite_pipeline); // fullscreen blit with alpha blend
-                pass.set_bind_group(0, &self.polygon_resolve_bind_group, &[]);
-                pass.draw(0..3, 0..1);
+                // Edge samples will mix polygon colors with SDF background — correct AA!
             }
         } else {
             // No MSAA: draw directly to offscreen with alpha blend (Load preserves layers 1-3)
@@ -339,7 +349,7 @@ pub fn end_frame(&mut self, surface: &wgpu::Surface, device: &wgpu::Device, queu
 
 **Important implementation notes:**
 - The background color must be passed as the `Clear` color for layer 0 (the first pass). Currently `render_frame` computes an HDR background color and draws a fill rect — instead, pass that color to `end_frame` as the clear color. Add a `pub clear_color: wgpu::Color` field to Renderer2D.
-- **MSAA compositing (layer 4):** wgpu MSAA resolve OVERWRITES the resolve target — it does not alpha-blend. Resolving directly onto offscreen would destroy SDF content from layers 1-3 in non-polygon areas. Solution: resolve to a separate `polygon_resolve_texture`, then alpha-blend it onto offscreen via the `composite_pipeline` (fullscreen triangle pass with alpha blending). This costs one extra texture + one extra draw call but preserves correct compositing. See the updated layer 4 code above.
+- **MSAA compositing — skybox approach (layer 4):** wgpu MSAA resolve OVERWRITES the resolve target. Solution: seed the MSAA texture with offscreen content via a fullscreen blit pass (like a skybox filling the MSAA target), then draw polygons on top, then resolve back to offscreen. Edge samples naturally anti-alias against the actual SDF background — correct AA with no extra textures. Cost: one fullscreen blit pass per frame when MSAA is on.
 
 - [ ] **Step 2: Handle background color** — add `pub clear_color: wgpu::Color` to Renderer2D. Set it in `render_frame` before rendering starts. Use it as the Clear color for the first render pass.
 
