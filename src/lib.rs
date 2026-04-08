@@ -5,6 +5,7 @@ pub mod field;
 pub mod game;
 pub mod glyphs;
 pub mod input;
+pub mod locale;
 pub mod math;
 pub mod math_utils;
 pub mod objects;

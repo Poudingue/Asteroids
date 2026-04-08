@@ -17,3 +17,4 @@ zstd = "0.13"
 bincode = "1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 chrono = "0.4"
+sys-locale = "0.3"
