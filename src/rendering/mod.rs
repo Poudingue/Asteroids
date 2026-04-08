@@ -802,31 +802,22 @@ impl Renderer2D {
             label: Some("Render Encoder"),
         });
 
-        // --- Pass 1: Render world geometry into offscreen Rgba16Float texture ---
-        // When MSAA is enabled, render into the multisampled texture and resolve to offscreen.
-        // When MSAA is off (sample_count==1), render directly to offscreen.
+        let wgpu_clear = wgpu::Color {
+            r: clear_color[0],
+            g: clear_color[1],
+            b: clear_color[2],
+            a: clear_color[3],
+        };
+
+        // === Layer 0: Clear offscreen to background color ===
         {
-            let load_op = wgpu::LoadOp::Clear(wgpu::Color {
-                r: clear_color[0],
-                g: clear_color[1],
-                b: clear_color[2],
-                a: clear_color[3],
-            });
-
-            let (target_view, resolve_target) =
-                if let Some(ref msaa_view) = self.msaa_offscreen_view {
-                    (msaa_view, Some(&self.offscreen_view))
-                } else {
-                    (&self.offscreen_view, None)
-                };
-
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("World Pass"),
+            let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Clear Offscreen"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target_view,
-                    resolve_target,
+                    view: &self.offscreen_view,
+                    resolve_target: None,
                     ops: wgpu::Operations {
-                        load: load_op,
+                        load: wgpu::LoadOp::Clear(wgpu_clear),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -834,32 +825,202 @@ impl Renderer2D {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-
-            if !self.vertices.is_empty() {
-                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(&self.vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-
-                render_pass.set_pipeline(&self.world_pipeline);
-                render_pass.set_bind_group(0, &self.world_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                render_pass.draw(0..self.vertices.len() as u32, 0..1);
-            }
+            // Empty pass — just clears
         }
 
-        // === Pass 2: SDF entities -> offscreen Rgba16Float (no clear, load existing) ===
-        let has_sdf =
-            !self.sdf_circle_instances.is_empty() || !self.sdf_capsule_instances.is_empty();
-        if has_sdf {
+        // === Layers 1+2: Star trail + bullet trail capsules → offscreen (ADDITIVE blend) ===
+        if !self.star_trail_capsules.is_empty() || !self.bullet_trail_capsules.is_empty() {
+            // Concatenate star trails and bullet trails into a single buffer
+            let mut all_trail_capsules = Vec::with_capacity(
+                self.star_trail_capsules.len() + self.bullet_trail_capsules.len(),
+            );
+            all_trail_capsules.extend_from_slice(&self.star_trail_capsules);
+            all_trail_capsules.extend_from_slice(&self.bullet_trail_capsules);
+
+            let capsule_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Trail Capsule Instance Buffer"),
+                contents: bytemuck::cast_slice(&all_trail_capsules),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("SDF Pass"),
+                label: Some("Trail Capsule Pass (Additive)"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &self.offscreen_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load, // Preserve world geometry
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.sdf_capsule_additive_pipeline);
+            render_pass.set_bind_group(0, &self.sdf_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, capsule_buffer.slice(..));
+            render_pass.draw(0..6, 0..all_trail_capsules.len() as u32);
+        }
+
+        // === Layer 3: Smoke circles → offscreen (ALPHA blend) ===
+        if !self.smoke_circles.is_empty() {
+            let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Smoke Circle Instance Buffer"),
+                contents: bytemuck::cast_slice(&self.smoke_circles),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Smoke Circle Pass (Alpha)"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.offscreen_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.sdf_circle_pipeline);
+            render_pass.set_bind_group(0, &self.sdf_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, instance_buffer.slice(..));
+            render_pass.draw(0..6, 0..self.smoke_circles.len() as u32);
+        }
+
+        // === Layer 4: Polygon entities (world geometry) ===
+        // Upload all vertices (background + entity polygons) once.
+        // Only draw the entity polygon slice [polygon_vertex_start..end].
+        let polygon_vertex_count =
+            self.vertices.len().saturating_sub(self.polygon_vertex_start);
+        if polygon_vertex_count > 0 {
+            let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Polygon Vertex Buffer"),
+                contents: bytemuck::cast_slice(&self.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            if self.msaa_sample_count > 1 {
+                if let Some(ref msaa_view) = self.msaa_offscreen_view {
+                    // Step A: Blit current offscreen → MSAA texture (seed all MSAA samples)
+                    if let (Some(ref blit_pipeline), Some(ref blit_bg)) =
+                        (&self.blit_to_msaa_pipeline, &self.blit_bind_group)
+                    {
+                        let mut blit_pass =
+                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                label: Some("Blit Offscreen → MSAA"),
+                                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                    view: msaa_view,
+                                    resolve_target: None,
+                                    ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                                        store: wgpu::StoreOp::Store,
+                                    },
+                                })],
+                                depth_stencil_attachment: None,
+                                timestamp_writes: None,
+                                occlusion_query_set: None,
+                            });
+                        blit_pass.set_pipeline(blit_pipeline);
+                        blit_pass.set_bind_group(0, blit_bg, &[]);
+                        blit_pass.draw(0..3, 0..1);
+                    }
+
+                    // Step B: Draw polygons on seeded MSAA texture, resolve back to offscreen
+                    {
+                        let mut render_pass =
+                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                label: Some("Polygon Pass (MSAA)"),
+                                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                    view: msaa_view,
+                                    resolve_target: Some(&self.offscreen_view),
+                                    ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Load,
+                                        store: wgpu::StoreOp::Store,
+                                    },
+                                })],
+                                depth_stencil_attachment: None,
+                                timestamp_writes: None,
+                                occlusion_query_set: None,
+                            });
+                        render_pass.set_pipeline(&self.world_pipeline);
+                        render_pass.set_bind_group(0, &self.world_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                        render_pass.draw(
+                            self.polygon_vertex_start as u32..self.vertices.len() as u32,
+                            0..1,
+                        );
+                    }
+                }
+            } else {
+                // No MSAA: draw polygons directly to offscreen, preserving layers 1-3
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Polygon Pass (No MSAA)"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &self.offscreen_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                render_pass.set_pipeline(&self.world_pipeline);
+                render_pass.set_bind_group(0, &self.world_bind_group, &[]);
+                render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                render_pass.draw(
+                    self.polygon_vertex_start as u32..self.vertices.len() as u32,
+                    0..1,
+                );
+            }
+        }
+
+        // === Layer 5: Effect circles (explosions) → offscreen (ADDITIVE blend) ===
+        if !self.effect_circles.is_empty() {
+            let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Effect Circle Instance Buffer"),
+                contents: bytemuck::cast_slice(&self.effect_circles),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Effect Circle Pass (Additive)"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.offscreen_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.sdf_circle_additive_pipeline);
+            render_pass.set_bind_group(0, &self.sdf_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, instance_buffer.slice(..));
+            render_pass.draw(0..6, 0..self.effect_circles.len() as u32);
+        }
+
+        // === Legacy SDF pass (kept for compatibility — fields cleared each frame in begin_frame) ===
+        // Once B5 removes these fields, this block is deleted entirely.
+        let has_legacy_sdf =
+            !self.sdf_circle_instances.is_empty() || !self.sdf_capsule_instances.is_empty();
+        if has_legacy_sdf {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Legacy SDF Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.offscreen_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -871,7 +1032,7 @@ impl Renderer2D {
             if !self.sdf_circle_instances.is_empty() {
                 let instance_buffer =
                     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("SDF Circle Instance Buffer"),
+                        label: Some("Legacy SDF Circle Instance Buffer"),
                         contents: bytemuck::cast_slice(&self.sdf_circle_instances),
                         usage: wgpu::BufferUsages::VERTEX,
                     });
@@ -883,7 +1044,7 @@ impl Renderer2D {
 
             if !self.sdf_capsule_instances.is_empty() {
                 let capsule_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("SDF Capsule Instance Buffer"),
+                    label: Some("Legacy SDF Capsule Instance Buffer"),
                     contents: bytemuck::cast_slice(&self.sdf_capsule_instances),
                     usage: wgpu::BufferUsages::VERTEX,
                 });
@@ -894,7 +1055,7 @@ impl Renderer2D {
             }
         }
 
-        // --- Pass 3: Blit offscreen texture to swapchain via fullscreen triangle ---
+        // === Postprocess: tonemap offscreen → swapchain ===
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Postprocess Pass"),
@@ -916,7 +1077,7 @@ impl Renderer2D {
             render_pass.draw(0..3, 0..1);
         }
 
-        // === Pass 4: HUD -> swapchain (no tonemapping, alpha blending) ===
+        // === Layer 6: HUD → swapchain (alpha blend, no tonemapping) ===
         if !self.hud_vertices.is_empty() {
             let hud_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("HUD Vertex Buffer"),
