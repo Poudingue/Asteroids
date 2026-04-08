@@ -2,6 +2,23 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::path::Path;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ObjectSnapshot {
+    pub kind: String,
+    pub x: f64,
+    pub y: f64,
+    pub radius: f64,
+    pub speed_x: f64,
+    pub speed_y: f64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct GameStateSnapshot {
+    pub frame: u64,
+    pub entity_count: usize,
+    pub objects: Vec<ObjectSnapshot>,
+}
+
 /// Header for a .inputs recording file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordingHeader {
@@ -150,5 +167,39 @@ impl InputPlayback {
 
     pub fn frame(&self, index: u64) -> Option<&InputFrame> {
         self.frames.get(index as usize)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn game_state_snapshot_default() {
+        let snap = GameStateSnapshot::default();
+        assert_eq!(snap.frame, 0);
+        assert_eq!(snap.entity_count, 0);
+        assert!(snap.objects.is_empty());
+    }
+
+    #[test]
+    fn game_state_snapshot_roundtrip() {
+        let snap = GameStateSnapshot {
+            frame: 42,
+            entity_count: 3,
+            objects: vec![ObjectSnapshot {
+                kind: "asteroid".to_string(),
+                x: 1.0,
+                y: 2.0,
+                radius: 5.0,
+                speed_x: 0.1,
+                speed_y: -0.2,
+            }],
+        };
+        let bytes = bincode::serialize(&snap).unwrap();
+        let restored: GameStateSnapshot = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(restored.frame, 42);
+        assert_eq!(restored.objects.len(), 1);
+        assert_eq!(restored.objects[0].kind, "asteroid");
     }
 }
