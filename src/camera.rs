@@ -1,7 +1,7 @@
-use crate::update::{move_star, translate_entity};
 use crate::math_utils::*;
 use crate::objects::*;
 use crate::parameters::*;
+use crate::update::{move_star, translate_entity};
 
 // ============================================================================
 // Camera system

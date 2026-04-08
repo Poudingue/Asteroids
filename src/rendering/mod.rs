@@ -45,8 +45,6 @@ pub struct Vertex {
     pub color: [f32; 4],
 }
 
-
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CircleInstance {
@@ -55,8 +53,6 @@ pub struct CircleInstance {
     pub color: [f32; 4],
     pub falloff_width: f32,
 }
-
-
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -67,8 +63,6 @@ pub struct CapsuleInstance {
     pub color: [f32; 4],
     pub _padding: [f32; 3],
 }
-
-
 
 pub struct Renderer2D {
     world_pipeline: wgpu::RenderPipeline,
@@ -98,10 +92,6 @@ pub struct Renderer2D {
     pub height: u32,
 }
 
-
-
-
-
 impl Renderer2D {
     pub fn new(
         device: &wgpu::Device,
@@ -127,8 +117,11 @@ impl Renderer2D {
             }],
         });
 
-        let world_pipeline =
-            pipeline::create_world_pipeline(device, &world_bind_group_layout, DEFAULT_MSAA_SAMPLE_COUNT);
+        let world_pipeline = pipeline::create_world_pipeline(
+            device,
+            &world_bind_group_layout,
+            DEFAULT_MSAA_SAMPLE_COUNT,
+        );
 
         // --- Offscreen texture ---
         let offscreen_texture = create_offscreen_texture(device, width, height);
@@ -200,8 +193,11 @@ impl Renderer2D {
             ],
         });
 
-        let postprocess_pipeline =
-            pipeline::create_postprocess_pipeline(device, surface_format, &postprocess_bind_group_layout);
+        let postprocess_pipeline = pipeline::create_postprocess_pipeline(
+            device,
+            surface_format,
+            &postprocess_bind_group_layout,
+        );
 
         // --- SDF circle + capsule pipelines (render into Rgba16Float offscreen texture) ---
         let sdf_bind_group_layout = pipeline::create_screen_size_bind_group_layout(device);
@@ -215,8 +211,10 @@ impl Renderer2D {
             }],
         });
 
-        let sdf_circle_pipeline = pipeline::create_sdf_circle_pipeline(device, &sdf_bind_group_layout);
-        let sdf_capsule_pipeline = pipeline::create_sdf_capsule_pipeline(device, &sdf_bind_group_layout);
+        let sdf_circle_pipeline =
+            pipeline::create_sdf_circle_pipeline(device, &sdf_bind_group_layout);
+        let sdf_capsule_pipeline =
+            pipeline::create_sdf_capsule_pipeline(device, &sdf_bind_group_layout);
 
         // --- HUD pipeline (renders directly to swapchain, alpha blending, no tonemapping) ---
         let hud_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -367,8 +365,11 @@ impl Renderer2D {
 
         // Recreate postprocess pipeline
         let postprocess_bind_group_layout = pipeline::create_postprocess_bind_group_layout(device);
-        self.postprocess_pipeline =
-            pipeline::create_postprocess_pipeline(device, new_format, &postprocess_bind_group_layout);
+        self.postprocess_pipeline = pipeline::create_postprocess_pipeline(
+            device,
+            new_format,
+            &postprocess_bind_group_layout,
+        );
 
         // Recreate HUD pipeline
         let hud_bind_group_layout = pipeline::create_hud_bind_group_layout(device);

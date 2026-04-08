@@ -2,11 +2,11 @@ use std::f64::consts::PI;
 
 use crate::color::*;
 use crate::game::GameState;
-use crate::update::accelerate_entity;
 use crate::math_utils::*;
 use crate::objects::*;
 use crate::parameters::*;
 use crate::spawning::*;
+use crate::update::accelerate_entity;
 
 // ============================================================================
 // Input handlers
