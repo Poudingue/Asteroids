@@ -625,7 +625,7 @@ fn main() {
 
         // Update per-frame globals (screenshake pos, jitter, exposure, game speed, etc.)
         // Must run AFTER update_game so screenshake from death/damage is sampled this frame
-        game::update_frame(&mut globals, &mut state.rng);
+        update::update_frame(&mut globals, &mut state.rng);
 
         // Render
         let output = match surface.get_current_texture() {

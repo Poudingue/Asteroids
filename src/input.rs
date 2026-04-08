@@ -1,7 +1,8 @@
 use std::f64::consts::PI;
 
 use crate::color::*;
-use crate::game::{accelerate_entity, GameState};
+use crate::game::GameState;
+use crate::update::accelerate_entity;
 use crate::math_utils::*;
 use crate::objects::*;
 use crate::parameters::*;

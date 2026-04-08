@@ -1,4 +1,4 @@
-/// Property tests for movement and collision functions in game.rs
+/// Property tests for movement and collision functions.
 /// Covers move_entity, apply_inertia, accelerate_entity, boost_entity, rotate_entity,
 /// turn_entity, apply_torque (apply_angular_momentum), collision_circles, collision_point.
 /// These tests serve as a safety net before the V2 refactor.
@@ -6,6 +6,7 @@ use asteroids::game::*;
 use asteroids::math_utils::*;
 use asteroids::objects::*;
 use asteroids::parameters::*;
+use asteroids::update::*;
 
 const EPS: f64 = 1e-10;
 

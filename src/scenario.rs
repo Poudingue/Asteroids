@@ -257,7 +257,7 @@ impl Scenario {
 
             // Run game update
             game::update_game(&mut state, &mut globals);
-            game::update_frame(&mut globals, &mut state.rng);
+            crate::update::update_frame(&mut globals, &mut state.rng);
 
             // Capture snapshots
             if self.def.snapshots_at.contains(&frame) {
