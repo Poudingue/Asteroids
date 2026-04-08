@@ -34,6 +34,12 @@ pub smoke_circles: Vec<CircleInstance>,
 pub polygon_vertex_start: usize,
 // Layer 5: effects — explosions, sparkles (additive blend circles)
 pub effect_circles: Vec<CircleInstance>,
+
+// MSAA compositing: temp texture for polygon resolve (avoids overwriting SDF layers)
+pub polygon_resolve_texture: Option<wgpu::Texture>,
+pub polygon_resolve_view: wgpu::TextureView,  // initialized when MSAA > 1
+pub polygon_resolve_bind_group: Option<wgpu::BindGroup>,
+pub composite_pipeline: wgpu::RenderPipeline,  // fullscreen blit with alpha blend
 ```
 
 - [ ] **Step 2: Add `clear_layer_buffers()` method:**
@@ -103,10 +109,29 @@ pub sdf_circle_additive_pipeline: wgpu::RenderPipeline,
 pub sdf_capsule_additive_pipeline: wgpu::RenderPipeline,
 ```
 
-- [ ] **Step 3: Create them in `Renderer2D::new()`** alongside existing pipelines
+- [ ] **Step 3: Add composite pipeline** to pipeline.rs — a fullscreen-triangle blit with alpha blending:
 
-- [ ] **Step 4: Run `cargo check`**
-- [ ] **Step 5: Commit** — `git commit -m "feat: add additive-blend SDF pipeline variants"`
+```rust
+pub fn create_composite_pipeline(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,  // Rgba16Float — targets offscreen
+    bind_group_layout: &wgpu::BindGroupLayout,  // texture + sampler (same as postprocess)
+) -> wgpu::RenderPipeline {
+    // Uses the SAME postprocess vertex shader (fullscreen triangle from vertex_index)
+    // Fragment shader: just samples the texture, no tonemap
+    // Blend: standard alpha blending (SrcAlpha, OneMinusSrcAlpha)
+    // This composites the resolved polygon layer onto the offscreen target
+}
+```
+
+This needs a small WGSL shader (or a variant entry point in postprocess.wgsl) that does `textureSample` without tonemapping. Simplest: add a `fs_passthrough` entry point to postprocess.wgsl that returns the sampled color directly.
+
+- [ ] **Step 4: Create all new pipelines in `Renderer2D::new()`** — additive SDF variants + composite
+
+- [ ] **Step 5: Create `polygon_resolve_texture`** in `Renderer2D::new()` and `resize()` — same format as offscreen (Rgba16Float), same dimensions, single-sample. Only allocated when MSAA > 1. Create its bind group (texture + sampler, same layout as postprocess).
+
+- [ ] **Step 6: Run `cargo check`**
+- [ ] **Step 7: Commit** — `git commit -m "feat: add additive-blend SDF + composite pipeline variants"`
 
 ---
 
@@ -195,25 +220,55 @@ pub fn end_frame(&mut self, surface: &wgpu::Surface, device: &wgpu::Device, queu
         // Draw smoke_circles
     }
 
-    // === Layer 4: Polygon entities → MSAA → resolve to offscreen ===
+    // === Layer 4: Polygon entities → MSAA → resolve-then-blend onto offscreen ===
+    //
+    // IMPORTANT: wgpu MSAA resolve OVERWRITES the resolve target — it does NOT blend.
+    // If we resolved directly onto offscreen, non-polygon areas would be overwritten
+    // with transparent black, destroying SDF content from layers 1-3.
+    //
+    // Solution: resolve to a SEPARATE temp texture (polygon_resolve_texture), then
+    // alpha-blend that onto offscreen in a subsequent fullscreen pass.
+    //
     let polygon_count = self.vertices.len() - self.polygon_vertex_start;
     if polygon_count > 0 {
         if self.msaa_sample_count > 1 {
-            // Draw to msaa_offscreen_texture, resolve to offscreen_view
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("layer4_polygons_msaa"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: self.msaa_offscreen_view.as_ref().unwrap(),
-                    resolve_target: Some(&self.offscreen_view),
-                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
-                })],
-                ..Default::default()
-            });
-            pass.set_pipeline(&self.world_pipeline);
-            pass.set_bind_group(0, &self.world_bind_group, &[]);
-            // Draw vertices[polygon_vertex_start..]
+            // Step A: Draw polygons to MSAA texture, resolve to polygon_resolve_texture
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("layer4_polygons_msaa"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: self.msaa_offscreen_view.as_ref().unwrap(),
+                        resolve_target: Some(&self.polygon_resolve_view),
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    ..Default::default()
+                });
+                pass.set_pipeline(&self.world_pipeline);
+                pass.set_bind_group(0, &self.world_bind_group, &[]);
+                // Draw vertices[polygon_vertex_start..]
+            }
+            // Step B: Alpha-blend polygon_resolve_texture onto offscreen
+            // Uses a fullscreen triangle pass with the postprocess pipeline structure
+            // but with alpha blending enabled and no tonemap — just samples + blends.
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("layer4_composite"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &self.offscreen_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                    })],
+                    ..Default::default()
+                });
+                pass.set_pipeline(&self.composite_pipeline); // fullscreen blit with alpha blend
+                pass.set_bind_group(0, &self.polygon_resolve_bind_group, &[]);
+                pass.draw(0..3, 0..1);
+            }
         } else {
-            // Draw directly to offscreen_view
+            // No MSAA: draw directly to offscreen with alpha blend (Load preserves layers 1-3)
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("layer4_polygons"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -223,10 +278,9 @@ pub fn end_frame(&mut self, surface: &wgpu::Surface, device: &wgpu::Device, queu
                 })],
                 ..Default::default()
             });
-            // Need a non-MSAA world pipeline for this case
-            // OR: the existing world_pipeline already handles sample_count=1
             pass.set_pipeline(&self.world_pipeline);
             pass.set_bind_group(0, &self.world_bind_group, &[]);
+            // Draw vertices[polygon_vertex_start..]
         }
     }
 
@@ -285,7 +339,7 @@ pub fn end_frame(&mut self, surface: &wgpu::Surface, device: &wgpu::Device, queu
 
 **Important implementation notes:**
 - The background color must be passed as the `Clear` color for layer 0 (the first pass). Currently `render_frame` computes an HDR background color and draws a fill rect — instead, pass that color to `end_frame` as the clear color. Add a `pub clear_color: wgpu::Color` field to Renderer2D.
-- For MSAA layer 4: the MSAA pass uses `Load` (not `Clear`) so it composites on top of what's already in offscreen. But MSAA resolve needs the MSAA texture to contain only the polygon content, then resolve adds it to offscreen. This means MSAA layer needs `Clear` on the MSAA texture and the resolve writes to offscreen. **Wait** — wgpu resolve replaces, not blends. So we need to: (a) copy offscreen to MSAA texture first, (b) draw polygons on top, (c) resolve back. OR: use `Load` on MSAA texture if it shares content with offscreen. **Actually**, the cleanest approach: for MSAA layer 4, clear the MSAA texture, draw polygons, resolve to a TEMP texture, then composite (blend) the temp onto offscreen. This is complex. **Simpler**: skip MSAA resolve for compositing and instead just draw polygons directly to offscreen with a higher sample count. But wgpu doesn't support that easily. **Simplest practical approach**: accept that MSAA resolve overwrites the target region. Since polygons (asteroids, ship) are opaque and fill their area, the resolve overwriting is acceptable — the SDF content underneath (smoke, stars) that overlaps polygon areas would be hidden by the polygon anyway. So `Clear` the MSAA texture, draw polygons, resolve to offscreen, accepting that polygon areas overwrite SDF content beneath them. This is the correct visual result for opaque polygons on top of SDF background layers.
+- **MSAA compositing (layer 4):** wgpu MSAA resolve OVERWRITES the resolve target — it does not alpha-blend. Resolving directly onto offscreen would destroy SDF content from layers 1-3 in non-polygon areas. Solution: resolve to a separate `polygon_resolve_texture`, then alpha-blend it onto offscreen via the `composite_pipeline` (fullscreen triangle pass with alpha blending). This costs one extra texture + one extra draw call but preserves correct compositing. See the updated layer 4 code above.
 
 - [ ] **Step 2: Handle background color** — add `pub clear_color: wgpu::Color` to Renderer2D. Set it in `render_frame` before rendering starts. Use it as the Clear color for the first render pass.
 

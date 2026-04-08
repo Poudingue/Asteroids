@@ -33,25 +33,28 @@ Replace the 2-pass system with an **ordered layer system** inspired by compositi
 ### Render target layout
 
 - **offscreen**: `Rgba16Float`, single-sample — the compositing surface
-- **msaa_texture**: `Rgba16Float`, 4x MSAA — used only during polygon layers (4, 6), resolved onto `offscreen`
+- **msaa_texture**: `Rgba16Float`, 4x MSAA — used only during polygon layers (4, 6)
+- **polygon_resolve_texture**: `Rgba16Float`, single-sample — temp target for MSAA resolve (avoids overwriting offscreen)
 - **swapchain**: final output after postprocess
+
+**MSAA compositing note:** wgpu MSAA resolve OVERWRITES the resolve target — it does not alpha-blend. Resolving directly onto offscreen would destroy SDF content from layers 1-3 in non-polygon areas. Solution: resolve to `polygon_resolve_texture`, then alpha-blend it onto offscreen via a fullscreen composite pass.
 
 **Per-frame sequence:**
 
 ```
-1. Clear offscreen
-2. Layer 0: Draw background rect directly to offscreen (no MSAA)
-3. Layer 1: SDF capsule pass — star trails → offscreen (Load)
-4. Layer 2: SDF capsule pass — bullet trails → offscreen (Load)
-5. Layer 3: SDF circle pass — smoke → offscreen (Load)
-6. Layer 4: Begin MSAA pass → msaa_texture (Clear)
-         Draw all polygon entities (asteroids, fragments, ship)
-         Resolve msaa_texture → offscreen
-7. Layer 5: SDF circle pass — explosions, sparkles → offscreen (Load)
-8. Postprocess pass: tonemap offscreen → swapchain
-9. Layer 6: Begin MSAA pass → msaa_texture (Clear)
-          Draw HUD polygons + SDF glyphs
-          Resolve msaa_texture → swapchain (with HUD tonemap)
+1. Clear offscreen to background color
+2. Layer 1: SDF capsule pass — star trails → offscreen (Load, additive blend)
+3. Layer 2: SDF capsule pass — bullet trails → offscreen (Load, additive blend)
+4. Layer 3: SDF circle pass — smoke → offscreen (Load, alpha blend)
+5. Layer 4: If MSAA on:
+     a. Draw polygon entities → msaa_texture (Clear transparent)
+     b. Resolve msaa_texture → polygon_resolve_texture
+     c. Composite pass: alpha-blend polygon_resolve_texture → offscreen (Load)
+   If MSAA off:
+     Draw polygon entities directly → offscreen (Load, alpha blend)
+6. Layer 5: SDF circle pass — explosions, sparkles → offscreen (Load, additive blend)
+7. Postprocess pass: tonemap offscreen → swapchain
+8. Layer 6: HUD → swapchain (Load, alpha blend, no MSAA)
 ```
 
 Note: Layers 1-3 and layer 5 can potentially be batched into fewer draw calls if they share the same pipeline (SDF circles vs capsules). The layer ordering is logical — the implementation may merge consecutive same-type layers into one draw call with ordered instance data.
