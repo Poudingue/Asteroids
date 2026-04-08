@@ -1,4 +1,5 @@
 pub mod camera;
+pub mod glyphs;
 pub mod color;
 pub mod game;
 pub mod input;
