@@ -148,7 +148,12 @@ impl PauseMenu {
             MenuEntry {
                 label: "Tonemap",
                 kind: MenuEntryKind::Cycle {
-                    labels: &["Passthrough", "Pseudo-Reinhard", "Hard Redirect", "Soft Redirect"],
+                    labels: &[
+                        "Passthrough",
+                        "Pseudo-Reinhard",
+                        "Hard Redirect",
+                        "Soft Redirect",
+                    ],
                     get: |g| g.hdr.tonemap_variant as usize,
                     set: |g, idx| g.hdr.tonemap_variant = idx as u32,
                 },
@@ -190,6 +195,14 @@ impl PauseMenu {
                     get: |g| g.hdr.max_brightness,
                     set: |g, v| g.hdr.max_brightness = v,
                 },
+            },
+            MenuEntry {
+                label: "",
+                kind: MenuEntryKind::Separator,
+            },
+            MenuEntry {
+                label: "Record Scenario",
+                kind: MenuEntryKind::Toggle(GlobalToggle::RecordScenario),
             },
             MenuEntry {
                 label: "",

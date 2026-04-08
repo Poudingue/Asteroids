@@ -483,6 +483,10 @@ pub struct TimeConfig {
     pub pause: bool,
     pub restart: bool,
     pub quit: bool,
+    /// Set true on F12; consumed by the renderer after capture.
+    pub screenshot_requested: bool,
+    /// Toggled by F10 / "Record Scenario" menu entry.
+    pub video_capture_active: bool,
 }
 
 /// Exposure and color overlay state.
@@ -641,6 +645,8 @@ impl Globals {
                 pause: false,
                 restart: false,
                 quit: false,
+                screenshot_requested: false,
+                video_capture_active: false,
             },
             exposure: ExposureConfig {
                 game_exposure: 0.0,
@@ -767,6 +773,7 @@ impl Globals {
             GlobalToggle::DynColor => self.visual.dyn_color,
             GlobalToggle::Hdr => self.hdr.hdr_enabled,
             GlobalToggle::Smaa => self.hdr.smaa_enabled,
+            GlobalToggle::RecordScenario => self.time.video_capture_active,
         }
     }
 
@@ -784,6 +791,7 @@ impl Globals {
             GlobalToggle::DynColor => self.visual.dyn_color = val,
             GlobalToggle::Hdr => self.hdr.hdr_enabled = val,
             GlobalToggle::Smaa => self.hdr.smaa_enabled = val,
+            GlobalToggle::RecordScenario => self.time.video_capture_active = val,
         }
     }
 }
@@ -803,4 +811,5 @@ pub enum GlobalToggle {
     DynColor,
     Hdr,
     Smaa,
+    RecordScenario,
 }
