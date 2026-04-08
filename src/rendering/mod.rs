@@ -80,10 +80,7 @@ pub struct Renderer2D {
     hud_vertices: Vec<Vertex>,
     hud_bind_group: wgpu::BindGroup,
     hud_uniform_buffer: wgpu::Buffer,
-    sdf_circle_pipeline: wgpu::RenderPipeline,
-    sdf_circle_instances: Vec<CircleInstance>,
-    sdf_capsule_pipeline: wgpu::RenderPipeline,
-    sdf_capsule_instances: Vec<CapsuleInstance>,
+    sdf_circle_pipeline: wgpu::RenderPipeline, // alpha-blend circles (smoke, layer 3)
     sdf_bind_group: wgpu::BindGroup,
     // Layer 1: star trails (additive blend capsules)
     pub star_trail_capsules: Vec<CapsuleInstance>,
@@ -215,7 +212,7 @@ impl Renderer2D {
             &postprocess_bind_group_layout,
         );
 
-        // --- SDF circle + capsule pipelines (render into Rgba16Float offscreen texture) ---
+        // --- SDF bind group (shared by all SDF pipelines) ---
         let sdf_bind_group_layout = pipeline::create_screen_size_bind_group_layout(device);
 
         let sdf_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -229,8 +226,6 @@ impl Renderer2D {
 
         let sdf_circle_pipeline =
             pipeline::create_sdf_circle_pipeline(device, &sdf_bind_group_layout);
-        let sdf_capsule_pipeline =
-            pipeline::create_sdf_capsule_pipeline(device, &sdf_bind_group_layout);
 
         // --- Additive SDF pipelines (for trails and explosions) ---
         let sdf_circle_additive_pipeline =
@@ -316,9 +311,6 @@ impl Renderer2D {
             hud_bind_group,
             hud_uniform_buffer,
             sdf_circle_pipeline,
-            sdf_circle_instances: Vec::with_capacity(4096),
-            sdf_capsule_pipeline,
-            sdf_capsule_instances: Vec::with_capacity(2048),
             sdf_bind_group,
             sdf_circle_additive_pipeline,
             sdf_capsule_additive_pipeline,
@@ -499,8 +491,6 @@ impl Renderer2D {
     pub fn begin_frame(&mut self) {
         self.vertices.clear();
         self.hud_vertices.clear();
-        self.sdf_circle_instances.clear();
-        self.sdf_capsule_instances.clear();
         self.clear_color = [0.0, 0.0, 0.0, 1.0];
         self.clear_layer_buffers();
     }
@@ -510,46 +500,6 @@ impl Renderer2D {
     /// and before drawing entity polygon shapes.
     pub fn mark_polygon_start(&mut self) {
         self.polygon_vertex_start = self.vertices.len();
-    }
-
-    pub fn push_circle_instance(
-        &mut self,
-        cx: f32,
-        cy: f32,
-        radius: f32,
-        color: [f32; 4],
-        falloff_width: f32,
-    ) {
-        if radius <= 0.0 {
-            return;
-        }
-        self.sdf_circle_instances.push(CircleInstance {
-            center: [cx, cy],
-            radius,
-            color,
-            falloff_width,
-        });
-    }
-
-    pub fn push_capsule_instance(
-        &mut self,
-        x0: f32,
-        y0: f32,
-        x1: f32,
-        y1: f32,
-        radius: f32,
-        color: [f32; 4],
-    ) {
-        if radius <= 0.0 {
-            return;
-        }
-        self.sdf_capsule_instances.push(CapsuleInstance {
-            p0: [x0, y0],
-            p1: [x1, y1],
-            radius,
-            color,
-            _padding: [0.0; 3],
-        });
     }
 
     // ---- Internal geometry helpers (write to an arbitrary target Vec<Vertex>) ----
@@ -1017,52 +967,6 @@ impl Renderer2D {
             render_pass.set_bind_group(0, &self.sdf_bind_group, &[]);
             render_pass.set_vertex_buffer(0, instance_buffer.slice(..));
             render_pass.draw(0..6, 0..self.effect_circles.len() as u32);
-        }
-
-        // === Legacy SDF pass (kept for compatibility — fields cleared each frame in begin_frame) ===
-        // Once B5 removes these fields, this block is deleted entirely.
-        let has_legacy_sdf =
-            !self.sdf_circle_instances.is_empty() || !self.sdf_capsule_instances.is_empty();
-        if has_legacy_sdf {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Legacy SDF Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.offscreen_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            if !self.sdf_circle_instances.is_empty() {
-                let instance_buffer =
-                    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Legacy SDF Circle Instance Buffer"),
-                        contents: bytemuck::cast_slice(&self.sdf_circle_instances),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
-                render_pass.set_pipeline(&self.sdf_circle_pipeline);
-                render_pass.set_bind_group(0, &self.sdf_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, instance_buffer.slice(..));
-                render_pass.draw(0..6, 0..self.sdf_circle_instances.len() as u32);
-            }
-
-            if !self.sdf_capsule_instances.is_empty() {
-                let capsule_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Legacy SDF Capsule Instance Buffer"),
-                    contents: bytemuck::cast_slice(&self.sdf_capsule_instances),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-                render_pass.set_pipeline(&self.sdf_capsule_pipeline);
-                render_pass.set_bind_group(0, &self.sdf_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, capsule_buffer.slice(..));
-                render_pass.draw(0..6, 0..self.sdf_capsule_instances.len() as u32);
-            }
         }
 
         // === Postprocess: tonemap offscreen → swapchain ===
