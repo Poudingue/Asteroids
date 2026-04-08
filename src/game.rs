@@ -1047,45 +1047,47 @@ pub fn render_frame(
     mouse_sy: f64,
     mouse_down: bool,
 ) {
-    let (w, h) = (renderer.width as i32, renderer.height as i32);
-
-    // Background
-    // Emit HDR value (exposure baked in); GPU post-process applies add_color/mul_color/redirect
+    // Layer 0: Background — set clear_color (HDR, exposure baked in).
+    // GPU post-process applies add_color/mul_color/redirect on top.
+    // No background fill_rect — the clear_color handles it directly.
     let bg = intensify(
         hdr(globals.visual.space_color),
         globals.exposure.game_exposure,
     );
-    let bg_color = [bg.r as f32, bg.g as f32, bg.b as f32, 1.0];
-    renderer.fill_rect(0, 0, w, h, bg_color);
+    renderer.clear_color = [bg.r, bg.g, bg.b, 1.0];
 
-    // Stars
+    // Layer 1: Star trails → star_trail_capsules (additive blend).
+    // Static stars (not moving) use renderer.plot() → vertices; they will appear
+    // in Layer 4 with entity polygons. This is a known limitation — tracked for
+    // a future task that moves static star pixels to a dedicated Layer 1 buffer.
     for star in &state.stars {
         render_star_trail(star, renderer, globals, &mut state.rng);
     }
 
-    // Smoke
+    // Layer 2: Bullet trails → bullet_trail_capsules (additive blend).
+    for p in &state.projectiles {
+        render_projectile(p, renderer, globals, &mut state.rng);
+    }
+
+    // Layer 3: Smoke → smoke_circles (alpha blend, soft falloff).
     for s in &state.smoke {
         render_visuals(s, Vec2::ZERO, renderer, globals);
     }
 
-    // Chunks
-    for chunk in &state.chunks {
-        render_chunk(chunk, renderer, globals);
-    }
+    // Mark where entity polygon vertices start (after stars/smoke/projectile pre-draws).
+    // Any static star pixels in renderer.vertices before this point will NOT be drawn
+    // in Layer 4 — they are in the pre-polygon section skipped by end_frame.
+    renderer.mark_polygon_start();
 
-    // TODO: Sparkles (collision light-trails) — will be added when collision system creates them
-
-    // Projectiles
-    for p in &state.projectiles {
-        render_projectile(p, renderer, globals, &mut state.rng);
-    }
+    // Layer 4: Entity polygons → renderer.vertices (rendered from polygon_vertex_start).
+    // Entities that are circle-only (smoke, explosions) push to layer 3/5 buffers instead.
 
     // Fragments
     for entity in &state.fragments {
         render_visuals(entity, Vec2::ZERO, renderer, globals);
     }
 
-    // Toosmall
+    // Toosmall (small asteroid pieces with polygon shapes)
     for entity in &state.toosmall {
         render_visuals(entity, Vec2::ZERO, renderer, globals);
     }
@@ -1095,12 +1097,21 @@ pub fn render_frame(
         render_visuals(entity, Vec2::ZERO, renderer, globals);
     }
 
-    // Explosions — in front of asteroids, behind ship
+    // Layer 5: Effects → effect_circles (additive blend).
+
+    // Chunks (explosion debris — circle only)
+    for chunk in &state.chunks {
+        render_chunk(chunk, renderer, globals);
+    }
+
+    // Explosions (circle only) — in front of asteroids, behind ship
     for e in &state.explosions {
         render_visuals(e, Vec2::ZERO, renderer, globals);
     }
 
-    // Ship — topmost game object
+    // TODO: Sparkles (collision light-trails) — will be added when collision system creates them
+
+    // Layer 4 (continued, topmost game object): Ship polygon
     let true_aim = state.ship.orientation;
     state.ship.orientation = state.gamepad.visual_aim_angle;
     render_visuals(&state.ship, Vec2::ZERO, renderer, globals);

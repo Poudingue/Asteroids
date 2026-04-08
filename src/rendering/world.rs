@@ -5,7 +5,7 @@ use crate::game::{hdr, to_hdr_rgba};
 use crate::math_utils::*;
 use crate::objects::*;
 use crate::parameters::*;
-use crate::rendering::Renderer2D;
+use crate::rendering::{CapsuleInstance, CircleInstance, Renderer2D};
 
 // ============================================================================
 // Trail rendering
@@ -39,7 +39,7 @@ impl TrailConfig {
 /// Brightness conservation: brightness×area stays constant as circle→capsule.
 /// Scale = π·r² / (π·r² + 2·r·L) = 1 / (1 + 2L/(π·r))
 pub fn render_trail(
-    renderer: &mut Renderer2D,
+    target: &mut Vec<CapsuleInstance>,
     p0: (f64, f64),
     p1: (f64, f64),
     cfg: &TrailConfig,
@@ -76,7 +76,15 @@ pub fn render_trail(
     ];
 
     let radius = (cfg.radius * cfg.shutter_speed).max(1.0) as f32;
-    renderer.push_capsule_instance(x1 as f32, y1 as f32, x2 as f32, y2 as f32, radius, color);
+    if radius > 0.0 {
+        target.push(CapsuleInstance {
+            p0: [x1 as f32, y1 as f32],
+            p1: [x2 as f32, y2 as f32],
+            radius,
+            color,
+            _padding: [0.0; 3],
+        });
+    }
 }
 
 // ============================================================================
@@ -137,13 +145,22 @@ pub fn render_visuals(entity: &Entity, offset: Vec2, renderer: &mut Renderer2D, 
     if visuals.radius > 0.0 && visuals.shapes.is_empty() {
         let color = to_hdr_rgba(intensify(hdr(visuals.color), exposure));
         let (x, y) = dither_vec(position, DITHER_AA, globals.render.current_jitter_double);
-        let r = (visuals.radius * globals.render.render_scale).max(1.0);
-        let falloff = if entity.kind == EntityKind::Smoke {
-            0.2
-        } else {
-            0.0
-        };
-        renderer.push_circle_instance(x as f32, y as f32, r as f32, color, falloff);
+        let r = (visuals.radius * globals.render.render_scale).max(1.0) as f32;
+        if r > 0.0 {
+            let (target, falloff_width) = if entity.kind == EntityKind::Smoke {
+                // Layer 3: smoke — alpha blend, soft falloff
+                (&mut renderer.smoke_circles, 0.2f32)
+            } else {
+                // Layer 5: effects — explosions and other circle-only entities
+                (&mut renderer.effect_circles, 0.0f32)
+            };
+            target.push(CircleInstance {
+                center: [x as f32, y as f32],
+                radius: r,
+                color,
+                falloff_width,
+            });
+        }
     }
 
     // Polygon shapes on top
@@ -169,8 +186,15 @@ pub fn render_chunk(entity: &Entity, renderer: &mut Renderer2D, globals: &Global
         intensity_chunk * globals.exposure.game_exposure * entity.hdr_exposure,
     ));
     let (x, y) = dither_vec(pos, DITHER_AA, globals.render.current_jitter_double);
-    let r = (globals.render.render_scale * entity.visuals.radius).max(1.0);
-    renderer.push_circle_instance(x as f32, y as f32, r as f32, color, 0.0);
+    let r = (globals.render.render_scale * entity.visuals.radius).max(1.0) as f32;
+    if r > 0.0 {
+        renderer.effect_circles.push(CircleInstance {
+            center: [x as f32, y as f32],
+            radius: r,
+            color,
+            falloff_width: 0.0,
+        });
+    }
 }
 
 pub fn render_star_trail(
@@ -241,7 +265,7 @@ pub fn render_star_trail(
             ),
         ));
         render_trail(
-            renderer,
+            &mut renderer.star_trail_capsules,
             (x1 as f64, y1 as f64),
             (x2 as f64, y2 as f64),
             &cfg,
@@ -294,7 +318,7 @@ pub fn render_projectile(
     let cfg = TrailConfig::bullet(radius_px);
     let base_color = to_hdr_rgba(col);
     render_trail(
-        renderer,
+        &mut renderer.bullet_trail_capsules,
         (x1 as f64, y1 as f64),
         (x2 as f64, y2 as f64),
         &cfg,

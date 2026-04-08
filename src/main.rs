@@ -692,7 +692,7 @@ fn main() {
             mouse_y_snap,
             mouse_left_snap,
         );
-        renderer.end_frame(&device, &queue, &view, [0.0, 0.0, 0.0, 1.0]);
+        renderer.end_frame(&device, &queue, &view);
         globals.framerate.frame_compute_secs = frame_start.elapsed().as_secs_f64();
         output.present();
 

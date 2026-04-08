@@ -95,6 +95,8 @@ pub struct Renderer2D {
     pub polygon_vertex_start: usize,
     // Layer 5: effects — explosions, sparkles (additive blend circles)
     pub effect_circles: Vec<CircleInstance>,
+    // Layer 0: background clear color (HDR, set by render_frame each frame)
+    pub clear_color: [f64; 4],
     sdf_circle_additive_pipeline: wgpu::RenderPipeline,
     sdf_capsule_additive_pipeline: wgpu::RenderPipeline,
     blit_to_msaa_pipeline: Option<wgpu::RenderPipeline>,
@@ -327,6 +329,7 @@ impl Renderer2D {
             smoke_circles: Vec::new(),
             polygon_vertex_start: 0,
             effect_circles: Vec::new(),
+            clear_color: [0.0, 0.0, 0.0, 1.0],
             msaa_sample_count: DEFAULT_MSAA_SAMPLE_COUNT,
             msaa_offscreen_texture,
             msaa_offscreen_view,
@@ -498,7 +501,15 @@ impl Renderer2D {
         self.hud_vertices.clear();
         self.sdf_circle_instances.clear();
         self.sdf_capsule_instances.clear();
+        self.clear_color = [0.0, 0.0, 0.0, 1.0];
         self.clear_layer_buffers();
+    }
+
+    /// Snapshot the current vertex count as the polygon_vertex_start.
+    /// Call this after drawing all pre-polygon content (stars, trails, etc.)
+    /// and before drawing entity polygon shapes.
+    pub fn mark_polygon_start(&mut self) {
+        self.polygon_vertex_start = self.vertices.len();
     }
 
     pub fn push_circle_instance(
@@ -796,17 +807,16 @@ impl Renderer2D {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         view: &wgpu::TextureView,
-        clear_color: [f64; 4],
     ) {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
 
         let wgpu_clear = wgpu::Color {
-            r: clear_color[0],
-            g: clear_color[1],
-            b: clear_color[2],
-            a: clear_color[3],
+            r: self.clear_color[0],
+            g: self.clear_color[1],
+            b: self.clear_color[2],
+            a: self.clear_color[3],
         };
 
         // === Layer 0: Clear offscreen to background color ===
