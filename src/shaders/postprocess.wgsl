@@ -149,3 +149,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let mapped = tonemap(hdr_color.rgb);
     return vec4<f32>(mapped, 1.0);
 }
+
+/// Passthrough fragment shader — samples the texture without any tonemapping.
+/// Used by the blit-to-MSAA pipeline to copy the SDF background into the MSAA texture.
+@fragment
+fn fs_passthrough(in: VertexOutput) -> @location(0) vec4<f32> {
+    return textureSample(offscreen_texture, offscreen_sampler, in.uv);
+}

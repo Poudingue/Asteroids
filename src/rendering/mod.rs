@@ -95,6 +95,10 @@ pub struct Renderer2D {
     pub polygon_vertex_start: usize,
     // Layer 5: effects — explosions, sparkles (additive blend circles)
     pub effect_circles: Vec<CircleInstance>,
+    sdf_circle_additive_pipeline: wgpu::RenderPipeline,
+    sdf_capsule_additive_pipeline: wgpu::RenderPipeline,
+    blit_to_msaa_pipeline: Option<wgpu::RenderPipeline>,
+    blit_bind_group: Option<wgpu::BindGroup>,
     msaa_sample_count: u32,
     msaa_offscreen_texture: Option<wgpu::Texture>,
     msaa_offscreen_view: Option<wgpu::TextureView>,
@@ -226,6 +230,43 @@ impl Renderer2D {
         let sdf_capsule_pipeline =
             pipeline::create_sdf_capsule_pipeline(device, &sdf_bind_group_layout);
 
+        // --- Additive SDF pipelines (for trails and explosions) ---
+        let sdf_circle_additive_pipeline =
+            pipeline::create_sdf_circle_additive_pipeline(device, &sdf_bind_group_layout);
+        let sdf_capsule_additive_pipeline =
+            pipeline::create_sdf_capsule_additive_pipeline(device, &sdf_bind_group_layout);
+
+        // --- Blit-to-MSAA pipeline + bind group (only when MSAA is active) ---
+        let (blit_to_msaa_pipeline, blit_bind_group) = if DEFAULT_MSAA_SAMPLE_COUNT > 1 {
+            let blit_pipeline = pipeline::create_blit_to_msaa_pipeline(
+                device,
+                wgpu::TextureFormat::Rgba16Float,
+                DEFAULT_MSAA_SAMPLE_COUNT,
+                &postprocess_bind_group_layout,
+            );
+            let blit_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Blit-to-MSAA Bind Group"),
+                layout: &postprocess_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&offscreen_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&postprocess_sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: postprocess_uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+            (Some(blit_pipeline), Some(blit_bg))
+        } else {
+            (None, None)
+        };
+
         // --- HUD pipeline (renders directly to swapchain, alpha blending, no tonemapping) ---
         let hud_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("HUD Uniform Buffer"),
@@ -277,6 +318,10 @@ impl Renderer2D {
             sdf_capsule_pipeline,
             sdf_capsule_instances: Vec::with_capacity(2048),
             sdf_bind_group,
+            sdf_circle_additive_pipeline,
+            sdf_capsule_additive_pipeline,
+            blit_to_msaa_pipeline,
+            blit_bind_group,
             star_trail_capsules: Vec::new(),
             bullet_trail_capsules: Vec::new(),
             smoke_circles: Vec::new(),
@@ -340,6 +385,28 @@ impl Renderer2D {
                 },
             ],
         });
+
+        // Recreate blit bind group when MSAA is active (references the old offscreen view)
+        if self.blit_bind_group.is_some() {
+            self.blit_bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Blit-to-MSAA Bind Group"),
+                layout: &postprocess_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&self.offscreen_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&self.postprocess_sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: self.postprocess_uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            }));
+        }
     }
 
     /// Recreate the world pipeline and MSAA texture with a new sample count.
