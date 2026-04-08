@@ -1,12 +1,10 @@
 use rand::prelude::*;
 
 use crate::color::*;
-use crate::glyphs::{displace_shape, glyph};
 use crate::game::GameState;
+use crate::glyphs::{displace_shape, glyph};
 use crate::parameters::*;
 use crate::rendering::Renderer2D;
-
-
 
 /// Render a single character at the given bounding quad (physical coords), filled.
 fn render_char(

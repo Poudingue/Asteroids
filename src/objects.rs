@@ -122,4 +122,3 @@ pub fn check_spawn(e: &Entity, phys_w: f64, phys_h: f64) -> bool {
 pub fn check_not_spawn(e: &Entity, phys_w: f64, phys_h: f64) -> bool {
     !check_spawn(e, phys_w, phys_h)
 }
-

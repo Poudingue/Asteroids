@@ -2,10 +2,24 @@ use crate::math::Vec2;
 
 #[derive(Debug, Clone)]
 pub enum FieldSourceKind {
-    ShockwaveRing { speed: f64, width: f64, pressure: f64 },
-    GravityWell { strength: f64, radius: f64 },
-    Vortex { angular_speed: f64, radius: f64 },
-    WindZone { direction: Vec2, strength: f64, radius: f64 },
+    ShockwaveRing {
+        speed: f64,
+        width: f64,
+        pressure: f64,
+    },
+    GravityWell {
+        strength: f64,
+        radius: f64,
+    },
+    Vortex {
+        angular_speed: f64,
+        radius: f64,
+    },
+    WindZone {
+        direction: Vec2,
+        strength: f64,
+        radius: f64,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +78,10 @@ mod tests {
     fn evaluate_with_sources_returns_neutral_stub() {
         let pos = Vec2 { x: 0.0, y: 0.0 };
         let sources = vec![FieldSource {
-            kind: FieldSourceKind::GravityWell { strength: 100.0, radius: 50.0 },
+            kind: FieldSourceKind::GravityWell {
+                strength: 100.0,
+                radius: 50.0,
+            },
             position: Vec2 { x: 10.0, y: 10.0 },
             age: 0.0,
             lifetime: 10.0,

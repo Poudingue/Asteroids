@@ -20,10 +20,18 @@ pub struct TrailConfig {
 
 impl TrailConfig {
     pub fn star() -> Self {
-        TrailConfig { radius: 1.0, brightness_falloff: 1.0, shutter_speed: 1.0 }
+        TrailConfig {
+            radius: 1.0,
+            brightness_falloff: 1.0,
+            shutter_speed: 1.0,
+        }
     }
     pub fn bullet(radius: f64) -> Self {
-        TrailConfig { radius, brightness_falloff: 0.5, shutter_speed: 1.0 }
+        TrailConfig {
+            radius,
+            brightness_falloff: 0.5,
+            shutter_speed: 1.0,
+        }
     }
 }
 
@@ -113,12 +121,7 @@ pub fn render_shapes(
 // ============================================================================
 
 /// Render an entity: base circle + polygon shapes
-pub fn render_visuals(
-    entity: &Entity,
-    offset: Vec2,
-    renderer: &mut Renderer2D,
-    globals: &Globals,
-) {
+pub fn render_visuals(entity: &Entity, offset: Vec2, renderer: &mut Renderer2D, globals: &Globals) {
     let visuals = &entity.visuals;
     let position = scale_vec(
         add_vec(
@@ -135,7 +138,11 @@ pub fn render_visuals(
         let color = to_hdr_rgba(intensify(hdr(visuals.color), exposure));
         let (x, y) = dither_vec(position, DITHER_AA, globals.render.current_jitter_double);
         let r = (visuals.radius * globals.render.render_scale).max(1.0);
-        let falloff = if entity.kind == EntityKind::Smoke { 0.2 } else { 0.0 };
+        let falloff = if entity.kind == EntityKind::Smoke {
+            0.2
+        } else {
+            0.0
+        };
         renderer.push_circle_instance(x as f32, y as f32, r as f32, color, falloff);
     }
 
@@ -151,11 +158,7 @@ pub fn render_visuals(
 }
 
 /// Render a chunk (small debris) — simpler than full entity rendering
-pub fn render_chunk(
-    entity: &Entity,
-    renderer: &mut Renderer2D,
-    globals: &Globals,
-) {
+pub fn render_chunk(entity: &Entity, renderer: &mut Renderer2D, globals: &Globals) {
     let pos = scale_vec(
         add_vec(entity.position, globals.screenshake.game_screenshake_pos),
         globals.render.render_scale,
@@ -227,11 +230,23 @@ pub fn render_star_trail(
         let base_color = to_hdr_rgba(hdr_add(
             star_color_tmp,
             hdr_add(
-                intensify(hdr(globals.visual.space_color), globals.exposure.game_exposure),
-                intensify(hdr(globals.exposure.add_color), globals.exposure.game_exposure),
+                intensify(
+                    hdr(globals.visual.space_color),
+                    globals.exposure.game_exposure,
+                ),
+                intensify(
+                    hdr(globals.exposure.add_color),
+                    globals.exposure.game_exposure,
+                ),
             ),
         ));
-        render_trail(renderer, (x1 as f64, y1 as f64), (x2 as f64, y2 as f64), &cfg, base_color);
+        render_trail(
+            renderer,
+            (x1 as f64, y1 as f64),
+            (x2 as f64, y2 as f64),
+            &cfg,
+            base_color,
+        );
     }
 }
 
@@ -278,7 +293,13 @@ pub fn render_projectile(
 
     let cfg = TrailConfig::bullet(radius_px);
     let base_color = to_hdr_rgba(col);
-    render_trail(renderer, (x1 as f64, y1 as f64), (x2 as f64, y2 as f64), &cfg, base_color);
+    render_trail(
+        renderer,
+        (x1 as f64, y1 as f64),
+        (x2 as f64, y2 as f64),
+        &cfg,
+        base_color,
+    );
 }
 
 #[cfg(test)]
@@ -298,7 +319,11 @@ mod trail_config_tests {
     }
     #[test]
     fn trail_config_shutter_zero_means_no_trail() {
-        let cfg = TrailConfig { radius: 5.0, brightness_falloff: 0.5, shutter_speed: 0.0 };
+        let cfg = TrailConfig {
+            radius: 5.0,
+            brightness_falloff: 0.5,
+            shutter_speed: 0.0,
+        };
         assert!((cfg.shutter_speed).abs() < 1e-9);
     }
 }
@@ -377,7 +402,10 @@ mod brightness_conservation_tests {
     fn scale_approaches_zero_for_infinite_trail() {
         // Very long trail relative to radius → scale approaches 0
         let scale = area_scale(1.0, 1_000_000.0);
-        assert!(scale < 0.001, "scale={scale} should approach 0 for very long trail");
+        assert!(
+            scale < 0.001,
+            "scale={scale} should approach 0 for very long trail"
+        );
     }
 
     #[test]
@@ -391,7 +419,13 @@ mod brightness_conservation_tests {
         let s1 = area_scale(1.0, 10.0);
         let s2 = area_scale(2.0, 20.0);
         let s3 = area_scale(0.5, 5.0);
-        assert!((s1 - s2).abs() < 1e-10, "Should be scale-invariant: s1={s1}, s2={s2}");
-        assert!((s1 - s3).abs() < 1e-10, "Should be scale-invariant: s1={s1}, s3={s3}");
+        assert!(
+            (s1 - s2).abs() < 1e-10,
+            "Should be scale-invariant: s1={s1}, s2={s2}"
+        );
+        assert!(
+            (s1 - s3).abs() < 1e-10,
+            "Should be scale-invariant: s1={s1}, s3={s3}"
+        );
     }
 }

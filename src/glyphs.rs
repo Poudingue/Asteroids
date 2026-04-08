@@ -589,7 +589,11 @@ pub fn glyph(c: char) -> Vec<(f64, f64)> {
 /// top = lerp_vec(p2, p1, rely) = p2*rely + p1*(1-rely)
 /// bot = lerp_vec(p3, p0, rely) = p3*rely + p0*(1-rely)
 /// result = lerp_vec(top, bot, relx) = top*relx + bot*(1-relx)
-pub fn displacement(encadrement: &[(f64, f64); 4], rel: (f64, f64), render_scale: f64) -> (f64, f64) {
+pub fn displacement(
+    encadrement: &[(f64, f64); 4],
+    rel: (f64, f64),
+    render_scale: f64,
+) -> (f64, f64) {
     let (relx, rely) = rel;
     let [p0, p1, p2, p3] = encadrement;
     // lerp_vec a b ratio = a*ratio + b*(1-ratio)

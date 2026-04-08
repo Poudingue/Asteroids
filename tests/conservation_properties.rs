@@ -7,14 +7,14 @@ use asteroids::math_utils::{add_vec, magnitude, scale_vec, squared, Vec2};
 ///
 /// Goal: document violations, not hide them.
 use asteroids::objects::Entity;
-use asteroids::spawning::{
-    fragment_asteroid, spawn_asteroid, spawn_explosion, spawn_explosion_chunk, spawn_fragments,
-    spawn_n_chunks, spawn_projectile,
-};
 use asteroids::parameters::{
     Globals, ASTEROID_DENSITY, ASTEROID_MIN_SIZE, CHUNKS_EXPLO_MAX_SPEED, FRAGMENT_NUMBER,
 };
 use asteroids::physics::consequences_collision;
+use asteroids::spawning::{
+    fragment_asteroid, spawn_asteroid, spawn_explosion, spawn_explosion_chunk, spawn_fragments,
+    spawn_n_chunks, spawn_projectile,
+};
 use rand::thread_rng;
 use std::f64::consts::PI;
 

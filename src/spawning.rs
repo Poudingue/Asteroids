@@ -262,7 +262,10 @@ pub fn spawn_explosion(projectile: &Entity, rng: &mut impl Rng) -> Entity {
         phys_ratio: 0.0,
         position: projectile.position,
         velocity: {
-            let rand_vel = from_polar(rng.gen::<f64>() * 2.0 * PI, rng.gen::<f64>() * SMOKE_MAX_SPEED);
+            let rand_vel = from_polar(
+                rng.gen::<f64>() * 2.0 * PI,
+                rng.gen::<f64>() * SMOKE_MAX_SPEED,
+            );
             crate::math_utils::add_vec(projectile.velocity, rand_vel)
         },
         orientation: 0.0,
@@ -338,7 +341,10 @@ pub fn spawn_explosion_object(
         phys_ratio: 0.0,
         position: obj.position,
         velocity: {
-            let rand_vel = from_polar(rng.gen::<f64>() * 2.0 * PI, rng.gen::<f64>() * SMOKE_MAX_SPEED);
+            let rand_vel = from_polar(
+                rng.gen::<f64>() * 2.0 * PI,
+                rng.gen::<f64>() * SMOKE_MAX_SPEED,
+            );
             crate::math_utils::add_vec(obj.velocity, rand_vel)
         },
         orientation: 0.0,
@@ -376,7 +382,10 @@ pub fn spawn_explosion_death(ship: &Entity, elapsed_time: f64, rng: &mut impl Rn
         phys_ratio: 0.0,
         position: ship.position,
         velocity: {
-            let rand_vel = from_polar(rng.gen::<f64>() * 2.0 * PI, rng.gen::<f64>() * SMOKE_MAX_SPEED);
+            let rand_vel = from_polar(
+                rng.gen::<f64>() * 2.0 * PI,
+                rng.gen::<f64>() * SMOKE_MAX_SPEED,
+            );
             crate::math_utils::add_vec(ship.velocity, rand_vel)
         },
         orientation: 0.0,
@@ -439,7 +448,10 @@ pub fn spawn_chunk_explosion(
         phys_ratio: 0.0,
         position: obj.position,
         velocity: {
-            let rand_vel = from_polar(rng.gen::<f64>() * 2.0 * PI, rng.gen::<f64>() * SMOKE_MAX_SPEED);
+            let rand_vel = from_polar(
+                rng.gen::<f64>() * 2.0 * PI,
+                rng.gen::<f64>() * SMOKE_MAX_SPEED,
+            );
             crate::math_utils::add_vec(obj.velocity, rand_vel)
         },
         orientation: 0.0,
@@ -520,8 +532,9 @@ pub fn spawn_fire(ship: &Entity, thrust_angle: f64, rng: &mut impl Rng) -> Entit
             // Backward kick scales with ship speed so fire always ejects visually
             let ship_speed =
                 (ship.velocity.x * ship.velocity.x + ship.velocity.y * ship.velocity.y).sqrt();
-            let kick =
-                ship_speed * FIRE_SPEED_RATIO + FIRE_MIN_SPEED + rng.gen::<f64>() * (FIRE_MAX_SPEED - FIRE_MIN_SPEED);
+            let kick = ship_speed * FIRE_SPEED_RATIO
+                + FIRE_MIN_SPEED
+                + rng.gen::<f64>() * (FIRE_MAX_SPEED - FIRE_MIN_SPEED);
             add_vec(
                 ship.velocity,
                 add_vec(
@@ -712,9 +725,9 @@ pub fn spawn_stars(n: i32, phys_w: f64, phys_h: f64, rng: &mut impl Rng) -> Vec<
 #[cfg(test)]
 mod smoke_velocity_tests {
     use super::*;
-    use rand::SeedableRng;
-    use rand::rngs::SmallRng;
     use crate::math::Vec2;
+    use rand::rngs::SmallRng;
+    use rand::SeedableRng;
 
     fn make_entity_at_velocity(vx: f64, vy: f64) -> crate::objects::Entity {
         let mut e = spawn_ship();
@@ -757,16 +770,19 @@ mod ship_color_tests {
         let (r, g, b) = ship.visuals.color;
         assert!(r > g * 5.0, "ship red={r} not dominant over green={g}");
         assert!(r > b * 5.0, "ship red={r} not dominant over blue={b}");
-        assert!(r > 255.0, "ship red={r} should exceed 255 for HDR wide gamut");
+        assert!(
+            r > 255.0,
+            "ship red={r} should exceed 255 for HDR wide gamut"
+        );
     }
 }
 
 #[cfg(test)]
 mod fire_velocity_tests {
     use super::*;
-    use rand::SeedableRng;
-    use rand::rngs::SmallRng;
     use crate::math::Vec2;
+    use rand::rngs::SmallRng;
+    use rand::SeedableRng;
 
     #[test]
     fn fire_ejects_backward_relative_to_ship_at_high_speed() {
@@ -782,7 +798,8 @@ mod fire_velocity_tests {
             assert!(
                 fire.velocity.x < ship.velocity.x,
                 "fire.vx={} >= ship.vx={}: fire appears in front of ship",
-                fire.velocity.x, ship.velocity.x
+                fire.velocity.x,
+                ship.velocity.x
             );
         }
     }
