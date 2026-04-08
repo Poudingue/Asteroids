@@ -85,6 +85,16 @@ pub struct Renderer2D {
     sdf_capsule_pipeline: wgpu::RenderPipeline,
     sdf_capsule_instances: Vec<CapsuleInstance>,
     sdf_bind_group: wgpu::BindGroup,
+    // Layer 1: star trails (additive blend capsules)
+    pub star_trail_capsules: Vec<CapsuleInstance>,
+    // Layer 2: bullet trails (additive blend capsules)
+    pub bullet_trail_capsules: Vec<CapsuleInstance>,
+    // Layer 3: smoke (alpha blend circles)
+    pub smoke_circles: Vec<CircleInstance>,
+    // Layer 4: polygons — track where entity polygons start in vertices buffer
+    pub polygon_vertex_start: usize,
+    // Layer 5: effects — explosions, sparkles (additive blend circles)
+    pub effect_circles: Vec<CircleInstance>,
     msaa_sample_count: u32,
     msaa_offscreen_texture: Option<wgpu::Texture>,
     msaa_offscreen_view: Option<wgpu::TextureView>,
@@ -267,6 +277,11 @@ impl Renderer2D {
             sdf_capsule_pipeline,
             sdf_capsule_instances: Vec::with_capacity(2048),
             sdf_bind_group,
+            star_trail_capsules: Vec::new(),
+            bullet_trail_capsules: Vec::new(),
+            smoke_circles: Vec::new(),
+            polygon_vertex_start: 0,
+            effect_circles: Vec::new(),
             msaa_sample_count: DEFAULT_MSAA_SAMPLE_COUNT,
             msaa_offscreen_texture,
             msaa_offscreen_view,
@@ -403,11 +418,20 @@ impl Renderer2D {
         );
     }
 
+    pub fn clear_layer_buffers(&mut self) {
+        self.star_trail_capsules.clear();
+        self.bullet_trail_capsules.clear();
+        self.smoke_circles.clear();
+        self.polygon_vertex_start = 0;
+        self.effect_circles.clear();
+    }
+
     pub fn begin_frame(&mut self) {
         self.vertices.clear();
         self.hud_vertices.clear();
         self.sdf_circle_instances.clear();
         self.sdf_capsule_instances.clear();
+        self.clear_layer_buffers();
     }
 
     pub fn push_circle_instance(
