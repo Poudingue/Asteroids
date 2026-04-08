@@ -43,7 +43,6 @@ pub fn render_string(
     let mut x0 = pos.0;
     let y0 = pos.1;
     for c in s.chars() {
-        let c = c.to_ascii_uppercase();
         let sx0 = if shake > 0.0 {
             rand_range(-shake, shake, rng)
         } else {
