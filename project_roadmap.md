@@ -17,8 +17,16 @@ wgpu pipeline, SDF shapes, HDR surface (sRGB ↔ Rgba16Float), tonemap variants 
 
 ---
 
-## Phase 2 — Rendering Correctness ⬜
+## Phase 2 — Rendering Correctness 🔄
 Fix the rendering pipeline before adding more features on top of a shaky foundation.
+
+**Wave 1 — Code Restructure & Capture Tooling ✅** (completed 2026-04-08)
+- Code restructure: update.rs, spawning.rs, pipeline.rs, textures.rs, glyphs.rs extracted
+- Capture tooling: VideoCapture, save_png, GameStateSnapshot implemented
+- Field groundwork: field.rs with FieldSource/FieldSample types
+
+**Wave 2 — Layer Renderer & i18n** (next)
+**Wave 3 — SSAA & Visual Fixes** (following)
 
 **Goals:**
 - Layer order: background → stars → smoke → chunks → sparkles (collision light-trails, intensity ∝ collision force) → bullets → asteroids → explosions → ship

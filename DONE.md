@@ -1,5 +1,11 @@
 # Asteroids Rust Port - Completed Items
 
+## Mega-Push Wave 1 — Code Restructure & Capture Tooling (2026-04-08)
+
+- [x] [architecture] Wave 1: Code restructure — extracted update.rs, spawning.rs, pipeline.rs, textures.rs, glyphs.rs from large files (completed: 2026-04-08)
+- [x] [testing] Wave 1: Capture tooling — capture.rs with VideoCapture, save_png, GameStateSnapshot, pause menu toggle (completed: 2026-04-08)
+- [x] [architecture] Wave 1: Field groundwork — field.rs with FieldSource/FieldSample types, evaluate_field stub (completed: 2026-04-08)
+
 ## Phase 2A — Rendering Visual Quality (2026-04-07)
 
 - [x] [rendering] Fix rendering layer order: ship now renders on top of all game objects (completed: 2026-04-07)

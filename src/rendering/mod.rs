@@ -752,12 +752,7 @@ impl Renderer2D {
         self.hud_fill_rect(x, y, 1, 1, color);
     }
 
-    pub fn end_frame(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        view: &wgpu::TextureView,
-    ) {
+    pub fn end_frame(&self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
@@ -854,8 +849,10 @@ impl Renderer2D {
         // === Layer 4: Polygon entities (world geometry) ===
         // Upload all vertices (background + entity polygons) once.
         // Only draw the entity polygon slice [polygon_vertex_start..end].
-        let polygon_vertex_count =
-            self.vertices.len().saturating_sub(self.polygon_vertex_start);
+        let polygon_vertex_count = self
+            .vertices
+            .len()
+            .saturating_sub(self.polygon_vertex_start);
         if polygon_vertex_count > 0 {
             let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Polygon Vertex Buffer"),

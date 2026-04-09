@@ -21,6 +21,7 @@
 - [ ] [rendering] Merge "exposure" and "game exposure" into single "exposure" slider � game exposure is internal state only (affected by events), not user-adjustable. Remove separate game_exposure slider from pause menu (severity: major, 2026-04-07)
 - [ ] [rendering/hdr] Clarify max_brightness role: it IS the tonemap threshold � for pseudo-Reinhard it's the target at +infinity input. Ensure all tonemap variants use it correctly as their threshold parameter (severity: major, 2026-04-07)
 
+- [x] [rendering] Bind group layout duplication in Renderer2D::resize() — discovered during code review, removed redundant layouts (severity: minor, 2026-04-08)
 - [ ] [rendering] Document that MSAA only affects polygon geometry (ship/asteroid edges), not SDF circles/capsules. MSAA stays for polygon AA (severity: minor, 2026-04-06)
 - [ ] [rendering] SMAA post-process AA — optional pass between scene render and final output. Complements MSAA (geometry) and SSAA (supersample). All three independently toggleable and stackable. Pipeline order: MSAA scene -> SMAA post-process -> SSAA downsample (severity: major, 2026-04-07)
 - [ ] [rendering] SSAA modes (4x, 9x, 16x) — render offscreen at higher resolution, downsample in postprocess. Purpose: generate pixel-perfect reference renders for visual comparison via screenshot tools. Optional, default Off (severity: major, 2026-04-06)
