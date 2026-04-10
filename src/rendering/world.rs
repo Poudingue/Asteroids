@@ -59,12 +59,14 @@ pub fn render_trail(
         pi_r2 / (pi_r2 + 2.0 * r * trail_len)
     };
 
-    let trail_lum = if cfg.brightness_falloff <= 0.0 {
+    // brightness_falloff: optional gentle artistic dimming on top of area conservation.
+    // 0.0 = no extra dimming; >0 applies a mild additional falloff for long trails.
+    let trail_lum = if cfg.brightness_falloff <= 0.0 || trail_len < 0.001 {
         1.0
-    } else if cfg.brightness_falloff >= 1.0 {
-        (1.0 / (1.0 + trail_len)).sqrt()
     } else {
-        cfg.brightness_falloff * (r / (r + trail_len)).sqrt()
+        // Mild falloff: attenuate gently so trails remain visible in HDR pipeline
+        let t = (trail_len / (r * 20.0)).min(1.0);
+        (1.0 - t * cfg.brightness_falloff * 0.4).max(0.2)
     };
 
     let combined_scale = (area_scale * trail_lum) as f32;

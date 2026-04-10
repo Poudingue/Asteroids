@@ -665,8 +665,8 @@ impl Globals {
                 variable_exposure: true,
                 space_color: (0.0, 0.0, 0.0),
                 space_color_goal: (0.0, 0.0, 0.0),
-                star_color: (100.0, 100.0, 100.0),
-                star_color_goal: (100.0, 100.0, 100.0),
+                star_color: (800.0, 800.0, 800.0),
+                star_color_goal: (800.0, 800.0, 800.0),
             },
             render: RenderState {
                 render_scale,
