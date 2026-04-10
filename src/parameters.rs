@@ -515,6 +515,14 @@ pub struct HdrConfig {
     pub tonemap_variant: u32,
 }
 
+impl HdrConfig {
+    /// Returns the exposure value scaled to the GPU uniform range (0.0–1.0 → 0.0–0.1).
+    /// The shader expects values in this range; the user-facing `exposure` field uses [0, 1].
+    pub fn render_exposure(&self) -> f32 {
+        self.exposure as f32 * 0.1
+    }
+}
+
 impl Default for HdrConfig {
     fn default() -> Self {
         Self {
@@ -665,8 +673,8 @@ impl Globals {
                 variable_exposure: true,
                 space_color: (0.0, 0.0, 0.0),
                 space_color_goal: (0.0, 0.0, 0.0),
-                star_color: (800.0, 800.0, 800.0),
-                star_color_goal: (800.0, 800.0, 800.0),
+                star_color: (3000.0, 3000.0, 3000.0),
+                star_color_goal: (3000.0, 3000.0, 3000.0),
             },
             render: RenderState {
                 render_scale,

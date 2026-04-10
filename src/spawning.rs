@@ -142,7 +142,7 @@ pub fn spawn_projectile(position: Vec2, velocity: Vec2, proper_time: f64) -> Ent
         orientation: 0.0,
         moment: 0.0,
         proper_time,
-        hdr_exposure: 4.0,
+        hdr_exposure: 40.0,
     }
 }
 
@@ -209,7 +209,7 @@ pub fn spawn_explosion_chunk(
         orientation: 0.0,
         moment: 0.0,
         proper_time,
-        hdr_exposure: 4.0,
+        hdr_exposure: 40.0,
     }
 }
 

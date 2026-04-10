@@ -1,6 +1,7 @@
 /// Return the polygon (as list of relative coords in [0,1]x[0,1]) for a given character.
 /// Each character is a single closed polyline matched exactly to the OCaml shape_char.
 fn shape_char(c: char) -> Vec<(f64, f64)> {
+    let c = c.to_ascii_uppercase();
     match c {
         '0' => vec![
             (0.25, 0.),
@@ -565,6 +566,7 @@ fn shape_char(c: char) -> Vec<(f64, f64)> {
             (0.65, 0.),
             (0.35, 0.),
         ],
+        '^' => vec![(0.5, 0.0), (1.0, 0.6), (0.85, 0.6), (0.5, 0.15), (0.15, 0.6), (0.0, 0.6)],
         _ => vec![],
     }
 }

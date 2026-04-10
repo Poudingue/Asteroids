@@ -1,5 +1,12 @@
 # Asteroids Rust Port - Completed Items
 
+## Visual Fixes (2026-04-10)
+
+- [x] [rendering] Glyph squares in pause menu — lowercase chars now map via `to_ascii_uppercase()`; added `^` glyph (completed: 2026-04-10)
+- [x] [rendering/hdr] Base exposure rescale — `HdrConfig::render_exposure()` applies 0.1× scale factor, slider 1.0 → GPU 0.1 (completed: 2026-04-10)
+- [x] [rendering] Bullet hdr_exposure boosted 4.0 → 40.0 to compensate for exposure rescale (completed: 2026-04-10)
+- [x] [rendering] Star colors boosted to (3000, 3000, 3000) for HDR visibility (completed: 2026-04-10)
+
 ## Mega-Push Wave 1 — Code Restructure & Capture Tooling (2026-04-08)
 
 - [x] [architecture] Wave 1: Code restructure — extracted update.rs, spawning.rs, pipeline.rs, textures.rs, glyphs.rs from large files (completed: 2026-04-08)

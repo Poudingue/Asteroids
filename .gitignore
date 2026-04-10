@@ -8,3 +8,6 @@ SDL2.dll
 # IDE / tool config
 .claude/
 .serena/
+
+# Crash dumps
+*.stackdump

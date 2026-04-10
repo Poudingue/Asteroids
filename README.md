@@ -1,12 +1,12 @@
 # Asteroids
 
-A from-scratch Rust port of the classic arcade game, originally written in OCaml. Collision physics, advanced visual effects, and a solid gameplay loop.
+A from-scratch Rust port of the classic arcade game, originally written in OCaml. Custom GPU renderer, advanced visual effects, and a solid gameplay loop.
 
-**V1** is tagged and stable on `master`. **V2 refactor** is actively in progress — see roadmap below.
+**V1** is tagged and stable. **V2 refactor** is actively in progress — see roadmap below.
 
 ## Stack
 
-- **Rendering**: [wgpu](https://wgpu.rs/) (Vulkan backend) — immediate-mode 2D renderer
+- **Rendering**: [wgpu](https://wgpu.rs/) (Vulkan backend) — layered compositing 2D renderer
 - **Windowing / input**: SDL2 (uses `create_surface_unsafe` — SDL2 `Window` carries an `Rc`, not `Sync`)
 - **Language**: Rust, custom HDR-ready linear color pipeline
 
@@ -16,16 +16,37 @@ A from-scratch Rust port of the classic arcade game, originally written in OCaml
 
 ## Features
 
+### Rendering
+- **Layered compositing pipeline** — 7-layer render graph: background → star trails → smoke → polygons → effect explosions → tonemap → HUD
+- **HDR rendering** with configurable tonemapping variants and exposure slider
+- **SDF rendering** for circles and capsules (smoke, trails, explosions) with soft falloff
+- **Additive blending** for trails and explosion effects
+- **Polygon MSAA** — ship and asteroids render into an MSAA buffer, resolved and composited onto the offscreen target
+- **Glyph-based text rendering** — HUD text drawn as polygon outlines; no font files required
+
+### Gameplay
 - Fullscreen with 16:9 safe zone (F11 or Alt+Enter to toggle)
 - Screenshake on damage and explosions
+- **Explosion shockwave push** — nearby entities receive an outward impulse on asteroid destruction
 - Explosion chunk trails
 - Dynamic color effects (shield flash, damage pulse, engine fire)
-- Scancode-based input — layout-independent (AZERTY/QWERTY both work)
-- Pause menu with toggleable visual options
 - Death phase: controllable burning wreck before respawn
 - Teleport (Space) with cooldown
-- HUD bars (health, boost, etc.) and FPS counter
 - Wave system: asteroid count and speed scale per stage
+
+### Input & Controls
+- **Gamepad support** — world-space controls (aim with right stick, all actions mapped)
+- Scancode-based keyboard input — layout-independent (AZERTY/QWERTY both work)
+
+### HUD & Menus
+- **Pause menu** with toggle, cycle, and slider entry types — configure tonemapping, exposure, visual options
+- HUD bars (health, boost, etc.) and FPS counter
+- HUD shares the same HDR tonemap curve as the scene
+
+### Engine
+- **Fixed-dt deterministic simulation** — physics runs at a fixed timestep, decoupled from render rate
+- **i18n groundwork** — locale system with `.ron` locale files (English wired in)
+- **Video capture support** — snapshot and PNG export for testing/recording
 
 ## Build & Run
 
@@ -37,6 +58,8 @@ cargo run --release
 ```
 
 ## Controls
+
+### Keyboard
 
 | Key | Action |
 |-----|--------|
@@ -51,31 +74,44 @@ cargo run --release
 
 Keys are scancode-based — physical position matters, not label. ZQSD (AZERTY) and WASD (QWERTY) both work out of the box.
 
+### Gamepad
+
+| Input | Action |
+|-------|--------|
+| Left stick | Thrust / rotate |
+| Right stick | Aim (world-space) |
+| Right trigger | Fire |
+| Face button (South) | Teleport |
+| Start | Pause |
+
 ## Module Structure
 
 ```
 src/
 ├─ main.rs          — SDL2/wgpu init, game loop, event handling
-├─ lib.rs           — Module declarations
-├─ game.rs          — GameState, update_game, render_frame orchestration
-├─ math.rs          — Vec2 struct with std::ops
-├─ math_utils.rs    — Math helper functions
-├─ color.rs         — HdrColor, color pipeline
-├─ objects.rs       — Entity types and spawn functions
-├─ parameters.rs    — Globals, game constants (split into sub-structs)
-├─ input.rs         — Player input handling
+├─ lib.rs           — Dual lib+bin crate, module declarations
+├─ game.rs          — GameState and render_frame orchestration
+├─ update.rs        — Simulation update logic
+├─ spawning.rs      — Entity spawning functions
+├─ input.rs         — Keyboard, mouse, and gamepad input
 ├─ camera.rs        — Predictive camera system
-├─ pause_menu.rs    — Pause UI and button system
-├─ rendering/       — Render pipeline
-│   ├─ mod.rs       — Renderer2D
-│   ├─ world.rs     — Entity rendering
-│   └─ hud.rs       — HUD, text, bars
-├─ physics/         — Collision system
+├─ pause_menu.rs    — Pause UI (toggle/cycle/slider items)
+├─ capture.rs       — Video capture, PNG export, snapshot testing
+├─ field.rs         — Distortion field system (groundwork)
+├─ locale.rs        — i18n skeleton and locale loading
+├─ locales/
+│   └─ en.ron       — English locale strings
+├─ math.rs          — Vec2, HdrColor, matrix utilities
+├─ rendering/
+│   ├─ pipeline.rs  — GPU pipeline setup, pass orchestration
+│   ├─ textures.rs  — Texture resources, SDF atlases, offscreen targets
+│   ├─ glyphs.rs    — Glyph rendering (polygon glyphs, character lookup)
+│   └─ postprocess.wgsl — Tonemap, color effects, SSAA compositing
+├─ physics/
 │   ├─ mod.rs       — Spatial grid infrastructure
 │   ├─ collision.rs — Detection primitives
-│   └─ response.rs  — Damage, elastic bounce
-└─ shaders/
-    └─ shader.wgsl  — Vertex/fragment shader
+│   └─ response.rs  — Damage, elastic bounce, shockwave push
+└─ util/            — Configuration, RON scenarios, test helpers
 ```
 
 ## Testing
@@ -89,39 +125,27 @@ cargo test --test conservation_properties  # Physics conservation tests
 
 ## V2 Roadmap
 
-V2 is a full architectural overhaul with no behavior changes in Phase 0. All behavior remains constant-driven — every tunable value lives in `parameters.rs`.
+V2 is a full architectural overhaul targeting a modern GPU rendering pipeline and richer gameplay. All tunable values live in `parameters.rs`.
 
 | Phase | Name | Status | Summary |
 |-------|------|--------|---------|
-| 0 | Foundation | ~80% | Module extraction, Vec2, HdrColor, French→English rename, 290+ tests |
-| 1 | Rendering | Planned | Multi-pass pipeline (offscreen HDR), SDF circles, post-process quad |
-| 2 | Physics | Planned | parry2d polygon collisions, game owns collision response |
-| 3 | Camera & Zoom | Planned | Ship zone tracking, dynamic zoom uniform in vertex shader |
-| 4 | GPU Particles | Planned | Compute shader particle pool (chunks, smoke, fire, sparks) |
-| 5 | Weapons | Planned | 3 weapon types, scroll-wheel switch, HUD indicators |
-| 6 | HDR Output | Planned | Optional HDR display path, calibration menu (150 nits default) |
-
-### Phase 0 progress
-
-- [x] Dual lib+bin crate (`src/lib.rs`)
-- [x] Exhaustive safety-net tests (290+)
-- [x] `Vec2` struct replacing `(f64, f64)` tuples throughout
-- [x] `HdrColor` field renamed `.g` (was `.v`), operator impls added
-- [x] French → English identifier rename (71 identifiers)
-- [x] Extract `input.rs`, `camera.rs`, `pause_menu.rs` from `game.rs`
-- [x] Extract `rendering/` modules from `game.rs`
-- [x] Extract `physics/` modules from `game.rs`
-- [x] `MAX_DT = 50ms` cap to prevent physics explosions on frame stalls
-- [x] Physics conservation tests (mass, momentum, energy — violations documented)
-- [ ] `Globals` config restructure (split into typed sub-structs — in progress)
-- [ ] Bug fixes (raw pointers, dead code, `EntityKind` dedup)
+| 0 | Foundation | ✅ Complete | Module extraction, Vec2, HdrColor, 290+ tests |
+| 1 | Rendering Foundation | ✅ Complete | Multi-pass HDR pipeline, SDF circles, post-process quad |
+| 2A | Rendering Visual Quality | ✅ Complete | Layered compositing, additive blend, trail system, HUD tonemap |
+| 2B | AA & Tooling | ✅ Complete | Polygon MSAA, capture tooling, code restructure |
+| 3 | Camera & Zoom | Planned | Ship zone tracking, dynamic zoom |
+| 4 | Physics | Planned | parry2d polygon collisions, distortion fields |
+| 5 | GPU Particles | Planned | Compute shader particle pool |
+| 6 | Weapons | Planned | 3 weapon types, scroll-wheel switch, HUD indicators |
+| 7 | i18n & Glyphs | Planned | Extended character sets, locale files |
+| 8 | Haptics | Planned | Gamepad vibration |
+| 9 | Audio | Planned | Synthesized engine sounds |
 
 ## Branches & Tags
 
 | Ref | Description |
 |-----|-------------|
-| `master` | Stable (V1 complete, V2 merges in) |
-| `v2-phase0-foundation` | Active V2 work |
+| `master` | Main branch (V1 tagged, V2 merges in) |
 | `ocaml` | Historical OCaml version |
 | `v1` | V1 release tag |
 
